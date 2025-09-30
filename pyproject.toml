@@ -1,0 +1,22 @@
+[project]
+name = "tq-oracle"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dotenv>=0.9.9",
+    "requests>=2.32.5",
+    "typer>=0.19.2",
+    "web3>=7.13.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyrefly>=0.35.0",
+    "pytest>=8.4.2",
+    "ruff>=0.13.2",
+]
+
+[tool.pyrefly]
+project-includes = ["src","tests"]
