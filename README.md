@@ -18,11 +18,12 @@ cd tq-oracle
 # Install dependencies
 uv sync
 
-# Activate virtual environment (if not using uv run)
-source .venv/bin/activate
 ```
 
 ## Usage
+
+> [!IMPORTANT]
+> The following is **INTENDED** function surface but not actually in place yet.
 
 ### Basic Command
 
