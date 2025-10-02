@@ -183,15 +183,6 @@ The adapter will be automatically discovered and executed!
   ]
 }
 ```
-
-## Security Considerations
-
-- **Private Keys**: Always use environment variables, never commit to git
-- **Dry-run Default**: Application defaults to dry-run mode for safety
-- **RPC Endpoints**: Use trusted RPC providers
-- **Transaction Validation**: Review dry-run output before execution
-- **Gas Limits**: Monitor transaction gas costs (future enhancement)
-
 ## Development
 
 ```bash
