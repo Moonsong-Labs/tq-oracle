@@ -20,3 +20,10 @@ dev = [
 
 [tool.pyrefly]
 project-includes = ["src","tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

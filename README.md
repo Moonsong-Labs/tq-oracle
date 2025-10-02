@@ -32,7 +32,7 @@ tq-oracle \
   --vault-address 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
   --destination 0xYourDestinationAddress \
   --mainnet-rpc https://eth.drpc.org \
-  --hl-rpc https://your-hyperlane-rpc \
+  --hl-rpc https://your-hyperliquid-rpc \
   --dry-run
 ```
 
@@ -42,7 +42,7 @@ Create a `.env` file:
 
 ```env
 MAINNET_RPC_URL=https://eth.drpc.org
-HL_RPC_URL=https://your-hyperlane-rpc
+HL_RPC_URL=https://your-hyperliquid-rpc
 PRIVATE_KEY=0xYourPrivateKey
 ```
 
@@ -61,8 +61,8 @@ tq-oracle \
 | `--vault-address` | - | *required* | Vault contract address to query |
 | `--destination` | - | *required* | Destination EOA for transaction |
 | `--mainnet-rpc` | `MAINNET_RPC_URL` | `https://eth.drpc.org` | Ethereum mainnet RPC endpoint |
-| `--hl-rpc` | `HL_RPC_URL` | - | Hyperlane testnet RPC endpoint |
-| `--testnet/--no-testnet` | - | `False` | Use Hyperlane testnet instead of mainnet |
+| `--hl-rpc` | `HL_RPC_URL` | - | hyperliquid testnet RPC endpoint |
+| `--testnet/--no-testnet` | - | `False` | Use hyperliquid testnet instead of mainnet |
 | `--dry-run/--no-dry-run` | - | `True` | Preview without sending transaction |
 | `--backoff/--no-backoff` | - | `True` | Enable exponential backoff retry |
 | `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required if not dry-run) |
