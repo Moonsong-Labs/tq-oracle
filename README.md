@@ -154,7 +154,7 @@ class MyProtocolAdapter(BaseAdapter):
 
 2. **Add ABI file** to `contracts/abis/MyProtocol.json`
 
-3. **Import in registry** (`src/adapters/__init__.py`):
+3. **Import in registry** (`src/adapters/__init_git_.py`):
 
 ```python
 from . import my_protocol_adapter
