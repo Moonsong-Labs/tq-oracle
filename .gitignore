@@ -16,3 +16,11 @@ wheels/
 .ruff_cache
 AGENTS.md
 CLAUDE.md
+
+
+# forge
+**/out/
+**/cache/
+**/dependencies/
+
+.kluster
