@@ -27,7 +27,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
             vault_address: The vault contract address to query
 
         Returns:
-            List of asset data from Hyperliquid protocol
+            Account portfolio value
 
         TODO: Implement actual Hyperliquid API calls
         """

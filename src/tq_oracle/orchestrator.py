@@ -52,8 +52,6 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
 
     asset_addresses = list(aggregated.assets.keys())
 
-    # Fetch prices from all price adapters (currently just Chainlink)
-    # In future, could aggregate prices from multiple sources
     price_data = []
     for price_adapter in price_adapters:
         prices = await price_adapter.fetch_prices(asset_addresses)
