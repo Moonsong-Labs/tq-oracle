@@ -12,9 +12,7 @@ async def test_base_asset_always_one():
         PriceData("0xOTHER", 1000 * 10**18),  # $1000
     ]
 
-    result = await calculate_relative_prices(
-        ["0xBASE", "0xOTHER"], prices, "0xBASE"
-    )
+    result = await calculate_relative_prices(["0xBASE", "0xOTHER"], prices, "0xBASE")
 
     assert result.base_asset == "0xBASE"
     assert result.prices["0xBASE"] == 10**18
@@ -28,9 +26,7 @@ async def test_relative_price_calculation():
         PriceData("0xBTC", 40000 * 10**18),  # $40000
     ]
 
-    result = await calculate_relative_prices(
-        ["0xETH", "0xBTC"], prices, "0xETH"
-    )
+    result = await calculate_relative_prices(["0xETH", "0xBTC"], prices, "0xETH")
 
     # BTC/ETH = 40000/2000 = 20
     assert result.prices["0xBTC"] == 20 * 10**18
@@ -44,9 +40,7 @@ async def test_zero_base_price():
         PriceData("0xOTHER", 1000 * 10**18),
     ]
 
-    result = await calculate_relative_prices(
-        ["0xBASE", "0xOTHER"], prices, "0xBASE"
-    )
+    result = await calculate_relative_prices(["0xBASE", "0xOTHER"], prices, "0xBASE")
 
     assert result.prices["0xOTHER"] == 0
 
@@ -58,9 +52,7 @@ async def test_missing_asset_in_price_map():
         PriceData("0xBASE", 2000 * 10**18),
     ]
 
-    result = await calculate_relative_prices(
-        ["0xBASE", "0xMISSING"], prices, "0xBASE"
-    )
+    result = await calculate_relative_prices(["0xBASE", "0xMISSING"], prices, "0xBASE")
 
     assert result.prices["0xMISSING"] == 0
 
@@ -72,9 +64,7 @@ async def test_missing_base_asset_defaults_to_one():
         PriceData("0xOTHER", 1000 * 10**18),
     ]
 
-    result = await calculate_relative_prices(
-        ["0xBASE", "0xOTHER"], prices, "0xBASE"
-    )
+    result = await calculate_relative_prices(["0xBASE", "0xOTHER"], prices, "0xBASE")
 
     # base defaults to 10^18, so 1000/1 = 1000
     assert result.prices["0xOTHER"] == 1000 * 10**18
@@ -88,9 +78,7 @@ async def test_fractional_relative_price():
         PriceData("0xUSDC", 1 * 10**18),  # $1
     ]
 
-    result = await calculate_relative_prices(
-        ["0xETH", "0xUSDC"], prices, "0xETH"
-    )
+    result = await calculate_relative_prices(["0xETH", "0xUSDC"], prices, "0xETH")
 
     # USDC/ETH = 1/2000 = 0.0005
     assert result.prices["0xUSDC"] == (10**18 // 2000)

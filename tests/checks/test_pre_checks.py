@@ -24,9 +24,7 @@ def config():
 @pytest.mark.asyncio
 @patch("tq_oracle.checks.pre_checks.check_already_published")
 @patch("tq_oracle.checks.pre_checks.check_pending_vote")
-async def test_no_errors_when_all_checks_pass(
-    mock_pending, mock_published, config
-):
+async def test_no_errors_when_all_checks_pass(mock_pending, mock_published, config):
     """Should not raise when both checks return False."""
     mock_published.return_value = False
     mock_pending.return_value = False
@@ -70,9 +68,7 @@ async def test_raises_when_pending_vote(mock_pending, mock_published, config):
 @pytest.mark.asyncio
 @patch("tq_oracle.checks.pre_checks.check_already_published")
 @patch("tq_oracle.checks.pre_checks.check_pending_vote")
-async def test_includes_vault_address_in_error(
-    mock_pending, mock_published, config
-):
+async def test_includes_vault_address_in_error(mock_pending, mock_published, config):
     """Error message should include vault address."""
     mock_published.return_value = True
 
