@@ -6,9 +6,12 @@ from typing import Annotated, Optional
 import typer
 
 from .config import OracleCLIConfig
+from .logger import setup_logging
 from .orchestrator import execute_oracle_flow
 
 DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
+
+setup_logging()
 
 app = typer.Typer(
     add_completion=False,
@@ -17,9 +20,8 @@ app = typer.Typer(
 )
 
 
-@app.callback(invoke_without_command=True)
-def main(
-    ctx: typer.Context,
+@app.command("report")
+def report(
     vault_address: Annotated[
         str,
         typer.Option(
@@ -57,7 +59,7 @@ def main(
         bool,
         typer.Option(
             "--testnet/--no-testnet",
-            help="Use hyperliquid testnet instead of mainnet.",
+            help="Use testnet instead of mainnet.",
         ),
     ] = False,
     dry_run: Annotated[
@@ -84,9 +86,6 @@ def main(
     ] = None,
 ) -> None:
     """Collect TVL data for the requested vault."""
-    if ctx.invoked_subcommand is not None:
-        return
-
     if not dry_run and not private_key:
         raise typer.BadParameter(
             "Provide --private-key when running with --no-dry-run.",

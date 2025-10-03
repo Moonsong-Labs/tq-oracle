@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from .adapters import ASSET_ADAPTERS, PRICE_ADAPTERS
 from .adapters.asset_adapters.base import AssetData
 from .checks.pre_checks import run_pre_checks
+from .logger import get_logger
 from .processors import (
     calculate_relative_prices,
     compute_total_assets,
@@ -15,6 +16,8 @@ from .report import generate_report, publish_report
 
 if TYPE_CHECKING:
     from .config import OracleCLIConfig
+
+logger = get_logger(__name__)
 
 
 async def execute_oracle_flow(config: OracleCLIConfig) -> None:
@@ -32,10 +35,16 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     Args:
         config: CLI configuration containing all parameters
     """
+    logger.info("Starting oracle flow for vault: %s", config.vault_address)
+    logger.debug("Configuration: %s", config.as_safe_dict())
+
+    logger.info("Running pre-checks...")
     await run_pre_checks(config, config.vault_address)
 
+    logger.info("Initializing %d asset adapters", len(ASSET_ADAPTERS))
     asset_adapters = [AdapterClass(config) for AdapterClass in ASSET_ADAPTERS]
 
+    logger.info("Fetching assets from %d adapters in parallel...", len(asset_adapters))
     asset_results = await asyncio.gather(
         *[adapter.fetch_assets(config.vault_address) for adapter in asset_adapters],
         return_exceptions=True,
@@ -44,32 +53,44 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     price_adapters = [AdapterClass(config) for AdapterClass in PRICE_ADAPTERS]
 
     asset_data: list[list[AssetData]] = []
-    for result in asset_results:
-        if isinstance(result, list):
+    for i, result in enumerate(asset_results):
+        if isinstance(result, Exception):
+            logger.error("Asset adapter %d failed: %s", i, result)
+        elif isinstance(result, list):
+            logger.debug("Asset adapter %d returned %d assets", i, len(result))
             asset_data.append(result)
 
+    logger.info("Computing total assets...")
     aggregated = await compute_total_assets(asset_data)
+    logger.debug("Total aggregated assets: %d", len(aggregated.assets))
 
     asset_addresses = list(aggregated.assets.keys())
 
+    logger.info("Fetching prices for %d assets...", len(asset_addresses))
     price_data = []
     for price_adapter in price_adapters:
         prices = await price_adapter.fetch_prices(asset_addresses)
+        logger.debug("Price adapter returned %d prices", len(prices))
         price_data.extend(prices)
 
     base_asset = asset_addresses[0] if asset_addresses else ""
+    logger.info("Calculating relative prices (base: %s)...", base_asset)
     relative_prices = await calculate_relative_prices(
         asset_addresses,
         price_data,
         base_asset,
     )
 
+    logger.info("Deriving final prices via OracleHelper...")
     final_prices = await derive_final_prices(config, relative_prices)
 
+    logger.info("Generating report...")
     report = await generate_report(
         config.vault_address,
         aggregated,
         final_prices,
     )
 
+    logger.info("Publishing report (dry_run=%s)...", config.dry_run)
     await publish_report(config, report)
+    logger.info("Oracle flow completed successfully")
