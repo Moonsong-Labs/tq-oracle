@@ -80,4 +80,4 @@ jobs:
       - *uv-sync
 
       - name: Run CLI with help flag
-        run: uv run python -m src.main --help
+        run: uv run tq-oracle --help
