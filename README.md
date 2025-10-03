@@ -28,11 +28,11 @@ uv sync
 ### Basic Command
 
 ```bash
-tq-oracle \
+uv run tq-oracle \
   --vault-address 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
   --destination 0xYourDestinationAddress \
   --mainnet-rpc https://eth.drpc.org \
-  --hl-rpc https://your-hyperlane-rpc \
+  --hl-rpc https://your-hyperliquid-rpc \
   --dry-run
 ```
 
@@ -42,7 +42,7 @@ Create a `.env` file:
 
 ```env
 MAINNET_RPC_URL=https://eth.drpc.org
-HL_RPC_URL=https://your-hyperlane-rpc
+HL_RPC_URL=https://your-hyperliquid-rpc
 PRIVATE_KEY=0xYourPrivateKey
 ```
 
@@ -61,8 +61,8 @@ tq-oracle \
 | `--vault-address` | - | *required* | Vault contract address to query |
 | `--destination` | - | *required* | Destination EOA for transaction |
 | `--mainnet-rpc` | `MAINNET_RPC_URL` | `https://eth.drpc.org` | Ethereum mainnet RPC endpoint |
-| `--hl-rpc` | `HL_RPC_URL` | - | Hyperlane testnet RPC endpoint |
-| `--testnet/--no-testnet` | - | `False` | Use Hyperlane testnet instead of mainnet |
+| `--hl-rpc` | `HL_RPC_URL` | - | hyperliquid testnet RPC endpoint |
+| `--testnet/--no-testnet` | - | `False` | Use hyperliquid testnet instead of mainnet |
 | `--dry-run/--no-dry-run` | - | `True` | Preview without sending transaction |
 | `--backoff/--no-backoff` | - | `True` | Enable exponential backoff retry |
 | `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required if not dry-run) |
@@ -70,11 +70,13 @@ tq-oracle \
 ### Examples
 
 **Dry-run on mainnet (safe):**
+
 ```bash
 uv run tq-oracle --vault-address 0x277... --destination 0xabc... --dry-run
 ```
 
 **Execute on testnet:**
+
 ```bash
 uv run tq-oracle \
   --vault-address 0x277... \
@@ -85,6 +87,7 @@ uv run tq-oracle \
 ```
 
 **With retry disabled:**
+
 ```bash
 uv run tq-oracle \
   --vault-address 0x277... \
@@ -94,95 +97,134 @@ uv run tq-oracle \
 
 ## Architecture
 
-```
-src/
-├── main.py                      # CLI entry point (Typer)
-├── models/
-│   ├── config.py                # Configuration validation (Pydantic)
-│   └── oracle_report.py         # Data models (AssetPrice, OracleReport)
-├── core/
-│   ├── web3_client.py           # Web3 connection management
-│   ├── oracle_manager.py        # Adapter orchestration
-│   └── transaction_builder.py  # Transaction preparation & signing
+```sh
+src/tq_oracle/
+├── main.py                           # CLI entry point (Typer)
+├── config.py                         # Configuration dataclass
+├── orchestrator.py                   # Main control flow orchestration
 ├── adapters/
-│   ├── base_adapter.py          # Abstract base class
-│   ├── fe_oracle_adapter.py     # FE Oracle TVL queries
-│   ├── wsteth_adapter.py        # wstETH price conversion
-│   └── oracle_helper_adapter.py # OracleHelper price aggregation
-└── utils/
-    ├── abi_loader.py            # ABI file loading with caching
-    └── retry.py                 # Exponential backoff decorator
+│   ├── __init__.py                   # Adapter registry
+│   ├── asset_adapters/
+│   │   ├── base.py                   # AssetAdapter base class
+│   │   └── hyperliquid.py            # Hyperliquid asset fetching
+│   └── price_adapters/
+│       ├── base.py                   # PriceAdapter base class
+│       └── chainlink.py              # Chainlink price feeds
+├── processors/
+│   ├── asset_aggregator.py           # Aggregate assets from adapters
+│   ├── price_calculator.py           # Calculate relative prices
+│   └── oracle_helper.py              # Derive final prices
+├── report/
+│   ├── generator.py                  # Generate oracle report
+│   └── publisher.py                  # Publish to stdout/Safe
+└── checks/
+    └── pre_checks.py                 # Pre-flight validation
 
-contracts/
-└── abis/                        # Contract ABIs (JSON)
-    ├── FEOracle.json
-    ├── OracleHelper.json
-    └── wstETH.json
+contracts/abis/                       # Contract ABIs (JSON)
+├── Vault.json
+├── Subvault.json
+├── OracleHelper.json
+├── EACAggregatorProxy.json
+├── HyperliquidStrategy.json
+└── ...
 ```
 
-## Adding New Protocol Adapters
+## Adding New Adapters
 
-1. **Create adapter file** in `src/adapters/`:
+### Asset Adapters
+
+Asset adapters fetch asset holdings from specific protocols (e.g., Hyperliquid, Aave, Uniswap).
+
+1. **Create adapter file** in `src/tq_oracle/adapters/asset_adapters/`:
 
 ```python
-# src/adapters/my_protocol_adapter.py
-from web3 import Web3
-from ..models.oracle_report import AssetPrice
-from ..models.config import OracleConfig
-from ..utils.abi_loader import load_abi
-from .base_adapter import BaseAdapter
+from __future__ import annotations
 
-class MyProtocolAdapter(BaseAdapter):
-    CONTRACT_ADDRESS = "0x..."
+from typing import TYPE_CHECKING
 
-    def __init__(self, w3: Web3, config: OracleConfig):
-        super().__init__(w3, config)
-        self.contract = w3.eth.contract(
-            address=Web3.to_checksum_address(self.CONTRACT_ADDRESS),
-            abi=load_abi("MyProtocol")
-        )
+from .base import AssetData, BaseAssetAdapter
+
+if TYPE_CHECKING:
+    from ...config import OracleCLIConfig
+
+class MyProtocolAdapter(BaseAssetAdapter):
+    """Adapter for querying MyProtocol assets."""
+
+    def __init__(self, config: OracleCLIConfig):
+        super().__init__(config)
+        # Initialize any protocol-specific clients/connections
 
     @property
     def adapter_name(self) -> str:
         return "my_protocol"
 
-    def get_asset_prices(self, vault: str, block_number: int) -> list[AssetPrice]:
-        # Your implementation here
-        price = self.contract.functions.getPrice().call(block_identifier=block_number)
-        return [AssetPrice(asset="0x...", price_d18=price)]
+    async def fetch_assets(self, vault_address: str) -> list[AssetData]:
+        """Fetch asset data from MyProtocol for the given vault."""
+        # Implement your protocol-specific logic here
+        return [
+            AssetData(asset_address="0x...", amount=1000000),
+        ]
 ```
 
-2. **Add ABI file** to `contracts/abis/MyProtocol.json`
-
-3. **Import in registry** (`src/adapters/__init_git_.py`):
+2. **Register adapter** in `src/tq_oracle/adapters/asset_adapters/__init__.py`:
 
 ```python
-from . import my_protocol_adapter
+from .my_protocol import MyProtocolAdapter
 
-# Add to module list in get_all_adapters()
+ASSET_ADAPTERS = [
+    HyperliquidAdapter,
+    MyProtocolAdapter,  # Add your adapter here
+]
 ```
 
-The adapter will be automatically discovered and executed!
+### Price Adapters
 
-## Output Format
+Price adapters fetch USD prices for assets from price oracles (e.g., Chainlink, Pyth).
 
-```json
-{
-  "vault": "0x277C6A642564A91ff78b008022D65683cEE5CCC5",
-  "block_number": 12345678,
-  "total_assets": 1000000000000000000,
-  "reports": [
-    {
-      "asset": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
-      "price_d18": 1150000000000000000
-    },
-    {
-      "asset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-      "price_d18": 1000000000000000000
-    }
-  ]
-}
+1. **Create adapter file** in `src/tq_oracle/adapters/price_adapters/`:
+
+```python
+# src/tq_oracle/adapters/price_adapters/my_oracle.py
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from .base import BasePriceAdapter, PriceData
+
+if TYPE_CHECKING:
+    from ...config import OracleCLIConfig
+
+class MyOracleAdapter(BasePriceAdapter):
+    """Adapter for querying MyOracle price feeds."""
+
+    def __init__(self, config: OracleCLIConfig):
+        super().__init__(config)
+        # Initialize oracle connections
+
+    @property
+    def adapter_name(self) -> str:
+        return "my_oracle"
+
+    async def fetch_prices(self, asset_addresses: list[str]) -> list[PriceData]:
+        """Fetch USD prices for the given asset addresses."""
+        # Implement price fetching logic
+        return [
+            PriceData(asset_address=addr, price_usd=1000000000000000000)
+            for addr in asset_addresses
+        ]
 ```
+
+2. **Register adapter** in `src/tq_oracle/adapters/price_adapters/__init__.py`:
+
+```python
+from .my_oracle import MyOracleAdapter
+
+PRICE_ADAPTERS = [
+    ChainlinkAdapter,
+    MyOracleAdapter,  # Add your adapter here
+]
+```
+
 ## Development
 
 ```bash
@@ -199,23 +241,6 @@ ruff check src/
 ruff format src/
 ```
 
-## Troubleshooting
-
-**RPC Connection Failed**
-- Verify RPC URL is accessible
-- Check firewall/network settings
-- Try alternative RPC provider
-
-**Adapter Errors**
-- Ensure ABIs are correctly extracted
-- Verify contract addresses are checksummed
-- Check block number is valid
-
-**Transaction Failures**
-- Ensure sufficient gas (if not dry-run)
-- Verify private key has signing permission
-- Check destination contract accepts format
-
 ---
 
 ## External Links
@@ -224,7 +249,3 @@ ruff format src/
 - Hyperliquid API [documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint)
 - `cctp-v2` [contracts](https://github.com/circlefin/evm-cctp-contracts/tree/master/src/v2)
 - DeBridge [contracts](https://github.com/debridge-finance/dln-contracts/tree/main/contracts/DLN)
-
-## License
-
-MIT
