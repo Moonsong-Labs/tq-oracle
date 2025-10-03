@@ -29,30 +29,47 @@ def test_config():
 @pytest.mark.asyncio
 async def test_all_adapters_succeed_processes_all_data(test_config):
     """All adapters succeeding should result in all asset data being processed."""
-    with patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock), \
-         patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters, \
-         patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters, \
-         patch("tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock) as mock_compute, \
-         patch("tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock) as mock_calc_prices, \
-         patch("tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock) as mock_derive, \
-         patch("tq_oracle.orchestrator.generate_report", new_callable=AsyncMock) as mock_gen_report, \
-         patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock) as mock_publish:
-
+    with (
+        patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock),
+        patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters,
+        patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters,
+        patch(
+            "tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock
+        ) as mock_compute,
+        patch(
+            "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
+        ) as mock_calc_prices,
+        patch(
+            "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
+        ) as mock_derive,
+        patch(
+            "tq_oracle.orchestrator.generate_report", new_callable=AsyncMock
+        ) as mock_gen_report,
+        patch(
+            "tq_oracle.orchestrator.publish_report", new_callable=AsyncMock
+        ) as mock_publish,
+    ):
         adapter1 = MagicMock()
         adapter1.fetch_assets = AsyncMock(return_value=[AssetData("0xA", 100)])
         adapter2 = MagicMock()
         adapter2.fetch_assets = AsyncMock(return_value=[AssetData("0xB", 200)])
 
-        mock_asset_adapters.__iter__.return_value = iter([lambda config: adapter1, lambda config: adapter2])
+        mock_asset_adapters.__iter__.return_value = iter(
+            [lambda config: adapter1, lambda config: adapter2]
+        )
         mock_price_adapters.__iter__.return_value = iter([])
 
         mock_compute.return_value = AggregatedAssets(assets={"0xA": 100, "0xB": 200})
-        mock_calc_prices.return_value = RelativePrices(base_asset="0xA", prices={"0xA": 10**18, "0xB": 2 * 10**18})
-        mock_derive.return_value = FinalPrices(prices={"0xA": 10**18, "0xB": 2 * 10**18})
+        mock_calc_prices.return_value = RelativePrices(
+            base_asset="0xA", prices={"0xA": 10**18, "0xB": 2 * 10**18}
+        )
+        mock_derive.return_value = FinalPrices(
+            prices={"0xA": 10**18, "0xB": 2 * 10**18}
+        )
         mock_gen_report.return_value = OracleReport(
             vault_address="0xVault",
             total_assets={"0xA": 100, "0xB": 200},
-            final_prices={"0xA": 10**18, "0xB": 2 * 10**18}
+            final_prices={"0xA": 10**18, "0xB": 2 * 10**18},
         )
 
         await execute_oracle_flow(test_config)
@@ -66,25 +83,33 @@ async def test_all_adapters_succeed_processes_all_data(test_config):
 @pytest.mark.asyncio
 async def test_some_adapters_fail_processes_successful_ones(test_config):
     """Failed adapters should be logged but successful ones should still be processed."""
-    with patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock), \
-         patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters, \
-         patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters, \
-         patch("tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock) as mock_compute, \
-         patch("tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock), \
-         patch("tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock) as mock_derive, \
-         patch("tq_oracle.orchestrator.generate_report", new_callable=AsyncMock) as mock_gen_report, \
-         patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock):
-
+    with (
+        patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock),
+        patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters,
+        patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters,
+        patch(
+            "tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock
+        ) as mock_compute,
+        patch(
+            "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
+        ),
+        patch(
+            "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
+        ) as mock_derive,
+        patch(
+            "tq_oracle.orchestrator.generate_report", new_callable=AsyncMock
+        ) as mock_gen_report,
+        patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock),
+    ):
         adapter_success = MagicMock()
         adapter_success.fetch_assets = AsyncMock(return_value=[AssetData("0xA", 100)])
 
         adapter_fail = MagicMock()
         adapter_fail.fetch_assets = AsyncMock(side_effect=RuntimeError("Network error"))
 
-        mock_asset_adapters.__iter__.return_value = iter([
-            lambda config: adapter_success,
-            lambda config: adapter_fail
-        ])
+        mock_asset_adapters.__iter__.return_value = iter(
+            [lambda config: adapter_success, lambda config: adapter_fail]
+        )
         mock_price_adapters.__iter__.return_value = iter([])
 
         mock_compute.return_value = AggregatedAssets(assets={"0xA": 100})
@@ -92,7 +117,7 @@ async def test_some_adapters_fail_processes_successful_ones(test_config):
         mock_gen_report.return_value = OracleReport(
             vault_address="0xVault",
             total_assets={"0xA": 100},
-            final_prices={"0xA": 10**18}
+            final_prices={"0xA": 10**18},
         )
 
         await execute_oracle_flow(test_config)
@@ -105,29 +130,38 @@ async def test_some_adapters_fail_processes_successful_ones(test_config):
 @pytest.mark.asyncio
 async def test_all_adapters_fail_handles_gracefully(test_config):
     """All adapters failing should result in empty asset data, not crash."""
-    with patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock), \
-         patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters, \
-         patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters, \
-         patch("tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock) as mock_compute, \
-         patch("tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock), \
-         patch("tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock) as mock_derive, \
-         patch("tq_oracle.orchestrator.generate_report", new_callable=AsyncMock) as mock_gen_report, \
-         patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock):
-
+    with (
+        patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock),
+        patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters,
+        patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters,
+        patch(
+            "tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock
+        ) as mock_compute,
+        patch(
+            "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
+        ),
+        patch(
+            "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
+        ) as mock_derive,
+        patch(
+            "tq_oracle.orchestrator.generate_report", new_callable=AsyncMock
+        ) as mock_gen_report,
+        patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock),
+    ):
         adapter1 = MagicMock()
         adapter1.fetch_assets = AsyncMock(side_effect=RuntimeError("Error 1"))
         adapter2 = MagicMock()
         adapter2.fetch_assets = AsyncMock(side_effect=RuntimeError("Error 2"))
 
-        mock_asset_adapters.__iter__.return_value = iter([lambda config: adapter1, lambda config: adapter2])
+        mock_asset_adapters.__iter__.return_value = iter(
+            [lambda config: adapter1, lambda config: adapter2]
+        )
         mock_price_adapters.__iter__.return_value = iter([])
 
         mock_compute.return_value = AggregatedAssets(assets={})
         mock_derive.return_value = FinalPrices(prices={})
         mock_gen_report.return_value = OracleReport(
-            vault_address="0xVault",
-            total_assets={},
-            final_prices={}
+            vault_address="0xVault", total_assets={}, final_prices={}
         )
 
         await execute_oracle_flow(test_config)
@@ -139,15 +173,24 @@ async def test_all_adapters_fail_handles_gracefully(test_config):
 @pytest.mark.asyncio
 async def test_empty_assets_results_in_empty_base_asset(test_config):
     """No assets should result in empty string base asset, not crash."""
-    with patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock), \
-         patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters, \
-         patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters, \
-         patch("tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock) as mock_compute, \
-         patch("tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock) as mock_calc_prices, \
-         patch("tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock) as mock_derive, \
-         patch("tq_oracle.orchestrator.generate_report", new_callable=AsyncMock) as mock_gen_report, \
-         patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock):
-
+    with (
+        patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock),
+        patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters,
+        patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters,
+        patch(
+            "tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock
+        ) as mock_compute,
+        patch(
+            "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
+        ) as mock_calc_prices,
+        patch(
+            "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
+        ) as mock_derive,
+        patch(
+            "tq_oracle.orchestrator.generate_report", new_callable=AsyncMock
+        ) as mock_gen_report,
+        patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock),
+    ):
         mock_asset_adapters.__iter__.return_value = iter([])
         mock_price_adapters.__iter__.return_value = iter([])
 
@@ -155,9 +198,7 @@ async def test_empty_assets_results_in_empty_base_asset(test_config):
         mock_calc_prices.return_value = RelativePrices(base_asset="", prices={})
         mock_derive.return_value = FinalPrices(prices={})
         mock_gen_report.return_value = OracleReport(
-            vault_address="0xVault",
-            total_assets={},
-            final_prices={}
+            vault_address="0xVault", total_assets={}, final_prices={}
         )
 
         await execute_oracle_flow(test_config)
@@ -172,9 +213,12 @@ async def test_empty_assets_results_in_empty_base_asset(test_config):
 @pytest.mark.asyncio
 async def test_pre_check_failure_stops_execution(test_config):
     """PreCheckError should stop execution before adapters are called."""
-    with patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock) as mock_pre_checks, \
-         patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters:
-
+    with (
+        patch(
+            "tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock
+        ) as mock_pre_checks,
+        patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters,
+    ):
         mock_pre_checks.side_effect = PreCheckError("Already published")
 
         adapter = MagicMock()
@@ -190,27 +234,38 @@ async def test_pre_check_failure_stops_execution(test_config):
 @pytest.mark.asyncio
 async def test_base_asset_is_first_in_list(test_config):
     """Base asset should be first asset in aggregated list."""
-    with patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock), \
-         patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters, \
-         patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters, \
-         patch("tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock) as mock_compute, \
-         patch("tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock) as mock_calc_prices, \
-         patch("tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock) as mock_derive, \
-         patch("tq_oracle.orchestrator.generate_report", new_callable=AsyncMock) as mock_gen_report, \
-         patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock):
-
+    with (
+        patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock),
+        patch("tq_oracle.orchestrator.ASSET_ADAPTERS") as mock_asset_adapters,
+        patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters,
+        patch(
+            "tq_oracle.orchestrator.compute_total_assets", new_callable=AsyncMock
+        ) as mock_compute,
+        patch(
+            "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
+        ) as mock_calc_prices,
+        patch(
+            "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
+        ) as mock_derive,
+        patch(
+            "tq_oracle.orchestrator.generate_report", new_callable=AsyncMock
+        ) as mock_gen_report,
+        patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock),
+    ):
         adapter = MagicMock()
         adapter.fetch_assets = AsyncMock(return_value=[])
         mock_asset_adapters.__iter__.return_value = iter([lambda config: adapter])
         mock_price_adapters.__iter__.return_value = iter([])
 
-        mock_compute.return_value = AggregatedAssets(assets={"0xFIRST": 100, "0xSECOND": 200})
+        mock_compute.return_value = AggregatedAssets(
+            assets={"0xFIRST": 100, "0xSECOND": 200}
+        )
         mock_calc_prices.return_value = RelativePrices(base_asset="0xFIRST", prices={})
         mock_derive.return_value = FinalPrices(prices={})
         mock_gen_report.return_value = OracleReport(
             vault_address="0xVault",
             total_assets={"0xFIRST": 100, "0xSECOND": 200},
-            final_prices={}
+            final_prices={},
         )
 
         await execute_oracle_flow(test_config)

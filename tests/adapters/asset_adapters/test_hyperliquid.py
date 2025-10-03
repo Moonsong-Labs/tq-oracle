@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -48,14 +48,16 @@ async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [[1, "100.0"]]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")
 
-        mock_info_class.assert_called_once_with(base_url=HL_MAINNET_API_URL, skip_ws=False)
+        mock_info_class.assert_called_once_with(
+            base_url=HL_MAINNET_API_URL, skip_ws=False
+        )
         assert len(assets) == 1
         assert assets[0].asset_address == USDC_MAINNET
 
@@ -68,14 +70,16 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [[1, "50.0"]]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[1, "50.0"]]})]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")
 
-        mock_info_class.assert_called_once_with(base_url=HL_TESTNET_API_URL, skip_ws=False)
+        mock_info_class.assert_called_once_with(
+            base_url=HL_TESTNET_API_URL, skip_ws=False
+        )
         assert len(assets) == 1
         assert assets[0].asset_address == USDC_SEPOLIA
 
@@ -88,13 +92,20 @@ async def test_twap_calculation_with_multiple_values(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [
-                [1, "100.0"],
-                [2, "200.0"],
-                [3, "300.0"],
-            ]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[
+                (
+                    "day",
+                    {
+                        "accountValueHistory": [
+                            [1, "100.0"],
+                            [2, "200.0"],
+                            [3, "300.0"],
+                        ]
+                    },
+                )
+            ]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")
@@ -112,9 +123,9 @@ async def test_single_value_twap_equals_that_value(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [[1, "42.5"]]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[1, "42.5"]]})]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")
@@ -131,9 +142,9 @@ async def test_empty_account_history_returns_empty(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": []})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": []})]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")
@@ -149,15 +160,22 @@ async def test_mixed_valid_invalid_values_skips_invalid(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [
-                [1, "100.0"],
-                [2, "not_a_number"],
-                [3, "200.0"],
-                [4, None],
-                [5, "300.0"],
-            ]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[
+                (
+                    "day",
+                    {
+                        "accountValueHistory": [
+                            [1, "100.0"],
+                            [2, "not_a_number"],
+                            [3, "200.0"],
+                            [4, None],
+                            [5, "300.0"],
+                        ]
+                    },
+                )
+            ]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")
@@ -175,13 +193,20 @@ async def test_all_invalid_values_returns_empty(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [
-                [1, "invalid"],
-                [2, None],
-                [3, "also_bad"],
-            ]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[
+                (
+                    "day",
+                    {
+                        "accountValueHistory": [
+                            [1, "invalid"],
+                            [2, None],
+                            [3, "also_bad"],
+                        ]
+                    },
+                )
+            ]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")
@@ -197,9 +222,9 @@ async def test_missing_day_period_raises_error(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("week", {"accountValueHistory": [[1, "100.0"]]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[("week", {"accountValueHistory": [[1, "100.0"]]})]
+        )
         mock_info_class.return_value = mock_info
 
         with pytest.raises(ValueError, match="No 'day' period data"):
@@ -216,9 +241,9 @@ async def test_websocket_disconnected_on_success(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [[1, "100.0"]]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+        )
         mock_info_class.return_value = mock_info
 
         await adapter.fetch_assets("0xSubvault")
@@ -251,9 +276,9 @@ async def test_amount_precision_conversion(mainnet_config):
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
         mock_info.ws_manager = MagicMock()
-        mock_info.portfolio = MagicMock(return_value=[
-            ("day", {"accountValueHistory": [[1, "123.456789"]]})
-        ])
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[1, "123.456789"]]})]
+        )
         mock_info_class.return_value = mock_info
 
         assets = await adapter.fetch_assets("0xSubvault")

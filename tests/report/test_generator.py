@@ -77,18 +77,22 @@ async def test_report_to_dict_serializable():
 async def test_multiple_assets_and_prices_in_report():
     """Report should correctly handle multiple assets with their corresponding prices."""
     vault_address = "0xMultiAssetVault"
-    aggregated = AggregatedAssets(assets={
-        "0xUSDC": 10000,
-        "0xETH": 5,
-        "0xBTC": 1,
-        "0xDAI": 8000,
-    })
-    final_prices = FinalPrices(prices={
-        "0xUSDC": 10**18,
-        "0xETH": 2000 * 10**18,
-        "0xBTC": 40000 * 10**18,
-        "0xDAI": 10**18,
-    })
+    aggregated = AggregatedAssets(
+        assets={
+            "0xUSDC": 10000,
+            "0xETH": 5,
+            "0xBTC": 1,
+            "0xDAI": 8000,
+        }
+    )
+    final_prices = FinalPrices(
+        prices={
+            "0xUSDC": 10**18,
+            "0xETH": 2000 * 10**18,
+            "0xBTC": 40000 * 10**18,
+            "0xDAI": 10**18,
+        }
+    )
 
     report = await generate_report(vault_address, aggregated, final_prices)
 
