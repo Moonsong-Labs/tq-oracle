@@ -38,7 +38,7 @@ jobs:
       - *uv-sync
 
       - name: Check formatting with ruff
-        run: ruff format --check
+        run: uv run ruff format --check
 
   typecheck:
     runs-on: ubuntu-latest
@@ -52,7 +52,7 @@ jobs:
       - *uv-sync
 
       - name: Run typecheck with pyrefly
-        run: pyrefly check
+        run: uv run pyrefly check
 
   lint:
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
       - *uv-sync
 
       - name: Run lint with ruff
-        run: ruff check
+        run: uv run ruff check
 
   run:
     runs-on: ubuntu-latest
