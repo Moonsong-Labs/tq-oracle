@@ -11,7 +11,6 @@ from .orchestrator import execute_oracle_flow
 
 DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
 
-# Initialize logging on module import
 setup_logging()
 
 app = typer.Typer(
