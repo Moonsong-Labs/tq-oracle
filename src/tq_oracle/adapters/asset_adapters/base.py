@@ -21,11 +21,11 @@ class AssetAdapter(Protocol):
         """Return the name of this adapter."""
         ...
 
-    async def fetch_assets(self, vault_address: str) -> list[AssetData]:
+    async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch asset data for the given vault.
 
         Args:
-            vault_address: The vault contract address to query
+            subvault_address: The subvault contract address to query
 
         Returns:
             List of asset data from this protocol
@@ -47,6 +47,6 @@ class BaseAssetAdapter(ABC):
         ...
 
     @abstractmethod
-    async def fetch_assets(self, vault_address: str) -> list[AssetData]:
-        """Fetch asset data for the given vault."""
+    async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
+        """Fetch asset data for the given subvault."""
         ...
