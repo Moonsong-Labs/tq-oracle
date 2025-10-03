@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING
 from .adapters import ASSET_ADAPTERS, PRICE_ADAPTERS
 from .adapters.asset_adapters.base import AssetData
 from .checks.pre_checks import run_pre_checks
-from .processors.asset_aggregator import compute_total_assets
-from .processors.oracle_helper import derive_final_prices
-from .processors.price_calculator import calculate_relative_prices
-from .report.generator import generate_report
-from .report.publisher import publish_report
+from .processors import (
+    calculate_relative_prices,
+    compute_total_assets,
+    derive_final_prices,
+)
+from .report import generate_report, publish_report
 
 if TYPE_CHECKING:
     from .config import OracleCLIConfig
