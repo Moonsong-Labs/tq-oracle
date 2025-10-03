@@ -10,18 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - &uv-install
         name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
-
       - &uv-python
         name: Set up Python
         run: uv python install
-
       - &uv-sync
         name: Install dependencies
         run: uv sync --all-packages --all-extras
@@ -30,13 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - *uv-install
-
       - *uv-python
-
       - *uv-sync
-
       - name: Check formatting with ruff
         run: uv run ruff format --check
 
@@ -44,13 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - *uv-install
-
       - *uv-python
-
       - *uv-sync
-
       - name: Run typecheck with pyrefly
         run: uv run pyrefly check
 
@@ -58,13 +47,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - *uv-install
-
       - *uv-python
-
       - *uv-sync
-
       - name: Run lint with ruff
         run: uv run ruff check
 
@@ -72,12 +57,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - *uv-install
-
       - *uv-python
-
       - *uv-sync
-
       - name: Run CLI with help flag
         run: uv run tq-oracle --help
+  
+  unittest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - *uv-install
+      - *uv-python
+      - *uv-sync
+      - name: Run unit tests with pytest
+        run: uv run pytest
+
