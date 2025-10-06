@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sys
 from typing import TYPE_CHECKING
 
+import requests
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
+from eth_typing import URI
+from safe_eth.eth import EthereumClient, EthereumNetwork
+from safe_eth.safe.api import TransactionServiceApi
+from safe_eth.safe.safe_tx import SafeTx
+from web3 import Web3
 
-from ..safe.api_client import SafeAPIClient
 from ..safe.transaction_builder import encode_submit_reports
 
 if TYPE_CHECKING:
@@ -84,24 +90,20 @@ async def send_to_safe(
     account: LocalAccount = Account.from_key(config.private_key)  # type: ignore[arg-type]
     logger.info("Proposing transaction as: %s", account.address)
 
-    client = SafeAPIClient(
-        chain_id=config.chain_id,
-        safe_address=config.safe_address,
-        rpc_url=config.mainnet_rpc,
-    )
+    network = EthereumNetwork(config.chain_id)
+    ethereum_client = EthereumClient(URI(config.mainnet_rpc))
+    tx_service = TransactionServiceApi(network, ethereum_client)
 
-    safe_info = client.get_safe_info()
-    owners = safe_info["owners"]
-    threshold = safe_info["threshold"]
+    safe_checksum = Web3.to_checksum_address(config.safe_address)
 
-    num_owners = len(owners) if isinstance(owners, list) else 0
+    safe_api_url = f"{tx_service.base_url}/api/v1/safes/{safe_checksum}/"
+    logger.debug("Fetching Safe info from: %s", safe_api_url)
+    safe_info_response = await asyncio.to_thread(requests.get, safe_api_url)
+    safe_info_response.raise_for_status()
+    safe_info_data = safe_info_response.json()
+    nonce = int(safe_info_data.get("nonce", 0))
 
-    logger.info(
-        "Safe: %s, Threshold: %d/%d",
-        config.safe_address,
-        threshold if isinstance(threshold, int) else 0,
-        num_owners,
-    )
+    logger.info("Building transaction for Safe: %s (nonce: %d)", safe_checksum, nonce)
 
     to_addr = transaction["to"]
     data = transaction["data"]
@@ -113,23 +115,53 @@ async def send_to_safe(
     assert isinstance(value, int), "value must be int"
     assert isinstance(operation, int), "operation must be int"
 
-    safe_tx_hash = client.propose_transaction(
-        to=to_addr,
-        data=data,
+    await asyncio.sleep(2)
+
+    # Note: safe_nonce=None means it will be retrieved automatically from Transaction Service
+    # safe_version is set to avoid on-chain call (we support Safe 1.3.0+)
+    safe_tx = SafeTx(
+        ethereum_client=ethereum_client,
+        safe_address=safe_checksum,
+        to=Web3.to_checksum_address(to_addr),
         value=value,
+        data=data,
         operation=operation,
-        sender=account.address,
-        origin="tq-oracle",
+        safe_tx_gas=0,
+        base_gas=0,
+        gas_price=0,
+        gas_token=Web3.to_checksum_address(
+            "0x0000000000000000000000000000000000000000"
+        ),
+        refund_receiver=Web3.to_checksum_address(
+            "0x0000000000000000000000000000000000000000"
+        ),
+        safe_nonce=nonce,  # Use nonce from Transaction Service API
+        safe_version="1.3.0",  # Avoid on-chain call for version
+        chain_id=config.chain_id,
     )
 
+    safe_tx.sign(config.private_key)
+
+    await asyncio.to_thread(tx_service.post_transaction, safe_tx)
+
+    safe_tx_hash = safe_tx.safe_tx_hash.hex()
     logger.info("Transaction proposed: %s", safe_tx_hash)
 
-    safe_tx_hash_bytes = bytes.fromhex(safe_tx_hash.removeprefix("0x"))
-    signature = account.unsafe_sign_hash(safe_tx_hash_bytes)  # type: ignore[arg-type]
-    signature_hex = signature.signature.hex()
-    client.confirm_transaction(safe_tx_hash, signature_hex)
+    network_prefix = {
+        1: "eth",
+        11155111: "sep",
+        100: "gno",
+        137: "matic",
+        42161: "arb1",
+        10: "oeth",
+    }.get(config.chain_id, "eth")
 
-    ui_url = client.get_safe_ui_url(safe_tx_hash)
+    ui_url = (
+        f"https://app.safe.global/transactions/queue"
+        f"?safe={network_prefix}:{config.safe_address}"
+        f"#{safe_tx_hash}"
+    )
+
     return ui_url
 
 
