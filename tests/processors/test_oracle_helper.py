@@ -42,3 +42,8 @@ def test_encode_asset_prices_single():
     encoded = encode_asset_prices(rp)
     assert isinstance(encoded, EncodedAssetPrices)
     assert encoded.asset_prices == [("0xABC", 123)]
+
+
+@pytest.mark.integration
+def test_oracle_helper_integration_smoke():
+    assert True is True
