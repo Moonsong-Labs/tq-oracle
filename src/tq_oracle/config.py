@@ -7,6 +7,7 @@ from typing import Optional
 @dataclass
 class OracleCLIConfig:
     vault_address: str
+    oracle_helper_address: str
     destination: str
     mainnet_rpc: str
     hl_rpc: Optional[str]

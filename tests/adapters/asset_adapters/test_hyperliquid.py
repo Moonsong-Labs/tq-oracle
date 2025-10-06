@@ -16,6 +16,7 @@ from tq_oracle.constants import (
 def mainnet_config():
     return OracleCLIConfig(
         vault_address="0xVault",
+        oracle_helper_address="0xOracleHelper",
         destination="0xDest",
         mainnet_rpc="https://mainnet.rpc",
         hl_rpc=None,
@@ -30,6 +31,7 @@ def mainnet_config():
 def testnet_config():
     return OracleCLIConfig(
         vault_address="0xVault",
+        oracle_helper_address="0xOracleHelper",
         destination="0xDest",
         mainnet_rpc="https://testnet.rpc",
         hl_rpc=None,

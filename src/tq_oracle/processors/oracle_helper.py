@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from web3 import Web3
+from web3.contract import Contract
+
+from ..abi import load_oracle_helper_abi
+
 if TYPE_CHECKING:
     from ..config import OracleCLIConfig
     from .price_calculator import RelativePrices
@@ -40,7 +45,16 @@ async def derive_final_prices(
     TODO: Implement actual OracleHelper contract interaction
     """
 
+    oracle_helper = get_oracle_helper_contract(config)
+
     return FinalPrices(prices=relative_prices.prices)
+
+
+def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
+    w3 = Web3()
+    abi = load_oracle_helper_abi()
+    checksum_address = Web3.to_checksum_address(config.oracle_helper_address)
+    return w3.eth.contract(address=checksum_address, abi=abi)
 
 
 def encode_asset_prices(relative_prices: RelativePrices) -> EncodedAssetPrices:

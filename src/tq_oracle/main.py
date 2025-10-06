@@ -30,6 +30,14 @@ def report(
             help="Vault contract address to query.",
         ),
     ],
+    oracle_helper_address: Annotated[
+        str,
+        typer.Option(
+            "--oracle-helper-address",
+            "-o",
+            help="OracleHelper contract address to query.",
+        ),
+    ],
     destination: Annotated[
         str,
         typer.Option(
@@ -94,6 +102,7 @@ def report(
 
     config = OracleCLIConfig(
         vault_address=vault_address,
+        oracle_helper_address=oracle_helper_address,
         destination=destination,
         mainnet_rpc=mainnet_rpc,
         hl_rpc=hl_rpc,
