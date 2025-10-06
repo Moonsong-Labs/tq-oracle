@@ -12,7 +12,7 @@ class AggregatedAssets:
     assets: dict[str, int]  # asset_address -> total_amount
 
 
-async def compute_total_assets(
+async def compute_total_aggregated_assets(
     protocol_assets: list[list[AssetData]],
 ) -> AggregatedAssets:
     """Compute total assets by aggregating data from multiple protocols.
