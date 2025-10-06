@@ -44,11 +44,6 @@ def test_encode_asset_prices_single():
 
 
 @pytest.mark.integration
-def test_oracle_helper_integration_smoke():
-    assert True is True
-
-
-@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_prices_d18_integration_via_derive_final_prices():
     provider = "https://eth.drpc.org"
@@ -66,6 +61,7 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
         oracle_helper_address=oracle_helper,
         destination="eth_mainnet",
         mainnet_rpc=provider,
+        testnet_rpc=provider,
         hl_rpc=None,
         testnet=False,
         dry_run=True,

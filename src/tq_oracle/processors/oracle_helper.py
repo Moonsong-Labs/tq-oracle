@@ -62,7 +62,8 @@ async def derive_final_prices(
 
 
 def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
-    w3 = Web3(Web3.HTTPProvider(config.mainnet_rpc))
+    provider = config.mainnet_rpc if not config.testnet else config.testnet_rpc
+    w3 = Web3(Web3.HTTPProvider(provider))
     abi = load_oracle_helper_abi()
     checksum_address = Web3.to_checksum_address(config.oracle_helper_address)
     return w3.eth.contract(address=checksum_address, abi=abi)

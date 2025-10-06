@@ -14,6 +14,7 @@ def config():
         oracle_helper_address="0xORACLE_HELPER",
         destination="0xDEST",
         mainnet_rpc="https://eth.example",
+        testnet_rpc="https://eth.example",
         hl_rpc=None,
         testnet=False,
         dry_run=True,
