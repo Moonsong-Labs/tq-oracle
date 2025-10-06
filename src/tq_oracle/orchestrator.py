@@ -81,8 +81,13 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
         base_asset,
     )
 
+    # TODO: calculate total assets here: totalAssets = sum(aggregated.assets[i] * relative_prices.prices[i])
+    logger.info("Calculating total assets in base asset...")
+    total_assets = 100
+    logger.debug("Total assets in base asset: %d", total_assets)
+
     logger.info("Deriving final prices via OracleHelper...")
-    final_prices = await derive_final_prices(config, relative_prices)
+    final_prices = await derive_final_prices(config, total_assets, relative_prices)
 
     logger.info("Generating report...")
     report = await generate_report(
