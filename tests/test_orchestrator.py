@@ -41,7 +41,7 @@ async def test_all_adapters_succeed_processes_all_data(test_config):
             "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
         ) as mock_calc_prices,
         patch(
-            "tq_oracle.orchestrator.calculate_total_assets", new_callable=AsyncMock
+            "tq_oracle.orchestrator.calculate_total_assets"
         ) as mock_calc_total_assets,
         patch(
             "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
@@ -100,7 +100,7 @@ async def test_some_adapters_fail_processes_successful_ones(test_config):
             "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
         ),
         patch(
-            "tq_oracle.orchestrator.calculate_total_assets", new_callable=AsyncMock
+            "tq_oracle.orchestrator.calculate_total_assets"
         ) as mock_calc_total_assets,
         patch(
             "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
@@ -152,7 +152,7 @@ async def test_all_adapters_fail_handles_gracefully(test_config):
             "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
         ),
         patch(
-            "tq_oracle.orchestrator.calculate_total_assets", new_callable=AsyncMock
+            "tq_oracle.orchestrator.calculate_total_assets"
         ) as mock_calc_total_assets,
         patch(
             "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
@@ -262,7 +262,7 @@ async def test_base_asset_is_first_in_list(test_config):
             "tq_oracle.orchestrator.calculate_relative_prices", new_callable=AsyncMock
         ) as mock_calc_prices,
         patch(
-            "tq_oracle.orchestrator.calculate_total_assets", new_callable=AsyncMock
+            "tq_oracle.orchestrator.calculate_total_assets"
         ) as mock_calc_total_assets,
         patch(
             "tq_oracle.orchestrator.derive_final_prices", new_callable=AsyncMock
