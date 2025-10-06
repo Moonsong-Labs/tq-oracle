@@ -100,8 +100,16 @@ def report(
             help="Private key for signing (required for direct submission).",
         ),
     ] = None,
+    safe_txn_srvc_api_key: Annotated[
+        Optional[str],
+        typer.Option(
+            "--safe-key",
+            envvar="SAFE_TRANSACTION_SERVICE_API_KEY",
+            help="API key for the Safe Transaction Service (optional, but recommended).",
+        ),
+    ] = None,
 ) -> None:
-    """Collect TVL data and submit via Gnosis Safe (optional) or direct transaction."""
+    """Collect TVL data and submit via Safe (optional)."""
     if not dry_run and not safe_address and not private_key:
         raise typer.BadParameter(
             "Either --safe-address OR --private-key required when running with --no-dry-run.",
@@ -129,6 +137,7 @@ def report(
         dry_run=dry_run,
         backoff=backoff,
         private_key=private_key,
+        safe_txn_srvc_api_key=safe_txn_srvc_api_key,
     )
 
     asyncio.run(execute_oracle_flow(config))

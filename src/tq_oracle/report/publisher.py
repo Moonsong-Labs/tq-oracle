@@ -54,6 +54,8 @@ async def build_transaction(
         oracle_address=config.oracle_address,
         report=report,
     )
+    logger.debug("Built submitReports() transaction to: %s", to_address)
+    logger.debug("Encoded calldata: %s", calldata.hex())
 
     return {
         "to": to_address,
@@ -92,7 +94,9 @@ async def send_to_safe(
 
     network = EthereumNetwork(config.chain_id)
     ethereum_client = EthereumClient(URI(config.mainnet_rpc))
-    tx_service = TransactionServiceApi(network, ethereum_client)
+    tx_service = TransactionServiceApi(
+        network, ethereum_client, api_key=config.safe_txn_srvc_api_key
+    )
 
     safe_checksum = Web3.to_checksum_address(config.safe_address)
 
@@ -115,7 +119,11 @@ async def send_to_safe(
     assert isinstance(value, int), "value must be int"
     assert isinstance(operation, int), "operation must be int"
 
-    await asyncio.sleep(2)
+    if config.safe_txn_srvc_api_key is None:
+        logger.debug(
+            "No Transaction Service API key configured; using waiting for 2s to avoid rate limits"
+        )
+        await asyncio.sleep(2)
 
     # Note: safe_nonce=None means it will be retrieved automatically from Transaction Service
     # safe_version is set to avoid on-chain call (we support Safe 1.3.0+)

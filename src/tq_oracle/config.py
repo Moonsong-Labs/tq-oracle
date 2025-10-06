@@ -15,6 +15,7 @@ class OracleCLIConfig:
     testnet: bool
     dry_run: bool
     backoff: bool
+    safe_txn_srvc_api_key: Optional[str]
     private_key: Optional[str]
 
     @property
@@ -27,4 +28,5 @@ class OracleCLIConfig:
         data = asdict(self)
         if self.private_key:
             data["private_key"] = "***redacted***"
+        data.pop("safe_txn_srvc_api_key", None)
         return data

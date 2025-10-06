@@ -20,6 +20,7 @@ def config():
         dry_run=True,
         backoff=False,
         private_key=None,
+        safe_txn_srvc_api_key=None,
     )
 
 

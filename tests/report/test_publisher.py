@@ -39,6 +39,7 @@ def broadcast_config() -> OracleCLIConfig:
         dry_run=False,
         backoff=False,
         private_key="0x" + "a" * 64,
+        safe_txn_srvc_api_key="0xSAFE",
     )
 
 
@@ -71,7 +72,10 @@ async def test_build_transaction_creates_valid_tx_dict(
     Verify that build_transaction correctly calls the encoder and
     formats the result into the expected transaction dictionary.
     """
-    mock_encode_submit_reports.return_value = (broadcast_config.oracle_address, b"\x12\x34")
+    mock_encode_submit_reports.return_value = (
+        broadcast_config.oracle_address,
+        b"\x12\x34",
+    )
 
     tx = await build_transaction(broadcast_config, sample_report)
 

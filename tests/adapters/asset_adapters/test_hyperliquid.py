@@ -25,6 +25,7 @@ def mainnet_config():
         dry_run=False,
         backoff=False,
         private_key=None,
+        safe_txn_srvc_api_key=None,
     )
 
 
@@ -41,6 +42,7 @@ def testnet_config():
         dry_run=False,
         backoff=False,
         private_key=None,
+        safe_txn_srvc_api_key=None,
     )
 
 

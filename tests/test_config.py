@@ -14,6 +14,7 @@ def test_as_safe_dict_with_private_key():
         dry_run=False,
         backoff=True,
         private_key="0x1234567890abcdef",
+        safe_txn_srvc_api_key="0xSAFE",
     )
 
     safe_dict = config.as_safe_dict()
@@ -36,6 +37,7 @@ def test_as_safe_dict_without_private_key():
         dry_run=True,
         backoff=False,
         private_key=None,
+        safe_txn_srvc_api_key=None,
     )
 
     safe_dict = config.as_safe_dict()
@@ -57,6 +59,7 @@ def test_as_safe_dict_preserves_all_fields():
         dry_run=True,
         backoff=True,
         private_key="0xSECRET",
+        safe_txn_srvc_api_key="0xSAFE",
     )
 
     safe_dict = config.as_safe_dict()
