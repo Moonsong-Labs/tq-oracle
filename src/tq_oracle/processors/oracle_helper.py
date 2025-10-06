@@ -48,13 +48,13 @@ async def derive_final_prices(
     oracle_helper = get_oracle_helper_contract(config)
 
     vault = Web3.to_checksum_address(config.vault_address)
-    asset_prices = encode_asset_prices(relative_prices)
+    asset_prices = encode_asset_prices(relative_prices).asset_prices
 
     prices_array = oracle_helper.functions.getPricesD18(
         vault,
         total_assets,
-        asset_prices.asset_prices,
-    )
+        asset_prices,
+    ).call(block_identifier="latest")
 
     prices = {asset_prices[i][0]: prices_array[i] for i in range(len(asset_prices))}
 
@@ -62,7 +62,7 @@ async def derive_final_prices(
 
 
 def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
-    w3 = Web3()
+    w3 = Web3(Web3.HTTPProvider(config.mainnet_rpc))
     abi = load_oracle_helper_abi()
     checksum_address = Web3.to_checksum_address(config.oracle_helper_address)
     return w3.eth.contract(address=checksum_address, abi=abi)
