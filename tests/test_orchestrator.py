@@ -16,8 +16,10 @@ from tq_oracle.report.generator import OracleReport
 def test_config():
     return OracleCLIConfig(
         vault_address="0xVault",
-        destination="0xDest",
+        oracle_address="0xOracle",
         mainnet_rpc="https://rpc",
+        safe_address=None,
+        chain_id=1,
         hl_rpc=None,
         testnet=False,
         dry_run=True,

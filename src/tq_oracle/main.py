@@ -30,12 +30,12 @@ def report(
             help="Vault contract address to query.",
         ),
     ],
-    destination: Annotated[
+    oracle_address: Annotated[
         str,
         typer.Option(
-            "--destination",
-            "-d",
-            help="Destination EOA that should receive the transaction.",
+            "--oracle-address",
+            "-o",
+            help="IOracle contract address to call submitReports on.",
         ),
     ],
     mainnet_rpc: Annotated[
@@ -47,6 +47,22 @@ def report(
             help="Ethereum mainnet RPC endpoint.",
         ),
     ] = DEFAULT_MAINNET_RPC_URL,
+    safe_address: Annotated[
+        Optional[str],
+        typer.Option(
+            "--safe-address",
+            "-s",
+            help="Gnosis Safe address for multi-sig submission (optional).",
+        ),
+    ] = None,
+    chain_id: Annotated[
+        int,
+        typer.Option(
+            "--chain-id",
+            "-c",
+            help="Network chain ID (1=mainnet, 11155111=sepolia).",
+        ),
+    ] = 1,
     hl_rpc: Annotated[
         Optional[str],
         typer.Option(
@@ -81,21 +97,27 @@ def report(
         typer.Option(
             "--private-key",
             envvar="PRIVATE_KEY",
-            help="Private key for signing (required when --no-dry-run).",
+            help="Private key for signing (required for direct submission).",
         ),
     ] = None,
 ) -> None:
-    """Collect TVL data for the requested vault."""
-    if not dry_run and not private_key:
+    """Collect TVL data and submit via Gnosis Safe (optional) or direct transaction."""
+    if not dry_run and not safe_address and not private_key:
         raise typer.BadParameter(
-            "Provide --private-key when running with --no-dry-run.",
-            param_hint=["--private-key"],
+            "Either --safe-address OR --private-key required when running with --no-dry-run.",
+            param_hint=["--safe-address", "--private-key"],
         )
+
+    resolved_chain_id = chain_id
+    if testnet and chain_id == 1:
+        resolved_chain_id = 11155111  # Sepolia
 
     config = OracleCLIConfig(
         vault_address=vault_address,
-        destination=destination,
+        oracle_address=oracle_address,
         mainnet_rpc=mainnet_rpc,
+        safe_address=safe_address,
+        chain_id=resolved_chain_id,
         hl_rpc=hl_rpc,
         testnet=testnet,
         dry_run=dry_run,

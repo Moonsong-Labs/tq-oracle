@@ -7,13 +7,20 @@ from typing import Optional
 @dataclass
 class OracleCLIConfig:
     vault_address: str
-    destination: str
+    oracle_address: str
     mainnet_rpc: str
+    safe_address: Optional[str]
+    chain_id: int
     hl_rpc: Optional[str]
     testnet: bool
     dry_run: bool
     backoff: bool
     private_key: Optional[str]
+
+    @property
+    def is_broadcast(self) -> bool:
+        """Check if Broadcast mode is enabled (Safe address provided and not dry-run)."""
+        return self.safe_address is not None and not self.dry_run
 
     def as_safe_dict(self) -> dict[str, object]:
         """Return the config as a dict with secrets redacted."""
