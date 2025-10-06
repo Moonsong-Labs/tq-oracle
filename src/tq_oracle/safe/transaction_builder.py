@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,8 @@ from web3 import Web3
 
 if TYPE_CHECKING:
     from ..report.generator import OracleReport
+
+logger = logging.getLogger(__name__)
 
 ABI_PATH = (
     Path(__file__).parent.parent.parent.parent / "contracts" / "abis" / "IOracle.json"
@@ -58,6 +61,13 @@ def encode_submit_reports(
     reports_array = [
         (asset_addr, price_d18) for asset_addr, price_d18 in report.final_prices.items()
     ]
+
+    logger.info("Encoding submitReports() with %d report(s):", len(reports_array))
+    for asset_addr, price_d18 in reports_array:
+        price_decimal = price_d18 / 10**18
+        logger.info(
+            "  - Asset: %s, Price: %d D18 (%.6f)", asset_addr, price_d18, price_decimal
+        )
 
     calldata_hex = contract.encode_abi(
         abi_element_identifier="submitReports",
