@@ -15,6 +15,13 @@ class FinalPrices:
     prices: dict[str, int]  # asset_address -> final_price (18 decimals)
 
 
+@dataclass
+class EncodedAssetPrices:
+    """Encoded asset prices."""
+
+    asset_prices: list[tuple[str, int]]
+
+
 async def derive_final_prices(
     config: OracleCLIConfig,
     relative_prices: RelativePrices,
@@ -34,3 +41,9 @@ async def derive_final_prices(
     """
 
     return FinalPrices(prices=relative_prices.prices)
+
+
+def encode_asset_prices(relative_prices: RelativePrices) -> EncodedAssetPrices:
+    """Encode asset prices for OracleHelper contract."""
+    asset_prices = sorted(relative_prices.prices.items(), key=lambda item: item[0])
+    return EncodedAssetPrices(asset_prices=asset_prices)
