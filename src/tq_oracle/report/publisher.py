@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from typing import TYPE_CHECKING
+
+from eth_account import Account
+from eth_account.signers.local import LocalAccount
 
 from ..safe.api_client import SafeAPIClient
 from ..safe.transaction_builder import encode_submit_reports
@@ -69,10 +73,16 @@ async def send_to_safe(
     This corresponds to the "send txn to Safe" and "txn appears on Safe for signing" steps.
 
     Raises:
-        ValueError: If safe_address is not configured
+        ValueError: If safe_address or private_key is not configured
     """
     if not config.safe_address:
         raise ValueError("safe_address required for Broadcast mode")
+
+    if not config.private_key:
+        raise ValueError("private_key required for Broadcast mode")
+
+    account: LocalAccount = Account.from_key(config.private_key)  # type: ignore[arg-type]
+    logger.info("Proposing transaction as: %s", account.address)
 
     client = SafeAPIClient(
         chain_id=config.chain_id,
@@ -108,11 +118,18 @@ async def send_to_safe(
         data=data,
         value=value,
         operation=operation,
+        sender=account.address,
+        origin="tq-oracle",
     )
 
-    ui_url = client.get_safe_ui_url(safe_tx_hash)
-
     logger.info("Transaction proposed: %s", safe_tx_hash)
+
+    safe_tx_hash_bytes = bytes.fromhex(safe_tx_hash.removeprefix("0x"))
+    signature = account.unsafe_sign_hash(safe_tx_hash_bytes)  # type: ignore[arg-type]
+    signature_hex = signature.signature.hex()
+    client.confirm_transaction(safe_tx_hash, signature_hex)
+
+    ui_url = client.get_safe_ui_url(safe_tx_hash)
     return ui_url
 
 
@@ -134,10 +151,14 @@ async def publish_report(
     if config.dry_run:
         await publish_to_stdout(report)
     elif config.is_broadcast:
-        transaction = await build_transaction(config, report)
-        safe_url = await send_to_safe(config, transaction)
-        print("\nTransaction proposed to Safe")
-        print(f"Approve here: {safe_url}")
+        try:
+            transaction = await build_transaction(config, report)
+            safe_url = await send_to_safe(config, transaction)
+            print("\nTransaction proposed to Safe")
+            print(f"Approve here: {safe_url}")
+        except ValueError as e:
+            print(f"\n❌ Error: {e}", file=sys.stderr)
+            raise SystemExit(1) from e
     else:
         raise NotImplementedError(
             "Direct transaction submission not yet implemented. "

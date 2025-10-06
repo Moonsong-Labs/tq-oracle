@@ -108,6 +108,12 @@ def report(
             param_hint=["--safe-address", "--private-key"],
         )
 
+    if safe_address and not dry_run and not private_key:
+        raise typer.BadParameter(
+            "--private-key required when using --safe-address with --no-dry-run.",
+            param_hint=["--private-key"],
+        )
+
     resolved_chain_id = chain_id
     if testnet and chain_id == 1:
         resolved_chain_id = 11155111  # Sepolia

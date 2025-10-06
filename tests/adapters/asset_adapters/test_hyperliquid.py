@@ -59,7 +59,7 @@ async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
         assets = await adapter.fetch_assets("0xSubvault")
 
         mock_info_class.assert_called_once_with(
-            base_url=HL_MAINNET_API_URL, skip_ws=False
+            base_url=HL_MAINNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
         assert assets[0].asset_address == USDC_MAINNET
@@ -80,7 +80,7 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
         assets = await adapter.fetch_assets("0xSubvault")
 
         mock_info_class.assert_called_once_with(
-            base_url=HL_TESTNET_API_URL, skip_ws=False
+            base_url=HL_TESTNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
         assert assets[0].asset_address == USDC_SEPOLIA

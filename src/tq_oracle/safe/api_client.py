@@ -186,7 +186,7 @@ class SafeAPIClient:
             requests.HTTPError: If proposing transaction fails
         """
         safe_info = self.get_safe_info()
-        nonce = safe_info["nonce"]
+        nonce_raw = safe_info["nonce"]
         owners = safe_info["owners"]
 
         if sender is None:
@@ -194,7 +194,12 @@ class SafeAPIClient:
                 raise ValueError("Safe has no owners")
             sender = owners[0]
 
-        if not isinstance(nonce, int):
+        # Safe API returns nonce as string, convert to int
+        if isinstance(nonce_raw, str):
+            nonce = int(nonce_raw)
+        elif isinstance(nonce_raw, int):
+            nonce = nonce_raw
+        else:
             nonce = 0
 
         safe_tx_hash = self.calculate_safe_tx_hash(
@@ -243,8 +248,68 @@ class SafeAPIClient:
             result = response.json()
             return result.get("safeTxHash", safe_tx_hash)
         except requests.HTTPError as e:
-            logger.error("Failed to propose transaction: %s - %s", e, response.text)
-            raise
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                if isinstance(error_json, dict):
+                    error_msgs: list[str] = []
+                    for key, value in error_json.items():
+                        if isinstance(value, list):
+                            error_msgs.append(
+                                f"{key}: {', '.join(str(v) for v in value)}"
+                            )
+                        else:
+                            error_msgs.append(f"{key}: {value}")
+                    error_detail = "; ".join(error_msgs)
+            except Exception:
+                pass  # Fall back to raw text if JSON parsing fails
+
+            logger.error("Failed to propose transaction: %s", error_detail)
+            raise ValueError(f"Safe API error: {error_detail}") from e
+
+    def confirm_transaction(
+        self,
+        safe_tx_hash: str,
+        signature: str,
+    ) -> None:
+        """Add confirmation signature to a proposed transaction.
+
+        Args:
+            safe_tx_hash: Safe transaction hash to confirm
+            signature: EIP-712 signature of the safe_tx_hash
+
+        Raises:
+            requests.HTTPError: If adding confirmation fails
+        """
+        payload = {"signature": signature}
+
+        response = self.session.post(
+            f"{self.service_url}/api/v1/multisig-transactions/{safe_tx_hash}/confirmations/",
+            json=payload,
+        )
+
+        try:
+            response.raise_for_status()
+            logger.info("Transaction confirmed successfully: %s", safe_tx_hash)
+        except requests.HTTPError as e:
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                if isinstance(error_json, dict):
+                    error_msgs: list[str] = []
+                    for key, value in error_json.items():
+                        if isinstance(value, list):
+                            error_msgs.append(
+                                f"{key}: {', '.join(str(v) for v in value)}"
+                            )
+                        else:
+                            error_msgs.append(f"{key}: {value}")
+                    error_detail = "; ".join(error_msgs)
+            except Exception:
+                pass
+
+            logger.error("Failed to confirm transaction: %s", error_detail)
+            raise ValueError(f"Safe API error: {error_detail}") from e
 
     def get_safe_ui_url(self, safe_tx_hash: str) -> str:
         """Generate Safe UI URL for transaction.
