@@ -6,13 +6,11 @@ def test_as_safe_dict_with_private_key():
     config = OracleCLIConfig(
         vault_address="0xVAULT",
         oracle_address="0xORACLE",
-        mainnet_rpc="https://eth.example",
+        l1_rpc="https://eth.example",
         safe_address=None,
-        chain_id=1,
         hl_rpc="https://hl.example",
         testnet=False,
         dry_run=False,
-        backoff=True,
         private_key="0x1234567890abcdef",
         safe_txn_srvc_api_key="0xSAFE",
     )
@@ -21,7 +19,7 @@ def test_as_safe_dict_with_private_key():
 
     assert safe_dict["private_key"] == "***redacted***"
     assert safe_dict["vault_address"] == "0xVAULT"
-    assert safe_dict["mainnet_rpc"] == "https://eth.example"
+    assert safe_dict["l1_rpc"] == "https://eth.example"
 
 
 def test_as_safe_dict_without_private_key():
@@ -29,13 +27,11 @@ def test_as_safe_dict_without_private_key():
     config = OracleCLIConfig(
         vault_address="0xVAULT",
         oracle_address="0xORACLE",
-        mainnet_rpc="https://eth.example",
+        l1_rpc="https://eth.example",
         safe_address=None,
-        chain_id=1,
         hl_rpc=None,
         testnet=True,
         dry_run=True,
-        backoff=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
     )
@@ -51,13 +47,11 @@ def test_as_safe_dict_preserves_all_fields():
     config = OracleCLIConfig(
         vault_address="0xVAULT",
         oracle_address="0xORACLE",
-        mainnet_rpc="https://eth.example",
+        l1_rpc="https://eth.example",
         safe_address=None,
-        chain_id=1,
         hl_rpc="https://hl.example",
         testnet=False,
         dry_run=True,
-        backoff=True,
         private_key="0xSECRET",
         safe_txn_srvc_api_key="0xSAFE",
     )
@@ -67,12 +61,12 @@ def test_as_safe_dict_preserves_all_fields():
     assert set(safe_dict.keys()) == {
         "vault_address",
         "oracle_address",
-        "mainnet_rpc",
+        "l1_rpc",
         "safe_address",
-        "chain_id",
         "hl_rpc",
         "testnet",
         "dry_run",
-        "backoff",
         "private_key",
+        "safe_txn_srvc_api_key",
+        "_chain_id",
     }

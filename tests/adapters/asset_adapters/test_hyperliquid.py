@@ -17,13 +17,11 @@ def mainnet_config():
     return OracleCLIConfig(
         vault_address="0xVault",
         oracle_address="0xOracle",
-        mainnet_rpc="https://mainnet.rpc",
+        l1_rpc="https://mainnet.rpc",
         safe_address=None,
-        chain_id=1,
         hl_rpc=None,
         testnet=False,
         dry_run=False,
-        backoff=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
     )
@@ -34,13 +32,11 @@ def testnet_config():
     return OracleCLIConfig(
         vault_address="0xVault",
         oracle_address="0xOracle",
-        mainnet_rpc="https://testnet.rpc",
+        l1_rpc="https://testnet.rpc",
         safe_address=None,
-        chain_id=11155111,
         hl_rpc=None,
         testnet=True,
         dry_run=False,
-        backoff=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
     )

@@ -6,10 +6,9 @@ from typing import Annotated, Optional
 import typer
 
 from .config import OracleCLIConfig
+from .constants import DEFAULT_MAINNET_RPC_URL, DEFAULT_SEPOLIA_RPC_URL
 from .logger import setup_logging
 from .orchestrator import execute_oracle_flow
-
-DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
 
 setup_logging()
 
@@ -38,15 +37,15 @@ def report(
             help="IOracle contract address to call submitReports on.",
         ),
     ],
-    mainnet_rpc: Annotated[
+    l1_rpc: Annotated[
         str,
         typer.Option(
-            "--mainnet-rpc",
-            envvar="MAINNET_RPC_URL",
+            "--l1-rpc",
+            envvar="L1_RPC_URL",
             show_default=True,
-            help="Ethereum mainnet RPC endpoint.",
+            help="Ethereum L1 RPC endpoint.",
         ),
-    ] = DEFAULT_MAINNET_RPC_URL,
+    ] = "empty",
     safe_address: Annotated[
         Optional[str],
         typer.Option(
@@ -55,14 +54,6 @@ def report(
             help="Gnosis Safe address for multi-sig submission (optional).",
         ),
     ] = None,
-    chain_id: Annotated[
-        int,
-        typer.Option(
-            "--chain-id",
-            "-c",
-            help="Network chain ID (1=mainnet, 11155111=sepolia).",
-        ),
-    ] = 1,
     hl_rpc: Annotated[
         Optional[str],
         typer.Option(
@@ -85,19 +76,12 @@ def report(
             help="Preview actions without sending a transaction.",
         ),
     ] = True,
-    backoff: Annotated[
-        bool,
-        typer.Option(
-            "--backoff/--no-backoff",
-            help="Enable exponential backoff retry logic.",
-        ),
-    ] = True,
     private_key: Annotated[
         Optional[str],
         typer.Option(
             "--private-key",
             envvar="PRIVATE_KEY",
-            help="Private key for signing (required for direct submission).",
+            help="Private key for signing transactions",
         ),
     ] = None,
     safe_txn_srvc_api_key: Annotated[
@@ -122,20 +106,17 @@ def report(
             param_hint=["--private-key"],
         )
 
-    resolved_chain_id = chain_id
-    if testnet and chain_id == 1:
-        resolved_chain_id = 11155111  # Sepolia
+    if l1_rpc == "empty":
+        l1_rpc = DEFAULT_SEPOLIA_RPC_URL if testnet else DEFAULT_MAINNET_RPC_URL
 
     config = OracleCLIConfig(
         vault_address=vault_address,
         oracle_address=oracle_address,
-        mainnet_rpc=mainnet_rpc,
+        l1_rpc=l1_rpc,
         safe_address=safe_address,
-        chain_id=resolved_chain_id,
         hl_rpc=hl_rpc,
         testnet=testnet,
         dry_run=dry_run,
-        backoff=backoff,
         private_key=private_key,
         safe_txn_srvc_api_key=safe_txn_srvc_api_key,
     )
