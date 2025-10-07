@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent
 
-ORACLE_HELPER_ABI_PATH = PROJECT_ROOT / "contracts" / "abis" / "OracleHelper.json"
+ORACLE_HELPER_ABI_PATH = PROJECT_ROOT / "abis" / "OracleHelper.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:

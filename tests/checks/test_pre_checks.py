@@ -12,13 +12,14 @@ def config():
     return OracleCLIConfig(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
-        destination="0xDEST",
-        mainnet_rpc="https://eth.example",
+        oracle_address="0xORACLE",
+        l1_rpc="https://eth.example",
+        safe_address=None,
         hl_rpc=None,
         testnet=False,
         dry_run=True,
-        backoff=False,
         private_key=None,
+        safe_txn_srvc_api_key=None,
     )
 
 

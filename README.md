@@ -31,7 +31,7 @@ uv sync
 uv run tq-oracle \
   --vault-address 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
   --destination 0xYourDestinationAddress \
-  --mainnet-rpc https://eth.drpc.org \
+  --l1-rpc https://eth.drpc.org \
   --hl-rpc https://your-hyperliquid-rpc \
   --dry-run
 ```
@@ -41,7 +41,7 @@ uv run tq-oracle \
 Create a `.env` file:
 
 ```env
-MAINNET_RPC_URL=https://eth.drpc.org
+L1_RPC_URL=https://eth.drpc.org
 HL_RPC_URL=https://your-hyperliquid-rpc
 PRIVATE_KEY=0xYourPrivateKey
 ```
@@ -49,9 +49,9 @@ PRIVATE_KEY=0xYourPrivateKey
 Then run:
 
 ```bash
-tq-oracle \
-  --vault-address 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
-  --destination 0xYourDestinationAddress
+uv run tq-oracle --vault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
+    --oracle-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
+    --testnet
 ```
 
 ### CLI Options
@@ -60,11 +60,10 @@ tq-oracle \
 |--------|---------------------|---------|-------------|
 | `--vault-address` | - | *required* | Vault contract address to query |
 | `--destination` | - | *required* | Destination EOA for transaction |
-| `--mainnet-rpc` | `MAINNET_RPC_URL` | `https://eth.drpc.org` | Ethereum mainnet RPC endpoint |
+| `--l1-rpc` | `L1_RPC_URL` | `https://eth.drpc.org` | Ethereum mainnet RPC endpoint |
 | `--hl-rpc` | `HL_RPC_URL` | - | hyperliquid testnet RPC endpoint |
 | `--testnet/--no-testnet` | - | `False` | Use hyperliquid testnet instead of mainnet |
 | `--dry-run/--no-dry-run` | - | `True` | Preview without sending transaction |
-| `--backoff/--no-backoff` | - | `True` | Enable exponential backoff retry |
 | `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required if not dry-run) |
 
 ### Examples
@@ -84,15 +83,6 @@ uv run tq-oracle \
   --testnet \
   --no-dry-run \
   --private-key 0x...
-```
-
-**With retry disabled:**
-
-```bash
-uv run tq-oracle \
-  --vault-address 0x277... \
-  --destination 0xabc... \
-  --no-backoff
 ```
 
 ## Architecture

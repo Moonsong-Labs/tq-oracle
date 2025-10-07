@@ -59,12 +59,13 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
     config = OracleCLIConfig(
         vault_address=vault,
         oracle_helper_address=oracle_helper,
-        destination="eth_mainnet",
-        mainnet_rpc=provider,
+        oracle_address="0xOracle",
+        l1_rpc=provider,
+        safe_address=None,
+        safe_txn_srvc_api_key=None,
         hl_rpc=None,
         testnet=False,
         dry_run=True,
-        backoff=False,
         private_key=None,
     )
 

@@ -17,13 +17,14 @@ def test_config():
     return OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        destination="0xDest",
-        mainnet_rpc="https://rpc",
+        oracle_address="0xOracle",
+        l1_rpc="https://rpc",
+        safe_address=None,
         hl_rpc=None,
         testnet=False,
         dry_run=True,
-        backoff=False,
         private_key=None,
+        safe_txn_srvc_api_key=None,
     )
 
 

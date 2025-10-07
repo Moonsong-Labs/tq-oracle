@@ -25,3 +25,5 @@ CLAUDE.md
 **/dependencies/
 
 .kluster
+
+.env

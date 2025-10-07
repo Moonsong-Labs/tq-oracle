@@ -1,0 +1,165 @@
+{
+    "abi": [
+        {
+            "type": "function",
+            "name": "tvl",
+            "inputs": [
+                {
+                    "name": "vault",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "data",
+                    "type": "tuple",
+                    "internalType": "struct ICustomOracle.Data",
+                    "components": [
+                        {
+                            "name": "oracle",
+                            "type": "address",
+                            "internalType": "address"
+                        },
+                        {
+                            "name": "timestamp",
+                            "type": "uint256",
+                            "internalType": "uint256"
+                        },
+                        {
+                            "name": "denominator",
+                            "type": "address",
+                            "internalType": "address"
+                        },
+                        {
+                            "name": "metadata",
+                            "type": "string",
+                            "internalType": "string"
+                        }
+                    ]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        }
+    ],
+    "bytecode": {
+        "object": "0x",
+        "sourceMap": "",
+        "linkReferences": {}
+    },
+    "deployedBytecode": {
+        "object": "0x",
+        "sourceMap": "",
+        "linkReferences": {}
+    },
+    "methodIdentifiers": {
+        "tvl(address,(address,uint256,address,string))": "c5e266da"
+    },
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.25+commit.b61c2a91\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"oracle\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"denominator\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"metadata\",\"type\":\"string\"}],\"internalType\":\"struct ICustomOracle.Data\",\"name\":\"data\",\"type\":\"tuple\"}],\"name\":\"tvl\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"scripts/collectors/defi/ICustomOracle.sol\":\"ICustomOracle\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/\",\":@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/\",\":erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/\",\":forge-std/=lib/openzeppelin-contracts-upgradeable/lib/forge-std/src/\",\":halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/\",\":openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/\"]},\"sources\":{\"scripts/collectors/defi/ICustomOracle.sol\":{\"keccak256\":\"0xe5a9f87693e93c128bf41455a1dcb43749ee2e66a47eeeb7618532f6f4bb2dc7\",\"license\":\"BUSL-1.1\",\"urls\":[\"bzz-raw://8de03dd1f361511fc0fdc353bb07eb5b3945322aebb864c0652fca1cdecd1fcb\",\"dweb:/ipfs/QmeuEw8V3Hwq8Q8gReV3xNLNR5WKwamqmGFFtEaLP8MXj3\"]}},\"version\":1}",
+    "metadata": {
+        "compiler": {
+            "version": "0.8.25+commit.b61c2a91"
+        },
+        "language": "Solidity",
+        "output": {
+            "abi": [
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "vault",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "struct ICustomOracle.Data",
+                            "name": "data",
+                            "type": "tuple",
+                            "components": [
+                                {
+                                    "internalType": "address",
+                                    "name": "oracle",
+                                    "type": "address"
+                                },
+                                {
+                                    "internalType": "uint256",
+                                    "name": "timestamp",
+                                    "type": "uint256"
+                                },
+                                {
+                                    "internalType": "address",
+                                    "name": "denominator",
+                                    "type": "address"
+                                },
+                                {
+                                    "internalType": "string",
+                                    "name": "metadata",
+                                    "type": "string"
+                                }
+                            ]
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "tvl",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ]
+                }
+            ],
+            "devdoc": {
+                "kind": "dev",
+                "methods": {},
+                "version": 1
+            },
+            "userdoc": {
+                "kind": "user",
+                "methods": {},
+                "version": 1
+            }
+        },
+        "settings": {
+            "remappings": [
+                "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+                "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+                "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
+                "forge-std/=lib/openzeppelin-contracts-upgradeable/lib/forge-std/src/",
+                "halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/",
+                "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
+                "openzeppelin-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/"
+            ],
+            "optimizer": {
+                "enabled": true,
+                "runs": 200
+            },
+            "metadata": {
+                "bytecodeHash": "ipfs"
+            },
+            "compilationTarget": {
+                "scripts/collectors/defi/ICustomOracle.sol": "ICustomOracle"
+            },
+            "evmVersion": "cancun",
+            "libraries": {}
+        },
+        "sources": {
+            "scripts/collectors/defi/ICustomOracle.sol": {
+                "keccak256": "0xe5a9f87693e93c128bf41455a1dcb43749ee2e66a47eeeb7618532f6f4bb2dc7",
+                "urls": [
+                    "bzz-raw://8de03dd1f361511fc0fdc353bb07eb5b3945322aebb864c0652fca1cdecd1fcb",
+                    "dweb:/ipfs/QmeuEw8V3Hwq8Q8gReV3xNLNR5WKwamqmGFFtEaLP8MXj3"
+                ],
+                "license": "BUSL-1.1"
+            }
+        },
+        "version": 1
+    },
+    "id": 80
+}
