@@ -28,9 +28,9 @@ uv sync
 ### Basic Command
 
 ```bash
-uv run tq-oracle \
+uv run tq-oracle report \
   --vault-address 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
-  --destination 0xYourDestinationAddress \
+  --oracle-helper-address 0x000000005F543c38d5ea6D0bF10A50974Eb55E35 \
   --l1-rpc https://eth.drpc.org \
   --hl-rpc https://your-hyperliquid-rpc \
   --dry-run
@@ -49,9 +49,10 @@ PRIVATE_KEY=0xYourPrivateKey
 Then run:
 
 ```bash
-uv run tq-oracle --vault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
-    --oracle-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
-    --testnet
+uv run tq-oracle report \
+  --vault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
+  --oracle-helper-address 0x000000005F543c38d5ea6D0bF10A50974Eb55E35 \
+  --testnet
 ```
 
 ### CLI Options
@@ -59,27 +60,33 @@ uv run tq-oracle --vault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
 | Option | Environment Variable | Default | Description |
 |--------|---------------------|---------|-------------|
 | `--vault-address` | - | *required* | Vault contract address to query |
-| `--destination` | - | *required* | Destination EOA for transaction |
-| `--l1-rpc` | `L1_RPC_URL` | `https://eth.drpc.org` | Ethereum mainnet RPC endpoint |
-| `--hl-rpc` | `HL_RPC_URL` | - | hyperliquid testnet RPC endpoint |
-| `--testnet/--no-testnet` | - | `False` | Use hyperliquid testnet instead of mainnet |
+| `--oracle-helper-address` | - | *required* | OracleHelper contract address |
+| `--l1-rpc` | `L1_RPC_URL` | Auto-detected | Ethereum L1 RPC endpoint |
+| `--hl-rpc` | `HL_RPC_URL` | - | Hyperliquid RPC endpoint (optional) |
+| `--safe-address` | - | - | Gnosis Safe address for multi-sig submission (optional) |
+| `--testnet/--no-testnet` | - | `False` | Use testnet instead of mainnet |
 | `--dry-run/--no-dry-run` | - | `True` | Preview without sending transaction |
-| `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required if not dry-run) |
+| `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required if not dry-run with Safe) |
+| `--safe-key` | `SAFE_TRANSACTION_SERVICE_API_KEY` | - | API key for Safe Transaction Service (optional) |
 
 ### Examples
 
 **Dry-run on mainnet (safe):**
 
 ```bash
-uv run tq-oracle --vault-address 0x277... --destination 0xabc... --dry-run
+uv run tq-oracle report \
+  --vault-address 0x277... \
+  --oracle-helper-address 0x000... \
+  --dry-run
 ```
 
-**Execute on testnet:**
+**Execute on testnet with Safe:**
 
 ```bash
-uv run tq-oracle \
+uv run tq-oracle report \
   --vault-address 0x277... \
-  --destination 0xabc... \
+  --oracle-helper-address 0x000... \
+  --safe-address 0xabc... \
   --testnet \
   --no-dry-run \
   --private-key 0x...
@@ -92,31 +99,12 @@ src/tq_oracle/
 ├── main.py                           # CLI entry point (Typer)
 ├── config.py                         # Configuration dataclass
 ├── orchestrator.py                   # Main control flow orchestration
-├── adapters/
-│   ├── __init__.py                   # Adapter registry
-│   ├── asset_adapters/
-│   │   ├── base.py                   # AssetAdapter base class
-│   │   └── hyperliquid.py            # Hyperliquid asset fetching
-│   └── price_adapters/
-│       ├── base.py                   # PriceAdapter base class
-│       └── chainlink.py              # Chainlink price feeds
-├── processors/
-│   ├── asset_aggregator.py           # Aggregate assets from adapters
-│   ├── price_calculator.py           # Calculate relative prices
-│   └── oracle_helper.py              # Derive final prices
-├── report/
-│   ├── generator.py                  # Generate oracle report
-│   └── publisher.py                  # Publish to stdout/Safe
-└── checks/
-    └── pre_checks.py                 # Pre-flight validation
-
-contracts/abis/                       # Contract ABIs (JSON)
-├── Vault.json
-├── Subvault.json
-├── OracleHelper.json
-├── EACAggregatorProxy.json
-├── HyperliquidStrategy.json
-└── ...
+├── adapters/                         # Protocol adapters (asset/price)
+├── processors/                       # Data processing pipeline
+├── report/                           # Report generation and publishing
+├── safe/                             # Safe transaction building
+├── checks/                           # Pre-flight validation
+└── abis/                             # Contract ABIs (JSON)
 ```
 
 ## Adding New Adapters

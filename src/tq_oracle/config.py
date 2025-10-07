@@ -11,7 +11,6 @@ from web3 import Web3
 class OracleCLIConfig:
     vault_address: str
     oracle_helper_address: str
-    oracle_address: str
     l1_rpc: str
     safe_address: Optional[str]
     hl_rpc: Optional[str]
@@ -19,7 +18,9 @@ class OracleCLIConfig:
     dry_run: bool
     safe_txn_srvc_api_key: Optional[str]
     private_key: Optional[str]
+    ignore_empty_vault: bool = False
     _chain_id: Optional[int] = None
+    _oracle_address: Optional[str] = None
 
     @property
     def chain_id(self) -> int:
@@ -30,6 +31,17 @@ class OracleCLIConfig:
                 raise ConnectionError(f"Failed to connect to RPC: {self.l1_rpc}")
             self._chain_id = w3.eth.chain_id
         return self._chain_id
+
+    @property
+    def oracle_address(self) -> str:
+        """Fetch oracle address from the vault contract."""
+        if self._oracle_address is None:
+            from .abi import get_oracle_address_from_vault
+
+            self._oracle_address = get_oracle_address_from_vault(
+                self.vault_address, self.l1_rpc
+            )
+        return self._oracle_address
 
     @property
     def is_broadcast(self) -> bool:

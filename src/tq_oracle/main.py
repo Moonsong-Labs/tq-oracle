@@ -9,6 +9,7 @@ from .config import OracleCLIConfig
 from .constants import DEFAULT_MAINNET_RPC_URL, DEFAULT_SEPOLIA_RPC_URL
 from .logger import setup_logging
 from .orchestrator import execute_oracle_flow
+from .constants import MAINNET_ORACLE_HELPER, SEPOLIA_ORACLE_HELPER
 
 setup_logging()
 
@@ -30,30 +31,21 @@ def report(
         ),
     ],
     oracle_helper_address: Annotated[
-        str,
+        Optional[str],
         typer.Option(
             "--oracle-helper-address",
-            "-o",
-            help="OracleHelper contract address to query.",
+            "-h",
+            help="OracleHelper contract address to query (defaults to mainnet/testnet based on --testnet flag).",
         ),
-    ],
-    oracle_address: Annotated[
-        str,
-        typer.Option(
-            "--oracle-address",
-            "-o",
-            help="IOracle contract address to call submitReports on.",
-        ),
-    ],
+    ] = None,
     l1_rpc: Annotated[
-        str,
+        Optional[str],
         typer.Option(
             "--l1-rpc",
             envvar="L1_RPC_URL",
-            show_default=True,
-            help="Ethereum L1 RPC endpoint.",
+            help="Ethereum L1 RPC endpoint (defaults to mainnet/testnet based on --testnet flag).",
         ),
-    ] = "empty",
+    ] = None,
     safe_address: Annotated[
         Optional[str],
         typer.Option(
@@ -100,6 +92,13 @@ def report(
             help="API key for the Safe Transaction Service (optional, but recommended).",
         ),
     ] = None,
+    ignore_empty_vault: Annotated[
+        bool,
+        typer.Option(
+            "--ignore-empty-vault/--no-ignore-empty-vault",
+            help="Suppress errors when vault has no assets or OracleHelper doesn't recognize assets (useful for testing pre-deployment).",
+        ),
+    ] = False,
 ) -> None:
     """Collect TVL data and submit via Safe (optional)."""
     if not dry_run and not safe_address and not private_key:
@@ -114,13 +113,17 @@ def report(
             param_hint=["--private-key"],
         )
 
-    if l1_rpc == "empty":
+    if l1_rpc is None:
         l1_rpc = DEFAULT_SEPOLIA_RPC_URL if testnet else DEFAULT_MAINNET_RPC_URL
+
+    if oracle_helper_address is None:
+        oracle_helper_address = (
+            SEPOLIA_ORACLE_HELPER if testnet else MAINNET_ORACLE_HELPER
+        )
 
     config = OracleCLIConfig(
         vault_address=vault_address,
         oracle_helper_address=oracle_helper_address,
-        oracle_address=oracle_address,
         l1_rpc=l1_rpc,
         safe_address=safe_address,
         hl_rpc=hl_rpc,

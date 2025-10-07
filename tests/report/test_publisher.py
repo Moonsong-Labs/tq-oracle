@@ -30,7 +30,6 @@ def broadcast_config() -> OracleCLIConfig:
     """Provides a sample OracleCLIConfig configured for broadcast mode."""
     return OracleCLIConfig(
         vault_address="0x1234567890123456789012345678901234567890",
-        oracle_address="0x2234567890123456789012345678901234567890",
         oracle_helper_address="0x3234567890123456789012345678901234567890",
         l1_rpc="http://localhost:8545",
         safe_address="0x3234567890123456789012345678901234567890",
@@ -62,7 +61,9 @@ async def test_publish_to_stdout_prints_correct_json(
 
 @pytest.mark.asyncio
 @patch("tq_oracle.report.publisher.encode_submit_reports")
+@patch("tq_oracle.config.get_oracle_address_from_vault")
 async def test_build_transaction_creates_valid_tx_dict(
+    mock_get_oracle: MagicMock,
     mock_encode_submit_reports: MagicMock,
     broadcast_config: OracleCLIConfig,
     sample_report: OracleReport,
@@ -71,19 +72,22 @@ async def test_build_transaction_creates_valid_tx_dict(
     Verify that build_transaction correctly calls the encoder and
     formats the result into the expected transaction dictionary.
     """
+    expected_oracle_address = "0x2234567890123456789012345678901234567890"
+    mock_get_oracle.return_value = expected_oracle_address
+
     mock_encode_submit_reports.return_value = (
-        broadcast_config.oracle_address,
+        expected_oracle_address,
         b"\x12\x34",
     )
 
     tx = await build_transaction(broadcast_config, sample_report)
 
     mock_encode_submit_reports.assert_called_once_with(
-        oracle_address=broadcast_config.oracle_address,
+        oracle_address=expected_oracle_address,
         report=sample_report,
     )
     assert tx == {
-        "to": broadcast_config.oracle_address,
+        "to": expected_oracle_address,
         "data": b"\x12\x34",
         "value": 0,
         "operation": 0,

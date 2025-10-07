@@ -17,7 +17,6 @@ def test_config():
     return OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        oracle_address="0xOracle",
         l1_rpc="https://rpc",
         safe_address=None,
         hl_rpc=None,
