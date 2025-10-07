@@ -6,6 +6,14 @@ A command-line application for collecting Total Value Locked (TVL) data from vau
 
 TQ Oracle performs read smart contract READ calls through a registry of protocol adapters to aggregate TVL data for specified vaults. Each adapter is responsible for querying specific contracts and returning standardized asset price data.
 
+## Running without installing
+
+You can run this CLI without any git cloning, directly with `uv`
+
+```sh
+uvx --from git+https://github.com/Moonsong-Labs/tq-oracle.git tq-oracle --help   
+```
+
 ## Installation
 
 This project uses `uv` for dependency management:
@@ -22,18 +30,10 @@ uv sync
 
 ## Usage
 
-> [!IMPORTANT]
-> The following is **INTENDED** function surface but not actually in place yet.
-
 ### Basic Command
 
 ```bash
-uv run tq-oracle \
-  --vault-address 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
-  --destination 0xYourDestinationAddress \
-  --l1-rpc https://eth.drpc.org \
-  --hl-rpc https://your-hyperliquid-rpc \
-  --dry-run
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
 ```
 
 ### With Environment Variables
@@ -41,48 +41,75 @@ uv run tq-oracle \
 Create a `.env` file:
 
 ```env
-L1_RPC_URL=https://eth.drpc.org
-HL_RPC_URL=https://your-hyperliquid-rpc
+L1_RPC_URL=https://sepolia.drpc.org
+HL_SUBVAULT_ADDRESS=0xYourHyperliquidSubvaultAddress
 PRIVATE_KEY=0xYourPrivateKey
 ```
 
 Then run:
 
 ```bash
-uv run tq-oracle --vault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
-    --oracle-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A \
-    --testnet
+uv run tq-oracle <VAULT_ADDRESS> [OPTIONS]
+```
+
+#### Example
+
+```bash
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
+  --dry-run \
+  --ignore-empty-vault \
+  --hl-subvault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A
 ```
 
 ### CLI Options
 
 | Option | Environment Variable | Default | Description |
 |--------|---------------------|---------|-------------|
-| `--vault-address` | - | *required* | Vault contract address to query |
-| `--destination` | - | *required* | Destination EOA for transaction |
-| `--l1-rpc` | `L1_RPC_URL` | `https://eth.drpc.org` | Ethereum mainnet RPC endpoint |
-| `--hl-rpc` | `HL_RPC_URL` | - | hyperliquid testnet RPC endpoint |
-| `--testnet/--no-testnet` | - | `False` | Use hyperliquid testnet instead of mainnet |
+| `VAULT_ADDRESS` | - | *required* | Vault contract address (positional argument) |
+| `--oracle-helper-address` `-h` | - | Auto (mainnet/testnet) | OracleHelper contract address |
+| `--l1-rpc` | `L1_RPC_URL` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
+| `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | Vault address | Hyperliquid subvault address to query |
+| `--hl-rpc` | `HL_RPC_URL` | - | Hyperliquid RPC endpoint (optional) |
+| `--safe-address` `-s` | - | - | Gnosis Safe address for multi-sig submission |
+| `--testnet/--no-testnet` | - | `False` | Use testnet instead of mainnet |
 | `--dry-run/--no-dry-run` | - | `True` | Preview without sending transaction |
-| `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required if not dry-run) |
+| `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required with Safe on --no-dry-run) |
+| `--safe-key` | `SAFE_TRANSACTION_SERVICE_API_KEY` | - | API key for Safe Transaction Service |
+| `--ignore-empty-vault` | - | `False` | Suppress errors for empty vaults (useful for testing) |
 
 ### Examples
 
-**Dry-run on mainnet (safe):**
+> [!IMPORTANT]  
+> Until Mellow has deployments of the vaults available for testing, you may need to use `--ignore-empty-vault` flag to overcome empty-asset errors.
+
+**Dry-run on mainnet:**
 
 ```bash
-uv run tq-oracle --vault-address 0x277... --destination 0xabc... --dry-run
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
 ```
 
-**Execute on testnet:**
+**Dry-run with custom Hyperliquid subvault:**
 
 ```bash
-uv run tq-oracle \
-  --vault-address 0x277... \
-  --destination 0xabc... \
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
+  --hl-subvault-address 0xYourHyperliquidAddress
+```
+
+**Execute on testnet with Safe:**
+
+```bash
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
+  --safe-address 0xabc... \
   --testnet \
   --no-dry-run \
   --private-key 0x...
+```
+
+**Testing empty vault (pre-deployment):**
+
+```bash
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
+  --ignore-empty-vault
 ```
 
 ## Architecture
@@ -92,31 +119,12 @@ src/tq_oracle/
 ├── main.py                           # CLI entry point (Typer)
 ├── config.py                         # Configuration dataclass
 ├── orchestrator.py                   # Main control flow orchestration
-├── adapters/
-│   ├── __init__.py                   # Adapter registry
-│   ├── asset_adapters/
-│   │   ├── base.py                   # AssetAdapter base class
-│   │   └── hyperliquid.py            # Hyperliquid asset fetching
-│   └── price_adapters/
-│       ├── base.py                   # PriceAdapter base class
-│       └── chainlink.py              # Chainlink price feeds
-├── processors/
-│   ├── asset_aggregator.py           # Aggregate assets from adapters
-│   ├── price_calculator.py           # Calculate relative prices
-│   └── oracle_helper.py              # Derive final prices
-├── report/
-│   ├── generator.py                  # Generate oracle report
-│   └── publisher.py                  # Publish to stdout/Safe
-└── checks/
-    └── pre_checks.py                 # Pre-flight validation
-
-contracts/abis/                       # Contract ABIs (JSON)
-├── Vault.json
-├── Subvault.json
-├── OracleHelper.json
-├── EACAggregatorProxy.json
-├── HyperliquidStrategy.json
-└── ...
+├── adapters/                         # Protocol adapters (asset/price)
+├── processors/                       # Data processing pipeline
+├── report/                           # Report generation and publishing
+├── safe/                             # Safe transaction building
+├── checks/                           # Pre-flight validation
+└── abis/                             # Contract ABIs (JSON)
 ```
 
 ## Adding New Adapters

@@ -17,10 +17,10 @@ def mainnet_config():
     return OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        oracle_address="0xOracle",
         l1_rpc="https://mainnet.rpc",
         safe_address=None,
         hl_rpc=None,
+        hl_subvault_address=None,
         testnet=False,
         dry_run=False,
         private_key=None,
@@ -33,10 +33,10 @@ def testnet_config():
     return OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        oracle_address="0xOracle",
         l1_rpc="https://testnet.rpc",
         safe_address=None,
         hl_rpc=None,
+        hl_subvault_address=None,
         testnet=True,
         dry_run=False,
         private_key=None,
@@ -275,3 +275,51 @@ async def test_amount_precision_conversion(mainnet_config):
 
         assert isinstance(assets[0].amount, int)
         assert assets[0].amount == int(123.456789 * 1e18)
+
+
+@pytest.mark.asyncio
+async def test_hl_subvault_address_from_config_overrides_parameter(mainnet_config):
+    """Config's hl_subvault_address should override the fetch_assets parameter."""
+    config_with_subvault = OracleCLIConfig(
+        vault_address="0xVault",
+        oracle_helper_address="0xOracleHelper",
+        l1_rpc="https://mainnet.rpc",
+        safe_address=None,
+        hl_rpc=None,
+        hl_subvault_address="0xConfigSubvault",
+        testnet=False,
+        dry_run=False,
+        private_key=None,
+        safe_txn_srvc_api_key=None,
+    )
+    adapter = HyperliquidAdapter(config_with_subvault)
+
+    with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
+        mock_info = MagicMock()
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+        )
+        mock_info_class.return_value = mock_info
+
+        await adapter.fetch_assets("0xPassedSubvault")
+
+        # Verify portfolio was called with config's subvault, not the passed parameter
+        mock_info.portfolio.assert_called_once_with(user="0xConfigSubvault")
+
+
+@pytest.mark.asyncio
+async def test_fallback_to_parameter_when_no_hl_subvault_in_config(mainnet_config):
+    """When config has no hl_subvault_address, should use fetch_assets parameter."""
+    adapter = HyperliquidAdapter(mainnet_config)
+
+    with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
+        mock_info = MagicMock()
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+        )
+        mock_info_class.return_value = mock_info
+
+        await adapter.fetch_assets("0xPassedSubvault")
+
+        # Verify portfolio was called with the passed parameter
+        mock_info.portfolio.assert_called_once_with(user="0xPassedSubvault")

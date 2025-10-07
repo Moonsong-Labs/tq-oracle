@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+from eth_typing import URI
+from web3 import Web3
+
+if TYPE_CHECKING:
+    from eth_typing import ChecksumAddress
 
 PROJECT_ROOT = Path(__file__).parent
 
 ORACLE_HELPER_ABI_PATH = PROJECT_ROOT / "abis" / "OracleHelper.json"
+VAULT_ABI_PATH = PROJECT_ROOT / "abis" / "Vault.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -31,3 +39,37 @@ def load_abi(path: str | Path) -> list[dict]:
 def load_oracle_helper_abi() -> list[dict]:
     """Load the OracleHelper ABI."""
     return load_abi(ORACLE_HELPER_ABI_PATH)
+
+
+def load_vault_abi() -> list[dict]:
+    """Load the Vault ABI."""
+    return load_abi(VAULT_ABI_PATH)
+
+
+def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumAddress:
+    """Fetch the oracle address from the vault contract.
+
+    Args:
+        vault_address: The vault contract address
+        rpc_url: RPC endpoint URL
+
+    Returns:
+        The oracle contract address from the vault
+
+    Raises:
+        ConnectionError: If RPC connection fails
+        ValueError: If contract call fails
+    """
+    w3 = Web3(Web3.HTTPProvider(URI(rpc_url)))
+    if not w3.is_connected():
+        raise ConnectionError(f"Failed to connect to RPC: {rpc_url}")
+
+    vault_abi = load_vault_abi()
+    checksum_vault = w3.to_checksum_address(vault_address)
+    vault_contract = w3.eth.contract(address=checksum_vault, abi=vault_abi)
+
+    try:
+        oracle_addr: ChecksumAddress = vault_contract.functions.oracle().call()
+        return oracle_addr
+    except Exception as e:
+        raise ValueError(f"Failed to fetch oracle address from vault: {e}") from e

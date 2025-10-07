@@ -12,10 +12,10 @@ def config():
     return OracleCLIConfig(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
-        oracle_address="0xORACLE",
         l1_rpc="https://eth.example",
         safe_address=None,
         hl_rpc=None,
+        hl_subvault_address=None,
         testnet=False,
         dry_run=True,
         private_key=None,
