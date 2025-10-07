@@ -9,9 +9,11 @@ from .checks.pre_checks import run_pre_checks
 from .logger import get_logger
 from .processors import (
     calculate_relative_prices,
-    compute_total_assets,
+    compute_total_aggregated_assets,
     derive_final_prices,
+    calculate_total_assets,
 )
+
 from .report import generate_report, publish_report
 
 if TYPE_CHECKING:
@@ -60,8 +62,8 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
             logger.debug("Asset adapter %d returned %d assets", i, len(result))
             asset_data.append(result)
 
-    logger.info("Computing total assets...")
-    aggregated = await compute_total_assets(asset_data)
+    logger.info("Computing agreggated assets...")
+    aggregated = await compute_total_aggregated_assets(asset_data)
     logger.debug("Total aggregated assets: %d", len(aggregated.assets))
 
     asset_addresses = list(aggregated.assets.keys())
@@ -81,9 +83,8 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
         base_asset,
     )
 
-    # TODO: calculate total assets here: totalAssets = sum(aggregated.assets[i] * relative_prices.prices[i])
     logger.info("Calculating total assets in base asset...")
-    total_assets = 100
+    total_assets = calculate_total_assets(aggregated, relative_prices)
     logger.debug("Total assets in base asset: %d", total_assets)
 
     logger.info("Deriving final prices via OracleHelper...")
