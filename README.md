@@ -33,7 +33,7 @@ uv sync
 ### Basic Command
 
 ```bash
-uv run tq-oracle report 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
 ```
 
 ### With Environment Variables
@@ -91,14 +91,14 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
 **Dry-run with custom Hyperliquid subvault:**
 
 ```bash
-uv run tq-oracle report 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
   --hl-subvault-address 0xYourHyperliquidAddress
 ```
 
 **Execute on testnet with Safe:**
 
 ```bash
-uv run tq-oracle report 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
   --safe-address 0xabc... \
   --testnet \
   --no-dry-run \
@@ -108,7 +108,7 @@ uv run tq-oracle report 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
 **Testing empty vault (pre-deployment):**
 
 ```bash
-uv run tq-oracle report 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
+uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
   --ignore-empty-vault
 ```
 
