@@ -20,6 +20,8 @@ setup_logging()
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
+    pretty_exceptions_short=True,
+    pretty_exceptions_show_locals=False,
     help="Collect TVL data from vault protocols using modular adapters.",
 )
 
@@ -28,9 +30,7 @@ app = typer.Typer(
 def report(
     vault_address: Annotated[
         str,
-        typer.Option(
-            "--vault-address",
-            "-v",
+        typer.Argument(
             help="Vault contract address to query.",
         ),
     ],
