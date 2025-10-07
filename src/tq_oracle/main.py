@@ -6,10 +6,9 @@ from typing import Annotated, Optional
 import typer
 
 from .config import OracleCLIConfig
+from .constants import DEFAULT_MAINNET_RPC_URL, DEFAULT_SEPOLIA_RPC_URL
 from .logger import setup_logging
 from .orchestrator import execute_oracle_flow
-
-DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
 
 setup_logging()
 
@@ -30,23 +29,31 @@ def report(
             help="Vault contract address to query.",
         ),
     ],
-    destination: Annotated[
+    oracle_address: Annotated[
         str,
         typer.Option(
-            "--destination",
-            "-d",
-            help="Destination EOA that should receive the transaction.",
+            "--oracle-address",
+            "-o",
+            help="IOracle contract address to call submitReports on.",
         ),
     ],
-    mainnet_rpc: Annotated[
+    l1_rpc: Annotated[
         str,
         typer.Option(
-            "--mainnet-rpc",
-            envvar="MAINNET_RPC_URL",
+            "--l1-rpc",
+            envvar="L1_RPC_URL",
             show_default=True,
-            help="Ethereum mainnet RPC endpoint.",
+            help="Ethereum L1 RPC endpoint.",
         ),
-    ] = DEFAULT_MAINNET_RPC_URL,
+    ] = "empty",
+    safe_address: Annotated[
+        Optional[str],
+        typer.Option(
+            "--safe-address",
+            "-s",
+            help="Gnosis Safe address for multi-sig submission (optional).",
+        ),
+    ] = None,
     hl_rpc: Annotated[
         Optional[str],
         typer.Option(
@@ -69,38 +76,49 @@ def report(
             help="Preview actions without sending a transaction.",
         ),
     ] = True,
-    backoff: Annotated[
-        bool,
-        typer.Option(
-            "--backoff/--no-backoff",
-            help="Enable exponential backoff retry logic.",
-        ),
-    ] = True,
     private_key: Annotated[
         Optional[str],
         typer.Option(
             "--private-key",
             envvar="PRIVATE_KEY",
-            help="Private key for signing (required when --no-dry-run).",
+            help="Private key for signing transactions",
+        ),
+    ] = None,
+    safe_txn_srvc_api_key: Annotated[
+        Optional[str],
+        typer.Option(
+            "--safe-key",
+            envvar="SAFE_TRANSACTION_SERVICE_API_KEY",
+            help="API key for the Safe Transaction Service (optional, but recommended).",
         ),
     ] = None,
 ) -> None:
-    """Collect TVL data for the requested vault."""
-    if not dry_run and not private_key:
+    """Collect TVL data and submit via Safe (optional)."""
+    if not dry_run and not safe_address and not private_key:
         raise typer.BadParameter(
-            "Provide --private-key when running with --no-dry-run.",
+            "Either --safe-address OR --private-key required when running with --no-dry-run.",
+            param_hint=["--safe-address", "--private-key"],
+        )
+
+    if safe_address and not dry_run and not private_key:
+        raise typer.BadParameter(
+            "--private-key required when using --safe-address with --no-dry-run.",
             param_hint=["--private-key"],
         )
 
+    if l1_rpc == "empty":
+        l1_rpc = DEFAULT_SEPOLIA_RPC_URL if testnet else DEFAULT_MAINNET_RPC_URL
+
     config = OracleCLIConfig(
         vault_address=vault_address,
-        destination=destination,
-        mainnet_rpc=mainnet_rpc,
+        oracle_address=oracle_address,
+        l1_rpc=l1_rpc,
+        safe_address=safe_address,
         hl_rpc=hl_rpc,
         testnet=testnet,
         dry_run=dry_run,
-        backoff=backoff,
         private_key=private_key,
+        safe_txn_srvc_api_key=safe_txn_srvc_api_key,
     )
 
     asyncio.run(execute_oracle_flow(config))

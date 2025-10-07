@@ -1,11 +1,26 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from typing import TYPE_CHECKING
+
+import requests
+from eth_account import Account
+from eth_account.signers.local import LocalAccount
+from eth_typing import URI
+from safe_eth.eth import EthereumClient, EthereumNetwork
+from safe_eth.safe.api import TransactionServiceApi
+from safe_eth.safe.safe_tx import SafeTx
+from web3 import Web3
+
+from ..safe.transaction_builder import encode_submit_reports
 
 if TYPE_CHECKING:
     from ..config import OracleCLIConfig
     from .generator import OracleReport
+
+logger = logging.getLogger(__name__)
 
 
 async def publish_to_stdout(report: OracleReport) -> None:
@@ -22,8 +37,8 @@ async def publish_to_stdout(report: OracleReport) -> None:
 async def build_transaction(
     config: OracleCLIConfig,
     report: OracleReport,
-) -> dict[str, object]:
-    """Build a submitReport() transaction.
+) -> dict[str, str | bytes | int]:
+    """Build a submitReports() transaction.
 
     Args:
         config: CLI configuration
@@ -32,20 +47,26 @@ async def build_transaction(
     Returns:
         Transaction data ready to be sent
 
-    This corresponds to the "submitReport() txn built" step in the flowchart.
-
-    TODO: Implement actual transaction building with Web3
+    This corresponds to the "submitReports() txn built" step in the flowchart.
     """
+    to_address, calldata = encode_submit_reports(
+        oracle_address=config.oracle_address,
+        report=report,
+    )
+    logger.debug("Built submitReports() transaction to: %s", to_address)
+    logger.debug("Encoded calldata: %s", calldata.hex())
+
     return {
-        "to": config.destination,
-        "data": "0x",  # Placeholder
+        "to": to_address,
+        "data": calldata,
         "value": 0,
+        "operation": 0,  # CALL
     }
 
 
 async def send_to_safe(
     config: OracleCLIConfig,
-    transaction: dict[str, object],
+    transaction: dict[str, str | bytes | int],
 ) -> str:
     """Send transaction to Gnosis Safe for signing.
 
@@ -54,13 +75,99 @@ async def send_to_safe(
         transaction: The transaction to send
 
     Returns:
-        Transaction hash or Safe URL
+        Safe UI URL for transaction approval
 
     This corresponds to the "send txn to Safe" and "txn appears on Safe for signing" steps.
 
-    TODO: Implement actual Safe API integration
+    Raises:
+        ValueError: If safe_address or private_key is not configured
     """
-    return f"https://app.safe.global/transactions/queue?safe=eth:{config.destination}"
+    if not config.safe_address:
+        raise ValueError("safe_address required for Broadcast mode")
+
+    if not config.private_key:
+        raise ValueError("private_key required for Broadcast mode")
+
+    account: LocalAccount = Account.from_key(config.private_key)  # type: ignore[arg-type]
+    logger.info("Proposing transaction as: %s", account.address)
+
+    network = EthereumNetwork(config.chain_id)
+    ethereum_client = EthereumClient(URI(config.l1_rpc))
+    tx_service = TransactionServiceApi(
+        network, ethereum_client, api_key=config.safe_txn_srvc_api_key
+    )
+
+    safe_checksum = Web3.to_checksum_address(config.safe_address)
+
+    safe_api_url = f"{tx_service.base_url}/api/v1/safes/{safe_checksum}/"
+    logger.debug("Fetching Safe info from: %s", safe_api_url)
+    safe_info_response = await asyncio.to_thread(requests.get, safe_api_url)
+    safe_info_response.raise_for_status()
+    safe_info_data = safe_info_response.json()
+    nonce = int(safe_info_data.get("nonce", 0))
+
+    logger.info("Building transaction for Safe: %s (nonce: %d)", safe_checksum, nonce)
+
+    to_addr = transaction["to"]
+    data = transaction["data"]
+    value = transaction.get("value", 0)
+    operation = transaction.get("operation", 0)
+
+    assert isinstance(to_addr, str), "to must be string"
+    assert isinstance(data, bytes), "data must be bytes"
+    assert isinstance(value, int), "value must be int"
+    assert isinstance(operation, int), "operation must be int"
+
+    if config.safe_txn_srvc_api_key is None:
+        logger.debug(
+            "No Transaction Service API key configured; waiting for 2s to avoid rate limits"
+        )
+        await asyncio.sleep(2)
+
+    safe_tx = SafeTx(
+        ethereum_client=ethereum_client,
+        safe_address=safe_checksum,
+        to=Web3.to_checksum_address(to_addr),
+        value=value,
+        data=data,
+        operation=operation,
+        safe_tx_gas=0,
+        base_gas=0,
+        gas_price=0,
+        gas_token=Web3.to_checksum_address(
+            "0x0000000000000000000000000000000000000000"
+        ),
+        refund_receiver=Web3.to_checksum_address(
+            "0x0000000000000000000000000000000000000000"
+        ),
+        safe_nonce=nonce,
+        safe_version="1.3.0",
+        chain_id=config.chain_id,
+    )
+
+    safe_tx.sign(config.private_key)
+
+    await asyncio.to_thread(tx_service.post_transaction, safe_tx)
+
+    safe_tx_hash = safe_tx.safe_tx_hash.hex()
+    logger.info("Transaction proposed: %s", safe_tx_hash)
+
+    network_prefix = {
+        1: "eth",
+        11155111: "sep",
+        100: "gno",
+        137: "matic",
+        42161: "arb1",
+        10: "oeth",
+    }.get(config.chain_id, "eth")
+
+    ui_url = (
+        f"https://app.safe.global/transactions/queue"
+        f"?safe={network_prefix}:{config.safe_address}"
+        f"#{safe_tx_hash}"
+    )
+
+    return ui_url
 
 
 async def publish_report(
@@ -75,11 +182,23 @@ async def publish_report(
 
     This handles the branching logic in the flowchart:
     - If dry_run: publish to stdout
-    - If not dry_run: build transaction, send to Safe
+    - If not dry_run and Broadcast mode: build transaction, send to Safe
     """
     if config.dry_run:
         await publish_to_stdout(report)
-    else:
-        transaction = await build_transaction(config, report)
-        safe_url = await send_to_safe(config, transaction)
-        print(f"Transaction sent to Safe: {safe_url}")
+        return
+
+    if config.is_broadcast:
+        try:
+            transaction = await build_transaction(config, report)
+            safe_url = await send_to_safe(config, transaction)
+            logger.info("\nTransaction proposed to Safe")
+            logger.info(f"Approve here: {safe_url}")
+            return
+        except ValueError as e:
+            logger.error(f"\n❌ Error: {e}")
+            raise SystemExit(1) from e
+
+    raise ValueError(
+        "Either dry_run must be True or safe_address must be set for Broadcast mode"
+    )

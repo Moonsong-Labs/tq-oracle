@@ -13,7 +13,7 @@ class ChainlinkAdapter(BasePriceAdapter):
 
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
-        self.mainnet_rpc = config.mainnet_rpc
+        self.l1_rpc = config.l1_rpc
 
     @property
     def adapter_name(self) -> str:

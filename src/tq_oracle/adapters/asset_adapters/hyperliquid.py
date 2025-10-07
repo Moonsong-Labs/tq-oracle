@@ -48,7 +48,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
         )
         logger.debug("Using API URL: %s", base_url)
 
-        info = await asyncio.to_thread(Info, base_url=base_url, skip_ws=False)
+        info = await asyncio.to_thread(Info, base_url=base_url, skip_ws=True)
 
         try:
             logger.debug("Calling portfolio API to fetch TWAP data...")
@@ -109,7 +109,3 @@ class HyperliquidAdapter(BaseAssetAdapter):
         except Exception as e:
             logger.error("Failed to fetch Hyperliquid assets: %s", e)
             raise
-        finally:
-            if info.ws_manager is not None:
-                logger.debug("Disconnecting WebSocket...")
-                info.disconnect_websocket()

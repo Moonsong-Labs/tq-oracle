@@ -5,3 +5,7 @@ USDC_SEPOLIA = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
 
 HL_MAINNET_API_URL = "https://api.hyperliquid.xyz"
 HL_TESTNET_API_URL = "https://api.hyperliquid-testnet.xyz"
+
+
+DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
+DEFAULT_SEPOLIA_RPC_URL = "https://sepolia.drpc.org"
