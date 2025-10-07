@@ -1,13 +1,13 @@
 import pytest
 
 from tq_oracle.adapters.asset_adapters.base import AssetData
-from tq_oracle.processors.asset_aggregator import compute_total_assets
+from tq_oracle.processors.asset_aggregator import compute_total_aggregated_assets
 
 
 @pytest.mark.asyncio
 async def test_empty_protocol_assets():
     """Empty input should return empty aggregated assets."""
-    result = await compute_total_assets([])
+    result = await compute_total_aggregated_assets([])
 
     assert result.assets == {}
 
@@ -17,7 +17,7 @@ async def test_single_protocol_single_asset():
     """Single protocol with one asset."""
     protocol_assets = [[AssetData("0xTOKEN", 1000)]]
 
-    result = await compute_total_assets(protocol_assets)
+    result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {"0xTOKEN": 1000}
 
@@ -32,7 +32,7 @@ async def test_single_protocol_multiple_assets():
         ]
     ]
 
-    result = await compute_total_assets(protocol_assets)
+    result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {"0xTOKEN1": 1000, "0xTOKEN2": 2000}
 
@@ -45,7 +45,7 @@ async def test_multiple_protocols_distinct_assets():
         [AssetData("0xTOKEN2", 2000)],
     ]
 
-    result = await compute_total_assets(protocol_assets)
+    result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {"0xTOKEN1": 1000, "0xTOKEN2": 2000}
 
@@ -59,7 +59,7 @@ async def test_multiple_protocols_overlapping_assets():
         [AssetData("0xUSDC", 300)],
     ]
 
-    result = await compute_total_assets(protocol_assets)
+    result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {"0xUSDC": 1800}
 
@@ -73,7 +73,7 @@ async def test_mixed_overlapping_and_distinct():
         [AssetData("0xETH", 3)],
     ]
 
-    result = await compute_total_assets(protocol_assets)
+    result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {
         "0xUSDC": 1500,
@@ -91,6 +91,6 @@ async def test_protocol_with_empty_assets():
         [AssetData("0xUSDC", 500)],
     ]
 
-    result = await compute_total_assets(protocol_assets)
+    result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {"0xUSDC": 1500}
