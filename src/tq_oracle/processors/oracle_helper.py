@@ -5,12 +5,16 @@ from typing import TYPE_CHECKING
 
 from web3 import Web3
 from web3.contract import Contract
+from web3.exceptions import ContractLogicError
 
 from ..abi import load_oracle_helper_abi
+from ..logger import get_logger
 
 if TYPE_CHECKING:
     from ..config import OracleCLIConfig
     from .price_calculator import RelativePrices
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -50,15 +54,26 @@ async def derive_final_prices(
     vault = Web3.to_checksum_address(config.vault_address)
     asset_prices = encode_asset_prices(relative_prices).asset_prices
 
-    prices_array = oracle_helper.functions.getPricesD18(
-        vault,
-        total_assets,
-        asset_prices,
-    ).call(block_identifier="latest")
+    try:
+        prices_array = oracle_helper.functions.getPricesD18(
+            vault,
+            total_assets,
+            asset_prices,
+        ).call(block_identifier="latest")
 
-    prices = {asset_prices[i][0]: prices_array[i] for i in range(len(asset_prices))}
+        prices = {asset_prices[i][0]: prices_array[i] for i in range(len(asset_prices))}
 
-    return FinalPrices(prices=prices)
+        return FinalPrices(prices=prices)
+    except ContractLogicError as e:
+        if config.ignore_empty_vault and "asset not found" in str(e):
+            logger.warning(
+                "OracleHelper contract returned 'asset not found' error. "
+                "Returning zero prices due to --ignore-empty-vault flag."
+            )
+            prices = {asset: 0 for asset, _ in asset_prices}
+            return FinalPrices(prices=prices)
+        else:
+            raise
 
 
 def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:

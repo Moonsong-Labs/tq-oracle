@@ -6,10 +6,14 @@ from typing import Annotated, Optional
 import typer
 
 from .config import OracleCLIConfig
-from .constants import DEFAULT_MAINNET_RPC_URL, DEFAULT_SEPOLIA_RPC_URL
+from .constants import (
+    DEFAULT_MAINNET_RPC_URL,
+    DEFAULT_SEPOLIA_RPC_URL,
+    MAINNET_ORACLE_HELPER,
+    SEPOLIA_ORACLE_HELPER,
+)
 from .logger import setup_logging
 from .orchestrator import execute_oracle_flow
-from .constants import MAINNET_ORACLE_HELPER, SEPOLIA_ORACLE_HELPER
 
 setup_logging()
 
@@ -131,6 +135,7 @@ def report(
         dry_run=dry_run,
         private_key=private_key,
         safe_txn_srvc_api_key=safe_txn_srvc_api_key,
+        ignore_empty_vault=ignore_empty_vault,
     )
 
     asyncio.run(execute_oracle_flow(config))
