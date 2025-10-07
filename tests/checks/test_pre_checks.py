@@ -11,6 +11,7 @@ def config():
     """Minimal config for testing."""
     return OracleCLIConfig(
         vault_address="0xVAULT",
+        oracle_helper_address="0xORACLE_HELPER",
         oracle_address="0xORACLE",
         l1_rpc="https://eth.example",
         safe_address=None,

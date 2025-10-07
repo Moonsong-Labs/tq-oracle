@@ -31,6 +31,7 @@ def broadcast_config() -> OracleCLIConfig:
     return OracleCLIConfig(
         vault_address="0x1234567890123456789012345678901234567890",
         oracle_address="0x2234567890123456789012345678901234567890",
+        oracle_helper_address="0x3234567890123456789012345678901234567890",
         l1_rpc="http://localhost:8545",
         safe_address="0x3234567890123456789012345678901234567890",
         hl_rpc=None,

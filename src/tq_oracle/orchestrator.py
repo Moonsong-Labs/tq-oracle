@@ -88,7 +88,7 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     logger.debug("Total assets in base asset: %d", total_assets)
 
     logger.info("Deriving final prices via OracleHelper...")
-    final_prices = await derive_final_prices(config, relative_prices)
+    final_prices = await derive_final_prices(config, total_assets, relative_prices)
 
     logger.info("Generating report...")
     report = await generate_report(

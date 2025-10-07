@@ -10,6 +10,7 @@ from web3 import Web3
 @dataclass
 class OracleCLIConfig:
     vault_address: str
+    oracle_helper_address: str
     oracle_address: str
     l1_rpc: str
     safe_address: Optional[str]

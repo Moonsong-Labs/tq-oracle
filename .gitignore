@@ -13,6 +13,7 @@ wheels/
 # Ignore kluster.ai Verify Code rules
 .github/instructions/kluster-code-verify.instructions.md
 .claude
+.cursor
 .ruff_cache
 AGENTS.md
 CLAUDE.md
