@@ -61,7 +61,6 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
         oracle_helper_address=oracle_helper,
         destination="eth_mainnet",
         mainnet_rpc=provider,
-        testnet_rpc=provider,
         hl_rpc=None,
         testnet=False,
         dry_run=True,

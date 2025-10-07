@@ -10,7 +10,6 @@ class OracleCLIConfig:
     oracle_helper_address: str
     destination: str
     mainnet_rpc: str
-    testnet_rpc: str
     hl_rpc: Optional[str]
     testnet: bool
     dry_run: bool

@@ -10,7 +10,6 @@ from .logger import setup_logging
 from .orchestrator import execute_oracle_flow
 
 DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
-DEFAULT_TESTNET_RPC_URL = "https://sepolia.drpc.org"
 
 setup_logging()
 
@@ -56,14 +55,6 @@ def report(
             help="Ethereum mainnet RPC endpoint.",
         ),
     ] = DEFAULT_MAINNET_RPC_URL,
-    testnet_rpc: Annotated[
-        str,
-        typer.Option(
-            "--testnet-rpc",
-            envvar="TESTNET_RPC_URL",
-            help="Ethereum testnet RPC endpoint.",
-        ),
-    ] = DEFAULT_TESTNET_RPC_URL,
     hl_rpc: Annotated[
         Optional[str],
         typer.Option(
@@ -114,7 +105,6 @@ def report(
         oracle_helper_address=oracle_helper_address,
         destination=destination,
         mainnet_rpc=mainnet_rpc,
-        testnet_rpc=testnet_rpc,
         hl_rpc=hl_rpc,
         testnet=testnet,
         dry_run=dry_run,
