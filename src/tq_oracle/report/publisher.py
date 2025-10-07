@@ -121,12 +121,10 @@ async def send_to_safe(
 
     if config.safe_txn_srvc_api_key is None:
         logger.debug(
-            "No Transaction Service API key configured; using waiting for 2s to avoid rate limits"
+            "No Transaction Service API key configured; waiting for 2s to avoid rate limits"
         )
         await asyncio.sleep(2)
 
-    # Note: safe_nonce=None means it will be retrieved automatically from Transaction Service
-    # safe_version is set to avoid on-chain call (we support Safe 1.3.0+)
     safe_tx = SafeTx(
         ethereum_client=ethereum_client,
         safe_address=safe_checksum,
@@ -143,8 +141,8 @@ async def send_to_safe(
         refund_receiver=Web3.to_checksum_address(
             "0x0000000000000000000000000000000000000000"
         ),
-        safe_nonce=nonce,  # Use nonce from Transaction Service API
-        safe_version="1.3.0",  # Avoid on-chain call for version
+        safe_nonce=nonce,
+        safe_version="1.3.0",
         chain_id=config.chain_id,
     )
 
@@ -186,21 +184,22 @@ async def publish_report(
     This handles the branching logic in the flowchart:
     - If dry_run: publish to stdout
     - If not dry_run and Broadcast mode: build transaction, send to Safe
-    - If not dry_run and direct mode: raise NotImplementedError (future work)
     """
     if config.dry_run:
         await publish_to_stdout(report)
-    elif config.is_broadcast:
+        return
+
+    if config.is_broadcast:
         try:
             transaction = await build_transaction(config, report)
             safe_url = await send_to_safe(config, transaction)
-            print("\nTransaction proposed to Safe")
-            print(f"Approve here: {safe_url}")
+            logger.info("\nTransaction proposed to Safe")
+            logger.info(f"Approve here: {safe_url}")
+            return
         except ValueError as e:
-            print(f"\n❌ Error: {e}", file=sys.stderr)
+            logger.error(f"\n❌ Error: {e}")
             raise SystemExit(1) from e
-    else:
-        raise NotImplementedError(
-            "Direct transaction submission not yet implemented. "
-            "Use --safe-address for Broadcast mode or --dry-run for testing."
-        )
+
+    raise ValueError(
+        "Either dry_run must be True or safe_address must be set for Broadcast mode"
+    )

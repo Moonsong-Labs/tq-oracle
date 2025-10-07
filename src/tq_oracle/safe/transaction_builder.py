@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+from importlib.resources import files
 from web3 import Web3
 
 if TYPE_CHECKING:
@@ -14,13 +14,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ABI_PATH = (
-    Path(__file__).parent.parent.parent.parent / "contracts" / "abis" / "IOracle.json"
-)
-
 
 def load_oracle_abi() -> list[dict]:
-    """Load IOracle ABI from contracts/abis/IOracle.json.
+    """Load IOracle ABI from package resources.
 
     Returns:
         ABI as a list of dictionaries
@@ -29,9 +25,13 @@ def load_oracle_abi() -> list[dict]:
         FileNotFoundError: If ABI file doesn't exist
         json.JSONDecodeError: If ABI file is malformed
     """
-    with open(ABI_PATH) as f:
-        data = json.load(f)
+    try:
+        abi_file = files("tq_oracle.abis").joinpath("IOracle.json")
+        abi_data = abi_file.read_text()
+        data = json.loads(abi_data)
         return data["abi"]
+    except (FileNotFoundError, KeyError) as e:
+        raise FileNotFoundError("IOracle ABI not found in package resources. ") from e
 
 
 def encode_submit_reports(

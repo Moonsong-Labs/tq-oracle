@@ -239,12 +239,15 @@ async def test_publish_report_routes_to_broadcast_flow(
     mock_send_to_safe: AsyncMock,
     broadcast_config: OracleCLIConfig,
     sample_report: OracleReport,
-    capsys,
+    caplog,
 ):
     """
     Verify that publish_report orchestrates the build and send flow
     when in broadcast mode.
     """
+    import logging
+
+    caplog.set_level(logging.INFO)
     broadcast_config.dry_run = False
     mock_build_transaction.return_value = {"tx": "data"}
     mock_send_to_safe.return_value = "http://safe.url"
@@ -253,9 +256,8 @@ async def test_publish_report_routes_to_broadcast_flow(
 
     mock_build_transaction.assert_awaited_once_with(broadcast_config, sample_report)
     mock_send_to_safe.assert_awaited_once_with(broadcast_config, {"tx": "data"})
-    captured = capsys.readouterr()
-    assert "Transaction proposed to Safe" in captured.out
-    assert "Approve here: http://safe.url" in captured.out
+    assert "Transaction proposed to Safe" in caplog.text
+    assert "Approve here: http://safe.url" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -266,12 +268,15 @@ async def test_publish_report_handles_broadcast_error_and_exits(
     mock_send_to_safe: AsyncMock,
     broadcast_config: OracleCLIConfig,
     sample_report: OracleReport,
-    capsys,
+    caplog,
 ):
     """
     Verify that publish_report catches ValueErrors from the broadcast flow,
     prints an error message, and exits with a non-zero status code.
     """
+    import logging
+
+    caplog.set_level(logging.ERROR)
     broadcast_config.dry_run = False
     mock_build_transaction.return_value = {"tx": "data"}
     mock_send_to_safe.side_effect = ValueError("Missing API key")
@@ -280,8 +285,7 @@ async def test_publish_report_handles_broadcast_error_and_exits(
         await publish_report(broadcast_config, sample_report)
 
     assert excinfo.value.code == 1
-    captured = capsys.readouterr()
-    assert "❌ Error: Missing API key" in captured.err
+    assert "❌ Error: Missing API key" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -289,13 +293,14 @@ async def test_publish_report_raises_for_unsupported_direct_mode(
     broadcast_config: OracleCLIConfig, sample_report: OracleReport
 ):
     """
-    Verify that publish_report raises NotImplementedError if not in
+    Verify that publish_report raises ValueError if not in
     dry-run or broadcast mode.
     """
     broadcast_config.dry_run = False
     broadcast_config.safe_address = None
 
     with pytest.raises(
-        NotImplementedError, match="Direct transaction submission not yet implemented"
+        ValueError,
+        match="Either dry_run must be True or safe_address must be set for Broadcast mode",
     ):
         await publish_report(broadcast_config, sample_report)
