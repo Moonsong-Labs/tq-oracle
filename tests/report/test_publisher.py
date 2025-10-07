@@ -61,7 +61,7 @@ async def test_publish_to_stdout_prints_correct_json(
 
 @pytest.mark.asyncio
 @patch("tq_oracle.report.publisher.encode_submit_reports")
-@patch("tq_oracle.config.get_oracle_address_from_vault")
+@patch("tq_oracle.abi.get_oracle_address_from_vault")
 async def test_build_transaction_creates_valid_tx_dict(
     mock_get_oracle: MagicMock,
     mock_encode_submit_reports: MagicMock,

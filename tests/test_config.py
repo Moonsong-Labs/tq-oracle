@@ -68,6 +68,7 @@ def test_as_safe_dict_preserves_all_fields():
         "dry_run",
         "private_key",
         "safe_txn_srvc_api_key",
+        "ignore_empty_vault",
         "_chain_id",
         "_oracle_address",
     }
