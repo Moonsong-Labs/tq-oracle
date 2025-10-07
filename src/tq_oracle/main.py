@@ -66,6 +66,14 @@ def report(
             help="hyperliquid RPC endpoint (optional).",
         ),
     ] = None,
+    hl_subvault_address: Annotated[
+        Optional[str],
+        typer.Option(
+            "--hl-subvault-address",
+            envvar="HL_SUBVAULT_ADDRESS",
+            help="Hyperliquid subvault address to query (optional, defaults to vault address).",
+        ),
+    ] = None,
     testnet: Annotated[
         bool,
         typer.Option(
@@ -131,6 +139,7 @@ def report(
         l1_rpc=l1_rpc,
         safe_address=safe_address,
         hl_rpc=hl_rpc,
+        hl_subvault_address=hl_subvault_address,
         testnet=testnet,
         dry_run=dry_run,
         private_key=private_key,

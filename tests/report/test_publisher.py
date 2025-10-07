@@ -34,6 +34,7 @@ def broadcast_config() -> OracleCLIConfig:
         l1_rpc="http://localhost:8545",
         safe_address="0x3234567890123456789012345678901234567890",
         hl_rpc=None,
+        hl_subvault_address=None,
         testnet=False,
         dry_run=False,
         private_key="0x" + "a" * 64,

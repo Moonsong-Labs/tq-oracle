@@ -14,6 +14,7 @@ class OracleCLIConfig:
     l1_rpc: str
     safe_address: Optional[str]
     hl_rpc: Optional[str]
+    hl_subvault_address: Optional[str]
     testnet: bool
     dry_run: bool
     safe_txn_srvc_api_key: Optional[str]

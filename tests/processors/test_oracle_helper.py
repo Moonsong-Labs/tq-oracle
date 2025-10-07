@@ -63,6 +63,7 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
         safe_address=None,
         safe_txn_srvc_api_key=None,
         hl_rpc=None,
+        hl_subvault_address=None,
         testnet=False,
         dry_run=True,
         private_key=None,

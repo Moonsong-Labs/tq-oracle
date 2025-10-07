@@ -20,6 +20,7 @@ def test_config():
         l1_rpc="https://rpc",
         safe_address=None,
         hl_rpc=None,
+        hl_subvault_address=None,
         testnet=False,
         dry_run=True,
         private_key=None,

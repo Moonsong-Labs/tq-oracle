@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from hyperliquid.info import Info
 
@@ -35,15 +35,19 @@ class HyperliquidAdapter(BaseAssetAdapter):
         """Fetch asset data from Hyperliquid for the given vault.
 
         Args:
-            subvault_address: The subvault contract address to query
+            subvault_address: The subvault contract address to query (used as fallback if config doesn't specify hl_subvault_address)
 
         Returns:
             Account portfolio value as USDC asset
         """
+        # Use config's hl_subvault_address if set, otherwise fall back to passed address
+        config = cast("OracleCLIConfig", self.config)
+        address_to_query = config.hl_subvault_address or subvault_address
+
         base_url = HL_TESTNET_API_URL if self.testnet else HL_MAINNET_API_URL
         logger.info(
             "Fetching Hyperliquid assets for %s (testnet=%s)",
-            subvault_address,
+            address_to_query,
             self.testnet,
         )
         logger.debug("Using API URL: %s", base_url)
@@ -53,7 +57,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
         try:
             logger.debug("Calling portfolio API to fetch TWAP data...")
             portfolio_data = await asyncio.to_thread(
-                info.portfolio, user=subvault_address
+                info.portfolio, user=address_to_query
             )
 
             day_data = next(
@@ -65,7 +69,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
             account_history = day_data.get("accountValueHistory", [])
             if not account_history:
                 logger.warning(
-                    "Empty account history for %s, returning 0", subvault_address
+                    "Empty account history for %s, returning 0", address_to_query
                 )
                 return []
 
