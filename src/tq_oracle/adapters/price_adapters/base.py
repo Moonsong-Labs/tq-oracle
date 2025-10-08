@@ -9,8 +9,8 @@ from typing import Protocol
 class PriceData:
     """Price data from a price adapter."""
 
-    asset_address: str
-    price_usd: int  # in 18 decimals
+    base_asset: str
+    prices: dict[str, int]  # asset_address -> price_wei (18 decimals)
 
 
 class PriceAdapter(Protocol):
@@ -21,7 +21,7 @@ class PriceAdapter(Protocol):
         """Return the name of this adapter."""
         ...
 
-    async def fetch_prices(self, asset_addresses: list[str]) -> list[PriceData]:
+    async def fetch_prices(self, asset_addresses: list[str]) -> PriceData:
         """Fetch prices for the given asset addresses.
 
         Args:
@@ -47,6 +47,6 @@ class BasePriceAdapter(ABC):
         ...
 
     @abstractmethod
-    async def fetch_prices(self, asset_addresses: list[str]) -> list[PriceData]:
+    async def fetch_prices(self, asset_addresses: list[str]) -> PriceData:
         """Fetch prices for the given asset addresses."""
         ...

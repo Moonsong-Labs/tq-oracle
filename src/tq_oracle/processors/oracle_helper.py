@@ -9,10 +9,10 @@ from web3.exceptions import ContractLogicError
 
 from ..abi import load_oracle_helper_abi
 from ..logger import get_logger
+from ..adapters.price_adapters.base import PriceData
 
 if TYPE_CHECKING:
     from ..config import OracleCLIConfig
-    from .price_calculator import RelativePrices
 
 logger = get_logger(__name__)
 
@@ -34,7 +34,7 @@ class EncodedAssetPrices:
 async def derive_final_prices(
     config: OracleCLIConfig,
     total_assets: int,
-    relative_prices: RelativePrices,
+    prices: PriceData,
 ) -> FinalPrices:
     """Derive final prices via OracleHelper contract.
 
@@ -52,7 +52,7 @@ async def derive_final_prices(
     oracle_helper = get_oracle_helper_contract(config)
 
     vault = Web3.to_checksum_address(config.vault_address)
-    asset_prices = encode_asset_prices(relative_prices).asset_prices
+    asset_prices = encode_asset_prices(prices).asset_prices
 
     try:
         prices_array = oracle_helper.functions.getPricesD18(
@@ -83,7 +83,7 @@ def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
     return w3.eth.contract(address=checksum_address, abi=abi)
 
 
-def encode_asset_prices(relative_prices: RelativePrices) -> EncodedAssetPrices:
+def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
     """Encode asset prices for OracleHelper contract."""
-    asset_prices = sorted(relative_prices.prices.items(), key=lambda item: item[0])
+    asset_prices = sorted(prices.prices.items(), key=lambda item: item[0])
     return EncodedAssetPrices(asset_prices=asset_prices)

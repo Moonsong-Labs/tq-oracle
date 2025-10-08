@@ -33,5 +33,10 @@ async def test_fetch_prices_raises_on_invalid_asset(config):
 async def test_fetch_prices_usdc(config):
     adapter = ChainlinkAdapter(config)
     usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-    await adapter.fetch_prices([usdc_address])
-    assert True is False
+    result = await adapter.fetch_prices([usdc_address])
+    assert isinstance(result, list)
+    assert len(result) == 1
+    pd = result[0]
+    assert pd.asset_address == usdc_address
+    assert isinstance(pd.price_wei, int)
+    assert pd.price_wei >= 0
