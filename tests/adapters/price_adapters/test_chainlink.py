@@ -9,7 +9,7 @@ def config():
     return OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://mainnet.rpc",
+        l1_rpc="https://eth.drpc.org",
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
@@ -27,3 +27,11 @@ async def test_fetch_prices_raises_on_invalid_asset(config):
 
     with pytest.raises(ValueError, match="not supported"):
         await adapter.fetch_prices([invalid_address])
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_usdc(config):
+    adapter = ChainlinkAdapter(config)
+    usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    await adapter.fetch_prices([usdc_address])
+    assert True is False
