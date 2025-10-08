@@ -34,14 +34,14 @@ class EncodedAssetPrices:
 async def derive_final_prices(
     config: OracleCLIConfig,
     total_assets: int,
-    prices: PriceData,
+    price_data: PriceData,
 ) -> FinalPrices:
     """Derive final prices via OracleHelper contract.
 
     Args:
         config: CLI configuration with RPC endpoints
         total_assets: Total assets from vault and adapters
-        relative_prices: Relative prices from price calculator
+        price_data: Prices from price adapters
 
     Returns:
         Final oracle prices
@@ -52,7 +52,7 @@ async def derive_final_prices(
     oracle_helper = get_oracle_helper_contract(config)
 
     vault = Web3.to_checksum_address(config.vault_address)
-    asset_prices = encode_asset_prices(prices).asset_prices
+    asset_prices = encode_asset_prices(price_data).asset_prices
 
     try:
         prices_array = oracle_helper.functions.getPricesD18(

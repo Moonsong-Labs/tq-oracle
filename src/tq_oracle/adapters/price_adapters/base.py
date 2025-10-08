@@ -21,14 +21,17 @@ class PriceAdapter(Protocol):
         """Return the name of this adapter."""
         ...
 
-    async def fetch_prices(self, asset_addresses: list[str]) -> PriceData:
+    async def fetch_prices(
+        self, asset_addresses: list[str], price_data: PriceData
+    ) -> PriceData:
         """Fetch prices for the given asset addresses.
 
         Args:
             asset_addresses: List of asset contract addresses to get prices for
+            price_data: Price data to update
 
         Returns:
-            List of price data for the assets
+            Price data with updated prices
         """
         ...
 
@@ -47,6 +50,8 @@ class BasePriceAdapter(ABC):
         ...
 
     @abstractmethod
-    async def fetch_prices(self, asset_addresses: list[str]) -> PriceData:
+    async def fetch_prices(
+        self, asset_addresses: list[str], price_data: PriceData
+    ) -> PriceData:
         """Fetch prices for the given asset addresses."""
         ...

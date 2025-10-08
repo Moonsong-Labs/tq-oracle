@@ -45,9 +45,10 @@ class ChainlinkAdapter(BasePriceAdapter):
 
         Args:
             asset_addresses: List of asset contract addresses to get prices for
+            price_data: Price data to update
 
         Returns:
-            List of price data from Chainlink
+            Price data with updated prices
         """
         if price_data.base_asset != ETH_ASSET:
             raise ValueError("Chainlink adapter only supports ETH as base asset")
