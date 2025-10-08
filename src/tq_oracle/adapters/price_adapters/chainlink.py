@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...abi import load_aggregator_abi
+from ...constants import ETH_ASSET, USDC_MAINNET
 
 from .base import BasePriceAdapter, PriceData
 
@@ -16,9 +17,6 @@ class ChainlinkAdapter(BasePriceAdapter):
     """Adapter for querying Chainlink price feeds."""
 
     PRICE_FEED_USDC_ETH = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
-
-    ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-    USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
@@ -40,7 +38,9 @@ class ChainlinkAdapter(BasePriceAdapter):
             return value * (10 ** (18 - decimals))
         return value // (10 ** (decimals - 18))
 
-    async def fetch_prices(self, asset_addresses: list[str]) -> PriceData:
+    async def fetch_prices(
+        self, asset_addresses: list[str], price_data: PriceData
+    ) -> PriceData:
         """Fetch asset prices from Chainlink price feeds.
 
         Args:
@@ -49,9 +49,11 @@ class ChainlinkAdapter(BasePriceAdapter):
         Returns:
             List of price data from Chainlink
         """
+        if price_data.base_asset != ETH_ASSET:
+            raise ValueError("Chainlink adapter only supports ETH as base asset")
 
-        if self.USDC not in asset_addresses:
-            return PriceData(base_asset=self.ETH, prices={})
+        if USDC_MAINNET not in asset_addresses:
+            return price_data
 
         w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
         aggregator_abi = load_aggregator_abi()
@@ -67,4 +69,6 @@ class ChainlinkAdapter(BasePriceAdapter):
 
         usdc_eth_scaled = self.scale_to_18(usdc_eth_answer, usdc_eth_decimals)
 
-        return PriceData(base_asset=self.ETH, prices={self.USDC: usdc_eth_scaled})
+        price_data.prices[USDC_MAINNET] = usdc_eth_scaled
+
+        return price_data

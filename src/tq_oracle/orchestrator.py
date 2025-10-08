@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+from .constants import ETH_ASSET
+from .adapters.price_adapters.base import PriceData
 from .adapters import ASSET_ADAPTERS, PRICE_ADAPTERS
 from .adapters.asset_adapters.base import AssetData
 from .checks.pre_checks import run_pre_checks
@@ -68,11 +70,10 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     asset_addresses = list(aggregated.assets.keys())
 
     logger.info("Fetching prices for %d assets...", len(asset_addresses))
-    price_data = {}
+    price_data: PriceData = PriceData(base_asset=ETH_ASSET, prices={})
     for price_adapter in price_adapters:
-        prices = await price_adapter.fetch_prices(asset_addresses)
-        logger.debug("Price adapter returned %d prices", len(prices))
-        price_data.extend(prices)
+        price_data = await price_adapter.fetch_prices(asset_addresses, price_data)
+        logger.debug("Price adapter returned %d prices", len(price_data.prices))
 
     logger.info("Calculating total assets in base asset...")
     total_assets = calculate_total_assets(aggregated, price_data)

@@ -3,6 +3,8 @@
 USDC_MAINNET = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 USDC_SEPOLIA = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
 
+ETH_ASSET = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+
 HL_MAINNET_API_URL = "https://api.hyperliquid.xyz"
 HL_TESTNET_API_URL = "https://api.hyperliquid-testnet.xyz"
 
