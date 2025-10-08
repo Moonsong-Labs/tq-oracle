@@ -22,13 +22,13 @@ def config():
 
 
 @pytest.mark.asyncio
-@pytest.mark.integration
-async def test_fetch_prices_raises_on_invalid_asset(config):
+async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(config):
     adapter = ChainlinkAdapter(config)
-    invalid_address = "0xInvalid"
+    unsupported_address = "0xUnsupported"
 
-    with pytest.raises(ValueError, match="not supported"):
-        await adapter.fetch_prices([invalid_address])
+    result = await adapter.fetch_prices([unsupported_address])
+    assert isinstance(result, PriceData)
+    assert len(result.prices) == 0
 
 
 @pytest.mark.asyncio
@@ -39,6 +39,6 @@ async def test_fetch_prices_usdc(config):
     result = await adapter.fetch_prices([usdc_address])
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
-    pd = result.prices[usdc_address]
-    assert isinstance(pd, int)
-    assert pd >= 0
+    price = result.prices[usdc_address]
+    assert isinstance(price, int)
+    assert price >= 0
