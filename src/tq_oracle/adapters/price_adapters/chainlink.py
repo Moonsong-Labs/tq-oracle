@@ -43,9 +43,7 @@ class ChainlinkAdapter(BasePriceAdapter):
 
         for asset_address in asset_addresses:
             if asset_address not in self.PRICE_FEED_ADDRESSES:
-                raise ValueError(
-                    f"Asset address {asset_address} not in PRICE_FEED_ADDRESSES"
-                )
+                raise ValueError(f"Asset {asset_address} is not supported")
 
         w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
         aggregator_abi = load_aggregator_abi()
