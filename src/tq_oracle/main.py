@@ -121,6 +121,20 @@ def report(
             help="Suppress errors when vault has no assets or OracleHelper doesn't recognize assets (useful for testing pre-deployment).",
         ),
     ] = False,
+    pre_check_retries: Annotated[
+        int,
+        typer.Option(
+            "--pre-check-retries",
+            help="Number of times to retry pre-checks if they fail (default: 3).",
+        ),
+    ] = 3,
+    pre_check_timeout: Annotated[
+        float,
+        typer.Option(
+            "--pre-check-timeout",
+            help="Timeout in seconds between pre-check retries (default: 12.0).",
+        ),
+    ] = 12.0,
 ) -> None:
     """Collect TVL data and submit via Safe (optional)."""
     if not dry_run and not safe_address and not private_key:
@@ -162,6 +176,8 @@ def report(
         private_key=private_key,
         safe_txn_srvc_api_key=safe_txn_srvc_api_key,
         ignore_empty_vault=ignore_empty_vault,
+        pre_check_retries=pre_check_retries,
+        pre_check_timeout=pre_check_timeout,
     )
 
     asyncio.run(execute_oracle_flow(config))

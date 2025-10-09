@@ -26,6 +26,8 @@ def test_config():
         dry_run=True,
         private_key=None,
         safe_txn_srvc_api_key=None,
+        pre_check_retries=0,
+        pre_check_timeout=0.0,
     )
 
 

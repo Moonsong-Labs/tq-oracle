@@ -22,6 +22,8 @@ class OracleCLIConfig:
     private_key: Optional[str]
     ignore_empty_vault: bool = False
     using_default_rpc: bool = False
+    pre_check_retries: int = 3
+    pre_check_timeout: float = 10.0
     _chain_id: Optional[int] = None
     _oracle_address: Optional[str] = None
 
