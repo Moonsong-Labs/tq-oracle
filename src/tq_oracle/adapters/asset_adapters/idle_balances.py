@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...constants import (
+    ETH_ASSET,
     USDC_HL_MAINNET,
     USDC_HL_TESTNET,
     USDC_MAINNET,
@@ -140,11 +141,20 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         self, w3: Web3, subvault_address: str, asset_address: str
     ) -> AssetData:
         """Fetch the balance of an asset for the given subvault."""
-        erc20_abi = load_erc20_abi()
-        checksum_asset_address = w3.to_checksum_address(asset_address)
         checksum_subvault_address = w3.to_checksum_address(subvault_address)
-        erc20_contract = w3.eth.contract(address=checksum_asset_address, abi=erc20_abi)
-        balance = await asyncio.to_thread(
-            erc20_contract.functions.balanceOf(checksum_subvault_address).call
-        )
+
+        if asset_address == ETH_ASSET:
+            balance = await asyncio.to_thread(
+                w3.eth.get_balance, checksum_subvault_address
+            )
+        else:
+            erc20_abi = load_erc20_abi()
+            checksum_asset_address = w3.to_checksum_address(asset_address)
+            erc20_contract = w3.eth.contract(
+                address=checksum_asset_address, abi=erc20_abi
+            )
+            balance = await asyncio.to_thread(
+                erc20_contract.functions.balanceOf(checksum_subvault_address).call
+            )
+
         return AssetData(asset_address=asset_address, amount=balance)

@@ -3,7 +3,7 @@ import pytest
 from tq_oracle.adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from tq_oracle.adapters.asset_adapters.base import AssetData
 from tq_oracle.config import OracleCLIConfig
-from tq_oracle.constants import USDC_HL_MAINNET, HL_PROD_EVM_RPC
+from tq_oracle.constants import ETH_ASSET, USDC_HL_MAINNET, HL_PROD_EVM_RPC
 
 
 @pytest.fixture
@@ -96,6 +96,22 @@ async def test_fetch_asset_balance_integration(config):
     assert usdt_asset.amount >= 0
 
 
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_fetch_eth_balance_integration(config):
+    adapter = IdleBalancesAdapter(config)
+
+    subvault_address = "0x90c983DC732e65DB6177638f0125914787b8Cb78"
+
+    eth_asset = await adapter._fetch_asset_balance(
+        adapter.w3_mainnet, subvault_address, ETH_ASSET
+    )
+    assert isinstance(eth_asset, AssetData)
+    assert eth_asset.asset_address == ETH_ASSET
+    assert isinstance(eth_asset.amount, int)
+    assert eth_asset.amount >= 0
+
+
 @pytest.fixture
 def hl_config():
     return OracleCLIConfig(
@@ -127,3 +143,28 @@ async def test_fetch_asset_balance_hyperevm_integration(hl_config):
     assert usdc_hl_asset.asset_address == USDC_HL_MAINNET
     assert isinstance(usdc_hl_asset.amount, int)
     assert usdc_hl_asset.amount >= 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_fetch_assets_integration(hl_config):
+    adapter = IdleBalancesAdapter(hl_config)
+
+    assets = await adapter.fetch_assets("unused_param")
+
+    expected_asset_addresses = {
+        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
+    }
+
+    assert len(assets) == 25
+
+    for asset in assets:
+        assert isinstance(asset, AssetData)
+        assert asset.asset_address in expected_asset_addresses
+        assert isinstance(asset.amount, int)
+        assert asset.amount >= 0
