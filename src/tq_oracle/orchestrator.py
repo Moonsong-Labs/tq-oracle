@@ -7,7 +7,7 @@ from .constants import ETH_ASSET
 from .adapters.price_adapters.base import PriceData
 from .adapters import ASSET_ADAPTERS, PRICE_ADAPTERS
 from .adapters.asset_adapters.base import AssetData
-from .checks.pre_checks import run_pre_checks
+from .checks.pre_checks import PreCheckError, run_pre_checks
 from .logger import get_logger
 from .processors import (
     compute_total_aggregated_assets,
@@ -27,7 +27,7 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     """Execute the complete oracle control flow.
 
     This implements the flowchart:
-    1. Pre-checks (already published? pending vote?)
+    1. Pre-checks (Safe validations + adapter checks)
     2. Fork: Parallel adapter queries
     3. Compute total assets
     4. Calculate relative prices
@@ -41,8 +41,49 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     logger.info("Starting oracle flow for vault: %s", config.vault_address)
     logger.debug("Configuration: %s", config.as_safe_dict())
 
-    logger.info("Running pre-checks...")
-    await run_pre_checks(config, config.vault_address)
+    logger.info(
+        "Running pre-checks (max retries: %d, timeout: %.1fs)...",
+        config.pre_check_retries,
+        config.pre_check_timeout,
+    )
+
+    retry_count = 0
+
+    while retry_count <= config.pre_check_retries:
+        try:
+            if retry_count > 0:
+                logger.info(
+                    "Pre-check retry attempt %d of %d...",
+                    retry_count,
+                    config.pre_check_retries,
+                )
+
+            await run_pre_checks(config, config.vault_address)
+            logger.info("Pre-checks passed successfully")
+            break
+
+        except PreCheckError as e:
+            retry_count += 1
+
+            if retry_count > config.pre_check_retries:
+                logger.error(
+                    "Pre-checks failed after %d attempts: %s",
+                    config.pre_check_retries + 1,
+                    e,
+                )
+                raise
+
+            logger.warning(
+                "Pre-check failed (attempt %d of %d): %s",
+                retry_count,
+                config.pre_check_retries + 1,
+                e,
+            )
+            logger.info(
+                "Waiting %.1f seconds before retry...",
+                config.pre_check_timeout,
+            )
+            await asyncio.sleep(config.pre_check_timeout)
 
     logger.info("Initializing %d asset adapters", len(ASSET_ADAPTERS))
     asset_adapters = [AdapterClass(config) for AdapterClass in ASSET_ADAPTERS]

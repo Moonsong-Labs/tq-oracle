@@ -41,7 +41,7 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
 Create a `.env` file:
 
 ```env
-L1_RPC_URL=https://sepolia.drpc.org
+L1_RPC=https://sepolia.drpc.org
 HL_SUBVAULT_ADDRESS=0xYourHyperliquidSubvaultAddress
 PRIVATE_KEY=0xYourPrivateKey
 ```
@@ -67,7 +67,7 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
 |--------|---------------------|---------|-------------|
 | `VAULT_ADDRESS` | - | *required* | Vault contract address (positional argument) |
 | `--oracle-helper-address` `-h` | - | Auto (mainnet/testnet) | OracleHelper contract address |
-| `--l1-rpc` | `L1_RPC_URL` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
+| `--l1-rpc` | `L1_RPC` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
 | `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | Vault address | Hyperliquid subvault address to query |
 | `--hl-rpc` | `HL_RPC_URL` | - | Hyperliquid RPC endpoint (optional) |
 | `--safe-address` `-s` | - | - | Gnosis Safe address for multi-sig submission |
@@ -119,12 +119,33 @@ src/tq_oracle/
 ├── main.py                           # CLI entry point (Typer)
 ├── config.py                         # Configuration dataclass
 ├── orchestrator.py                   # Main control flow orchestration
-├── adapters/                         # Protocol adapters (asset/price)
+├── adapters/                         # Protocol adapters (asset/price/check)
 ├── processors/                       # Data processing pipeline
 ├── report/                           # Report generation and publishing
 ├── safe/                             # Safe transaction building
-├── checks/                           # Pre-flight validation
+├── checks/                           # Pre-flight validation orchestration
 └── abis/                             # Contract ABIs (JSON)
+```
+
+## Pre-Flight Checks
+
+Before processing TVL data, TQ Oracle runs automated pre-flight validation checks to ensure data integrity:
+
+- **Safe State Validation**: Ensures no duplicate or pending reports exist
+- **CCTP Bridge Detection**: Identifies in-flight USDC transfers between L1 and Hyperliquid
+- **Check Retry Logic**: Automatically retries failed checks with exponential backoff when recommended
+
+These checks prevent race conditions and ensure accurate TVL snapshots by detecting ongoing cross-chain transfers that could affect asset balances.
+
+### Testing CCTP Bridge Detection
+
+A standalone test script is available to verify CCTP bridge in-flight detection:
+
+```bash
+# Test on mainnet
+uv run python scripts/check_cctp_inflight.py \
+  0xL1SubvaultAddress \
+  0xHLSubvaultAddress
 ```
 
 ## Adding New Adapters

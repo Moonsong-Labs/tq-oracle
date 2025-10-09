@@ -17,6 +17,7 @@ def test_config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://rpc",
+        l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
@@ -24,6 +25,8 @@ def test_config():
         dry_run=True,
         private_key=None,
         safe_txn_srvc_api_key=None,
+        pre_check_retries=0,
+        pre_check_timeout=0.0,
     )
 
 

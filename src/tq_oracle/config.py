@@ -12,6 +12,7 @@ class OracleCLIConfig:
     vault_address: str
     oracle_helper_address: str
     l1_rpc: str
+    l1_subvault_address: Optional[str]
     safe_address: Optional[str]
     hl_rpc: Optional[str]
     hl_subvault_address: Optional[str]
@@ -20,6 +21,9 @@ class OracleCLIConfig:
     safe_txn_srvc_api_key: Optional[str]
     private_key: Optional[str]
     ignore_empty_vault: bool = False
+    using_default_rpc: bool = False
+    pre_check_retries: int = 3
+    pre_check_timeout: float = 10.0
     _chain_id: Optional[int] = None
     _oracle_address: Optional[str] = None
 
