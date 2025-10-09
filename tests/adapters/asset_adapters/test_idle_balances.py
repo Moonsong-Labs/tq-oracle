@@ -3,6 +3,7 @@ import pytest
 from tq_oracle.adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from tq_oracle.adapters.asset_adapters.base import AssetData
 from tq_oracle.config import OracleCLIConfig
+from tq_oracle.constants import USDC_HL_MAINNET, HL_PROD_EVM_RPC
 
 
 @pytest.fixture
@@ -93,3 +94,36 @@ async def test_fetch_asset_balance_integration(config):
     assert usdt_asset.asset_address == usdt_address
     assert isinstance(usdt_asset.amount, int)
     assert usdt_asset.amount >= 0
+
+
+@pytest.fixture
+def hl_config():
+    return OracleCLIConfig(
+        vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
+        oracle_helper_address="0xOracleHelper",
+        l1_rpc="https://eth.drpc.org",
+        l1_subvault_address=None,
+        safe_address=None,
+        hl_rpc=HL_PROD_EVM_RPC,
+        hl_subvault_address="0x90c983DC732e65DB6177638f0125914787b8Cb78",
+        testnet=False,
+        dry_run=False,
+        private_key=None,
+        safe_txn_srvc_api_key=None,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_fetch_asset_balance_hyperevm_integration(hl_config):
+    adapter = IdleBalancesAdapter(hl_config)
+
+    hl_subvault_address = "0x90c983DC732e65DB6177638f0125914787b8Cb78"
+
+    usdc_hl_asset = await adapter._fetch_asset_balance(
+        adapter.w3_hl, hl_subvault_address, USDC_HL_MAINNET
+    )
+    assert isinstance(usdc_hl_asset, AssetData)
+    assert usdc_hl_asset.asset_address == USDC_HL_MAINNET
+    assert isinstance(usdc_hl_asset.amount, int)
+    assert usdc_hl_asset.amount >= 0

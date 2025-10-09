@@ -5,6 +5,12 @@ from typing import TYPE_CHECKING
 
 from web3 import Web3
 
+from ...constants import (
+    USDC_HL_MAINNET,
+    USDC_HL_TESTNET,
+    USDC_MAINNET,
+    USDC_SEPOLIA,
+)
 from ...logger import get_logger
 from ...abi import (
     load_vault_abi,
@@ -53,6 +59,15 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         ]
 
         assets = await asyncio.gather(*asset_tasks)
+
+        # Fetch USDC balance from HL subvault
+        usdc_address = USDC_HL_TESTNET if self.config.testnet else USDC_HL_MAINNET
+        usdc_asset = await self._fetch_asset_balance(
+            self.w3_hl, self.config.hl_subvault_address, usdc_address
+        )
+        # Overwrite USDC HL address with mainnet address
+        usdc_asset.asset_address = USDC_SEPOLIA if self.config.testnet else USDC_MAINNET
+        assets.append(usdc_asset)
 
         logger.debug("Fetched %d asset balances", len(assets))
         return list(assets)
