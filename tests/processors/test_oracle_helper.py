@@ -1,6 +1,6 @@
 import pytest
 
-from tq_oracle.processors.price_calculator import RelativePrices
+from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.processors.oracle_helper import (
     encode_asset_prices,
     EncodedAssetPrices,
@@ -10,7 +10,7 @@ from tq_oracle.config import OracleCLIConfig
 
 
 def test_encode_asset_prices_sorts_by_address():
-    rp = RelativePrices(
+    rp = PriceData(
         base_asset="0xBASE",
         prices={
             "0xBBB": 3,
@@ -30,14 +30,14 @@ def test_encode_asset_prices_sorts_by_address():
 
 
 def test_encode_asset_prices_empty():
-    rp = RelativePrices(base_asset="", prices={})
+    rp = PriceData(base_asset="", prices={})
     encoded = encode_asset_prices(rp)
     assert isinstance(encoded, EncodedAssetPrices)
     assert encoded.asset_prices == []
 
 
 def test_encode_asset_prices_single():
-    rp = RelativePrices(base_asset="0xX", prices={"0xABC": 123})
+    rp = PriceData(base_asset="0xX", prices={"0xABC": 123})
     encoded = encode_asset_prices(rp)
     assert isinstance(encoded, EncodedAssetPrices)
     assert encoded.asset_prices == [("0xABC", 123)]
@@ -70,7 +70,7 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
         private_key=None,
     )
 
-    relative_prices = RelativePrices(base_asset=vault, prices=asset_prices)
+    relative_prices = PriceData(base_asset=vault, prices=asset_prices)
 
     result = await derive_final_prices(config, total_assets, relative_prices)
 
