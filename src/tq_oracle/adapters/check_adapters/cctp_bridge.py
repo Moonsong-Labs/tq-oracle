@@ -77,7 +77,7 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         for provider in providers:
             if provider:
                 try:
-                    await provider.provider.disconnect()
+                    await provider.provider.disconnect()  # type: ignore[union-attr]
                 except AttributeError as e:
                     logger.debug(
                         f"Provider disconnect expected (no disconnect method): {e}"
