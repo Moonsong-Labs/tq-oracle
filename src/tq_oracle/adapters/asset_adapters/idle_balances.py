@@ -29,3 +29,17 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch asset data from Idle Balances for the given vault."""
         return []
+
+    async def get_subvault_addresses(self) -> list[str]:
+        """Get the subvault addresses for the given vault."""
+        vault_abi = load_vault_abi()
+        vault_address = self.w3_mainnet.to_checksum_address(self.config.vault_address)
+        vault_contract = self.w3_mainnet.eth.contract(
+            address=vault_address, abi=vault_abi
+        )
+        subvault_count = vault_contract.functions.subvaults().call()
+        subvault_addresses = []
+        for i in range(subvault_count):
+            subvault_address = vault_contract.functions.subvaultAt(i).call()
+            subvault_addresses.append(subvault_address)
+        return subvault_addresses
