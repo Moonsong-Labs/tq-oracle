@@ -6,6 +6,7 @@ from web3 import Web3
 
 from ...abi import load_aggregator_abi
 from ...constants import ETH_ASSET, USDC_MAINNET, PRICE_FEED_USDC_ETH
+from ...units import scale_to_18
 
 from .base import BasePriceAdapter, PriceData
 
@@ -28,13 +29,6 @@ class ChainlinkAdapter(BasePriceAdapter):
         _, answer, _, _, _ = feed_contract.functions.latestRoundData().call()
         decimals = feed_contract.functions.decimals().call()
         return int(answer), int(decimals)
-
-    def scale_to_18(self, value: int, decimals: int) -> int:
-        if decimals == 18:
-            return value
-        if decimals < 18:
-            return value * (10 ** (18 - decimals))
-        return value // (10 ** (decimals - 18))
 
     async def fetch_prices(
         self, asset_addresses: list[str], price_data: PriceData
@@ -66,7 +60,7 @@ class ChainlinkAdapter(BasePriceAdapter):
             usdc_eth_feed
         )
 
-        usdc_eth_scaled = self.scale_to_18(usdc_eth_answer, usdc_eth_decimals)
+        usdc_eth_scaled = scale_to_18(usdc_eth_answer, usdc_eth_decimals)
 
         price_data.prices[USDC_MAINNET] = usdc_eth_scaled
 
