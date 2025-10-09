@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...logger import get_logger
-from ...abi import load_vault_abi, load_oracle_abi, get_oracle_address_from_vault
+from ...abi import (
+    load_vault_abi,
+    load_oracle_abi,
+    get_oracle_address_from_vault,
+    load_erc20_abi,
+)
 from .base import AssetData, BaseAssetAdapter
 
 if TYPE_CHECKING:
@@ -70,7 +75,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         logger.debug("Retrieved %d %ss", len(items), item_type)
         return list(items)
 
-    async def fetch_subvault_addresses(self) -> list[str]:
+    async def _fetch_subvault_addresses(self) -> list[str]:
         """Get the subvault addresses for the given vault."""
         vault_abi = load_vault_abi()
         return await self._fetch_contract_list(
@@ -81,7 +86,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             item_type="subvault",
         )
 
-    async def fetch_supported_assets(self) -> list[str]:
+    async def _fetch_supported_assets(self) -> list[str]:
         """Get the supported assets for the given vault."""
         oracle_abi = load_oracle_abi()
         oracle_address = get_oracle_address_from_vault(
@@ -94,3 +99,11 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             item_function="supportedAssetAt",
             item_type="supported asset",
         )
+
+    async def _fetch_asset_balance(
+        self, w3: Web3, subvault_address: str, asset_address: str
+    ) -> int:
+        """Fetch the balance of an asset for the given subvault."""
+        erc20_abi = load_erc20_abi()
+        erc20_contract = w3.eth.contract(address=asset_address, abi=erc20_abi)
+        return erc20_contract.functions.balanceOf(subvault_address).call()

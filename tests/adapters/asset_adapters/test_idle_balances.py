@@ -26,7 +26,7 @@ def config():
 async def test_fetch_subvault_addresses_integration(config):
     adapter = IdleBalancesAdapter(config)
 
-    subvaults = await adapter.fetch_subvault_addresses()
+    subvaults = await adapter._fetch_subvault_addresses()
 
     expected_subvaults = [
         "0x90c983DC732e65DB6177638f0125914787b8Cb78",
@@ -44,7 +44,7 @@ async def test_fetch_subvault_addresses_integration(config):
 async def test_fetch_supported_assets_integration(config):
     adapter = IdleBalancesAdapter(config)
 
-    supported_assets = await adapter.fetch_supported_assets()
+    supported_assets = await adapter._fetch_supported_assets()
 
     expected_assets = [
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
@@ -57,3 +57,32 @@ async def test_fetch_supported_assets_integration(config):
 
     assert len(supported_assets) == len(expected_assets)
     assert supported_assets == expected_assets
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_fetch_asset_balance_integration(config):
+    adapter = IdleBalancesAdapter(config)
+
+    subvault_address = "0x90c983DC732e65DB6177638f0125914787b8Cb78"
+
+    usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    usdc_balance = await adapter._fetch_asset_balance(
+        adapter.w3_mainnet, subvault_address, usdc_address
+    )
+    assert isinstance(usdc_balance, int)
+    assert usdc_balance >= 0
+
+    weth_address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    weth_balance = await adapter._fetch_asset_balance(
+        adapter.w3_mainnet, subvault_address, weth_address
+    )
+    assert isinstance(weth_balance, int)
+    assert weth_balance >= 0
+
+    usdt_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+    usdt_balance = await adapter._fetch_asset_balance(
+        adapter.w3_mainnet, subvault_address, usdt_address
+    )
+    assert isinstance(usdt_balance, int)
+    assert usdt_balance >= 0
