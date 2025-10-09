@@ -22,16 +22,18 @@ class PriceAdapter(Protocol):
         ...
 
     async def fetch_prices(
-        self, asset_addresses: list[str], price_data: PriceData
+        self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
         """Fetch prices for the given asset addresses.
 
         Args:
             asset_addresses: List of asset contract addresses to get prices for
-            price_data: Price data to update
+            prices_accumulator: Existing price accumulator to update in place. Must
+                have base_asset set to ETH (wei). All prices are 18-decimal values
+                representing wei per 1 unit of the asset.
 
         Returns:
-            Price data with updated prices
+            The same accumulator with the adapter's prices merged in.
         """
         ...
 
@@ -51,7 +53,7 @@ class BasePriceAdapter(ABC):
 
     @abstractmethod
     async def fetch_prices(
-        self, asset_addresses: list[str], price_data: PriceData
+        self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
         """Fetch prices for the given asset addresses."""
         ...
