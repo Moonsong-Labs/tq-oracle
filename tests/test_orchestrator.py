@@ -18,6 +18,7 @@ def test_config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://rpc",
+        l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address=None,

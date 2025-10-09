@@ -1,7 +1,8 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tq_oracle.adapters.check_adapters.base import CheckResult
 from tq_oracle.checks.pre_checks import PreCheckError, run_pre_checks
 from tq_oracle.config import OracleCLIConfig
 
@@ -13,6 +14,7 @@ def config():
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
         l1_rpc="https://eth.example",
+        l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
@@ -24,55 +26,79 @@ def config():
 
 
 @pytest.mark.asyncio
-@patch("tq_oracle.checks.pre_checks.check_already_published")
-@patch("tq_oracle.checks.pre_checks.check_pending_vote")
-async def test_no_errors_when_all_checks_pass(mock_pending, mock_published, config):
-    """Should not raise when both checks return False."""
-    mock_published.return_value = False
-    mock_pending.return_value = False
+@patch("tq_oracle.checks.pre_checks.CHECK_ADAPTERS")
+async def test_no_errors_when_all_checks_pass(mock_adapters, config):
+    """Should not raise when all adapters return passing results."""
+    mock_adapter1 = MagicMock()
+    mock_adapter1.name = "Test Check 1"
+    mock_adapter1.run_check = AsyncMock(
+        return_value=CheckResult(passed=True, message="Check 1 passed")
+    )
+
+    mock_adapter2 = MagicMock()
+    mock_adapter2.name = "Test Check 2"
+    mock_adapter2.run_check = AsyncMock(
+        return_value=CheckResult(passed=True, message="Check 2 passed")
+    )
+
+    mock_adapters.__iter__.return_value = [
+        lambda config: mock_adapter1,
+        lambda config: mock_adapter2,
+    ]
 
     # Should not raise
     await run_pre_checks(config, "0xVAULT")
 
-    mock_published.assert_called_once_with(config, "0xVAULT")
-    mock_pending.assert_called_once_with(config, "0xVAULT")
+
+@pytest.mark.asyncio
+@patch("tq_oracle.checks.pre_checks.CHECK_ADAPTERS")
+async def test_raises_when_check_fails(mock_adapters, config):
+    """Should raise PreCheckError when any adapter returns failing result."""
+    mock_adapter = MagicMock()
+    mock_adapter.name = "Failing Check"
+    mock_adapter.run_check = AsyncMock(
+        return_value=CheckResult(
+            passed=False,
+            message="Check failed: issue detected",
+            retry_recommended=False,
+        )
+    )
+
+    mock_adapters.__iter__.return_value = [lambda config: mock_adapter]
+
+    with pytest.raises(PreCheckError, match="Pre-checks failed"):
+        await run_pre_checks(config, "0xVAULT")
 
 
 @pytest.mark.asyncio
-@patch("tq_oracle.checks.pre_checks.check_already_published")
-@patch("tq_oracle.checks.pre_checks.check_pending_vote")
-async def test_raises_when_already_published(mock_pending, mock_published, config):
-    """Should raise PreCheckError when already published."""
-    mock_published.return_value = True
+@patch("tq_oracle.checks.pre_checks.CHECK_ADAPTERS")
+async def test_includes_failure_message_in_error(mock_adapters, config):
+    """Error message should include the check failure message."""
+    mock_adapter = MagicMock()
+    mock_adapter.name = "Test Check"
+    mock_adapter.run_check = AsyncMock(
+        return_value=CheckResult(
+            passed=False,
+            message="Report already published for vault 0xVAULT",
+            retry_recommended=False,
+        )
+    )
+
+    mock_adapters.__iter__.return_value = [lambda config: mock_adapter]
 
     with pytest.raises(PreCheckError, match="already published"):
         await run_pre_checks(config, "0xVAULT")
 
-    mock_published.assert_called_once()
-    mock_pending.assert_not_called()  # should short-circuit
-
 
 @pytest.mark.asyncio
-@patch("tq_oracle.checks.pre_checks.check_already_published")
-@patch("tq_oracle.checks.pre_checks.check_pending_vote")
-async def test_raises_when_pending_vote(mock_pending, mock_published, config):
-    """Should raise PreCheckError when report is pending vote."""
-    mock_published.return_value = False
-    mock_pending.return_value = True
+@patch("tq_oracle.checks.pre_checks.CHECK_ADAPTERS")
+async def test_handles_adapter_exception(mock_adapters, config):
+    """Should raise PreCheckError when adapter raises exception."""
+    mock_adapter = MagicMock()
+    mock_adapter.name = "Exception Check"
+    mock_adapter.run_check = AsyncMock(side_effect=RuntimeError("Adapter error"))
 
-    with pytest.raises(PreCheckError, match="pending vote"):
-        await run_pre_checks(config, "0xVAULT")
+    mock_adapters.__iter__.return_value = [lambda config: mock_adapter]
 
-    mock_published.assert_called_once()
-    mock_pending.assert_called_once()
-
-
-@pytest.mark.asyncio
-@patch("tq_oracle.checks.pre_checks.check_already_published")
-@patch("tq_oracle.checks.pre_checks.check_pending_vote")
-async def test_includes_vault_address_in_error(mock_pending, mock_published, config):
-    """Error message should include vault address."""
-    mock_published.return_value = True
-
-    with pytest.raises(PreCheckError, match="0xVAULT"):
+    with pytest.raises(PreCheckError, match="Pre-checks failed"):
         await run_pre_checks(config, "0xVAULT")
