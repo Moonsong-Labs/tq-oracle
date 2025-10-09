@@ -31,31 +31,55 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Fetch asset data from Idle Balances for the given vault."""
         return []
 
+    async def _fetch_contract_list(
+        self,
+        contract_address: str,
+        abi: list,
+        count_function: str,
+        item_function: str,
+        item_type: str,
+    ) -> list[str]:
+        """Generic method to fetch a list of items from a contract.
+
+        Args:
+            contract_address: The contract address to query
+            abi: The contract ABI
+            count_function: Name of the function that returns the count
+            item_function: Name of the function that returns an item at index
+            item_type: Description for logging (e.g., "subvault", "supported asset")
+
+        Returns:
+            List of addresses fetched from the contract
+        """
+        checksum_address = self.w3_mainnet.to_checksum_address(contract_address)
+        logger.debug("Fetching %ss from contract: %s", item_type, checksum_address)
+
+        contract = self.w3_mainnet.eth.contract(address=checksum_address, abi=abi)
+        count = getattr(contract.functions, count_function)().call()
+        logger.debug("Found %d %ss", count, item_type)
+
+        async def fetch_item_at(index: int) -> str:
+            item = await asyncio.to_thread(
+                getattr(contract.functions, item_function)(index).call
+            )
+            logger.debug("%s %d: %s", item_type.capitalize(), index, item)
+            return item
+
+        items = await asyncio.gather(*[fetch_item_at(i) for i in range(count)])
+
+        logger.debug("Retrieved %d %ss", len(items), item_type)
+        return list(items)
+
     async def fetch_subvault_addresses(self) -> list[str]:
         """Get the subvault addresses for the given vault."""
         vault_abi = load_vault_abi()
-        vault_address = self.w3_mainnet.to_checksum_address(self.config.vault_address)
-        logger.debug("Fetching subvault addresses for vault: %s", vault_address)
-
-        vault_contract = self.w3_mainnet.eth.contract(
-            address=vault_address, abi=vault_abi
+        return await self._fetch_contract_list(
+            contract_address=self.config.vault_address,
+            abi=vault_abi,
+            count_function="subvaults",
+            item_function="subvaultAt",
+            item_type="subvault",
         )
-        subvault_count = vault_contract.functions.subvaults().call()
-        logger.debug("Found %d subvaults", subvault_count)
-
-        async def fetch_subvault_at(index: int) -> str:
-            address = await asyncio.to_thread(
-                vault_contract.functions.subvaultAt(index).call
-            )
-            logger.debug("Subvault %d: %s", index, address)
-            return address
-
-        subvault_addresses = await asyncio.gather(
-            *[fetch_subvault_at(i) for i in range(subvault_count)]
-        )
-
-        logger.debug("Retrieved %d subvault addresses", len(subvault_addresses))
-        return list(subvault_addresses)
 
     async def fetch_supported_assets(self) -> list[str]:
         """Get the supported assets for the given vault."""
@@ -63,24 +87,10 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         oracle_address = get_oracle_address_from_vault(
             self.config.vault_address, self.config.l1_rpc
         )
-        logger.debug("Fetching supported assets for oracle: %s", oracle_address)
-
-        oracle_contract = self.w3_mainnet.eth.contract(
-            address=oracle_address, abi=oracle_abi
+        return await self._fetch_contract_list(
+            contract_address=oracle_address,
+            abi=oracle_abi,
+            count_function="supportedAssets",
+            item_function="supportedAssetAt",
+            item_type="supported asset",
         )
-        supported_asset_count = oracle_contract.functions.supportedAssets().call()
-        logger.debug("Found %d supported assets", supported_asset_count)
-
-        async def fetch_supported_asset_at(index: int) -> str:
-            asset = await asyncio.to_thread(
-                oracle_contract.functions.supportedAssetAt(index).call
-            )
-            logger.debug("Supported asset %d: %s", index, asset)
-            return asset
-
-        supported_assets = await asyncio.gather(
-            *[fetch_supported_asset_at(i) for i in range(supported_asset_count)]
-        )
-
-        logger.debug("Retrieved %d supported assets", len(supported_assets))
-        return list(supported_assets)
