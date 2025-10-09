@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...logger import get_logger
-from ...abi import load_vault_abi
+from ...abi import load_vault_abi, load_oracle_abi, get_oracle_address_from_vault
 from .base import AssetData, BaseAssetAdapter
 
 if TYPE_CHECKING:
@@ -56,3 +56,31 @@ class IdleBalancesAdapter(BaseAssetAdapter):
 
         logger.debug("Retrieved %d subvault addresses", len(subvault_addresses))
         return list(subvault_addresses)
+
+    async def fetch_supported_assets(self) -> list[str]:
+        """Get the supported assets for the given vault."""
+        oracle_abi = load_oracle_abi()
+        oracle_address = get_oracle_address_from_vault(
+            self.config.vault_address, self.config.l1_rpc
+        )
+        logger.debug("Fetching supported assets for oracle: %s", oracle_address)
+
+        oracle_contract = self.w3_mainnet.eth.contract(
+            address=oracle_address, abi=oracle_abi
+        )
+        supported_asset_count = oracle_contract.functions.supportedAssets().call()
+        logger.debug("Found %d supported assets", supported_asset_count)
+
+        async def fetch_supported_asset_at(index: int) -> str:
+            asset = await asyncio.to_thread(
+                oracle_contract.functions.supportedAssetAt(index).call
+            )
+            logger.debug("Supported asset %d: %s", index, asset)
+            return asset
+
+        supported_assets = await asyncio.gather(
+            *[fetch_supported_asset_at(i) for i in range(supported_asset_count)]
+        )
+
+        logger.debug("Retrieved %d supported assets", len(supported_assets))
+        return list(supported_assets)
