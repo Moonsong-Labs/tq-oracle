@@ -135,7 +135,7 @@ def report(
             param_hint=["--private-key"],
         )
 
-    using_default_rpc = (l1_rpc is None or hl_rpc is None)
+    using_default_rpc = l1_rpc is None or hl_rpc is None
 
     if l1_rpc is None:
         l1_rpc = DEFAULT_SEPOLIA_RPC_URL if testnet else DEFAULT_MAINNET_RPC_URL

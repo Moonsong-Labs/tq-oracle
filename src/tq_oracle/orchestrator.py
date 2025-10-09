@@ -50,14 +50,9 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     logger.info("Initializing %d asset adapters", len(ASSET_ADAPTERS))
     asset_adapters = [AdapterClass(config) for AdapterClass in ASSET_ADAPTERS]
 
-    logger.info(
-        "Fetching assets from %d adapters in parallel...", len(asset_adapters)
-    )
+    logger.info("Fetching assets from %d adapters in parallel...", len(asset_adapters))
     asset_results = await asyncio.gather(
-        *[
-            adapter.fetch_assets(config.vault_address)
-            for adapter in asset_adapters
-        ],
+        *[adapter.fetch_assets(config.vault_address) for adapter in asset_adapters],
         return_exceptions=True,
     )
 
@@ -97,9 +92,7 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     logger.debug("Total assets in base asset: %d", total_assets)
 
     logger.info("Deriving final prices via OracleHelper...")
-    final_prices = await derive_final_prices(
-        config, total_assets, relative_prices
-    )
+    final_prices = await derive_final_prices(config, total_assets, relative_prices)
 
     logger.info("Generating report...")
     report = await generate_report(

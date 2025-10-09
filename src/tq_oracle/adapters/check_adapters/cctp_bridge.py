@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NamedTuple, cast
 
 from typing_extensions import Literal
 from web3 import AsyncWeb3
@@ -29,21 +29,48 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class TransactionIdentity(NamedTuple):
+    """Unique identifier for a CCTP bridge transaction.
+
+    Used for matching deposit events on source chain with mint events on destination chain.
+    """
+
+    amount: int
+    recipient: str
+
+
 class CCTPBridgeAdapter(BaseCheckAdapter):
     """Detects in-flight CCTP bridging transactions between L1 and Hyperliquid."""
 
     MESSENGER_ADDRESSES = {
-        True: TOKEN_MESSENGER_V2_TEST,
-        False: TOKEN_MESSENGER_V2_PROD,
+        "testnet": TOKEN_MESSENGER_V2_TEST,
+        "mainnet": TOKEN_MESSENGER_V2_PROD,
     }
 
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
+        self._config = config
         self.testnet = config.testnet
 
     @property
     def name(self) -> str:
         return "CCTP Bridge In-Flight Detection"
+
+    @staticmethod
+    def _extract_address_from_bytes32(w3: AsyncWeb3, bytes32_value: bytes) -> str:
+        """Extract 20-byte Ethereum address from bytes32 CCTP field.
+
+        CCTP stores addresses as bytes32 with the actual address in the last 20 bytes.
+        This helper extracts and checksums the address for comparison.
+
+        Args:
+            w3: Web3 instance for address checksumming
+            bytes32_value: The bytes32 value containing the address
+
+        Returns:
+            Lowercase checksummed Ethereum address
+        """
+        return w3.to_checksum_address(bytes32_value[-20:]).lower()
 
     async def _cleanup_providers(self, *providers: AsyncWeb3 | None) -> None:
         """Safely disconnect Web3 providers."""
@@ -51,8 +78,10 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
             if provider:
                 try:
                     await provider.provider.disconnect()
-                except AttributeError:
-                    pass
+                except AttributeError as e:
+                    logger.debug(
+                        f"Provider disconnect expected (no disconnect method): {e}"
+                    )
 
     def _calculate_scaled_blocks(
         self, base_blocks: int, source_block_time: int, dest_block_time: int
@@ -70,8 +99,11 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         if source_block_time == dest_block_time:
             return (base_blocks, base_blocks)
 
-        source_blocks = base_blocks * (L1_BLOCK_TIME // source_block_time)
-        source_blocks = min(source_blocks, base_blocks * (L1_BLOCK_TIME // HL_BLOCK_TIME))
+        source_time_multiplier = L1_BLOCK_TIME // source_block_time
+        source_blocks_scaled = base_blocks * source_time_multiplier
+
+        max_lookback_multiplier = L1_BLOCK_TIME // HL_BLOCK_TIME
+        source_blocks = min(source_blocks_scaled, base_blocks * max_lookback_multiplier)
 
         time_window_seconds = source_blocks * source_block_time
         dest_blocks = time_window_seconds // dest_block_time
@@ -83,33 +115,37 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         l1_w3 = None
         hl_w3 = None
         try:
-            config = cast("OracleCLIConfig", self.config)
-
-            if not config.l1_subvault_address:
+            if not self._config.l1_subvault_address:
                 return CheckResult(
                     passed=False,
                     message="L1 subvault address is required for CCTP bridge checks",
                     retry_recommended=False,
                 )
-            if not config.hl_subvault_address:
+            if not self._config.hl_subvault_address:
                 return CheckResult(
                     passed=False,
                     message="HL subvault address is required for CCTP bridge checks",
                     retry_recommended=False,
                 )
-            logger.debug(f"Connecting to L1 RPC: {config.l1_rpc}")
-            l1_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(config.l1_rpc))
-            logger.debug(f"Connecting to HL RPC: {config.hl_rpc}")
-            hl_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(config.hl_rpc))
+            logger.debug(f"Connecting to L1 RPC: {self._config.l1_rpc}")
+            l1_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.l1_rpc))
+            logger.debug(f"Connecting to HL RPC: {self._config.hl_rpc}")
+            hl_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.hl_rpc))
 
-            messenger_addr = self.MESSENGER_ADDRESSES[config.testnet]
+            messenger_addr = self.MESSENGER_ADDRESSES[
+                "testnet" if self._config.testnet else "mainnet"
+            ]
 
             abi_dir = Path(tq_oracle.__file__).parent / "abis"
             messenger_abi = load_abi(abi_dir / "TokenMessengerV2.json")
 
             messenger_checksum = l1_w3.to_checksum_address(messenger_addr)
-            l1_subvault_checksum = l1_w3.to_checksum_address(config.l1_subvault_address)
-            hl_subvault_checksum = hl_w3.to_checksum_address(config.hl_subvault_address)
+            l1_subvault_checksum = l1_w3.to_checksum_address(
+                self._config.l1_subvault_address
+            )
+            hl_subvault_checksum = hl_w3.to_checksum_address(
+                self._config.hl_subvault_address
+            )
 
             l1_messenger = l1_w3.eth.contract(
                 address=messenger_checksum, abi=messenger_abi
@@ -176,7 +212,7 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         dest_messenger: AsyncContract,
         source_subvault_address: str,
         dest_subvault_address: str,
-        direction: Literal['HL→L1', 'L1→HL'],
+        direction: Literal["HL→L1", "L1→HL"],
         source_block_time: int,
         dest_block_time: int,
     ) -> int:
@@ -201,8 +237,11 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
             dest_w3.eth.block_number,
         )
 
-        config = cast("OracleCLIConfig", self.config)
-        base_lookback = CCTP_RATE_LIMITED_LOOKBACK_BLOCKS if config.using_default_rpc else CCTP_LOOKBACK_BLOCKS
+        base_lookback = (
+            CCTP_RATE_LIMITED_LOOKBACK_BLOCKS
+            if self._config.using_default_rpc
+            else CCTP_LOOKBACK_BLOCKS
+        )
 
         logger.debug(f"Calculating lookback blocks for {direction} direction")
         source_lookback, dest_lookback = self._calculate_scaled_blocks(
@@ -242,21 +281,33 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         deposit_events, mint_events = await asyncio.gather(
             deposit_events_task, mint_events_task
         )
-        logger.debug("Fetched %d DepositForBurn events for %s %s", len(deposit_events), source_subvault_address, direction)
-        logger.debug("Fetched %d MintAndWithdraw events for %s %s", len(mint_events), dest_subvault_address, direction)
+        logger.info(
+            "Fetched %d DepositForBurn events for %s %s",
+            len(deposit_events),
+            source_subvault_address,
+            direction,
+        )
+        logger.info(
+            "Fetched %d MintAndWithdraw events for %s %s",
+            len(mint_events),
+            dest_subvault_address,
+            direction,
+        )
 
         deposited_txs = {
-            (
-                event["args"]["amount"],
-                source_w3.to_checksum_address(event["args"]["mintRecipient"][-20:]).lower()
+            TransactionIdentity(
+                amount=event["args"]["amount"],
+                recipient=self._extract_address_from_bytes32(
+                    source_w3, event["args"]["mintRecipient"]
+                ),
             )
             for event in deposit_events
         }
 
         minted_txs = {
-            (
-                event["args"]["amount"] + event["args"]["feeCollected"],
-                event["args"]["mintRecipient"].lower()
+            TransactionIdentity(
+                amount=event["args"]["amount"] + event["args"]["feeCollected"],
+                recipient=event["args"]["mintRecipient"].lower(),
             )
             for event in mint_events
         }

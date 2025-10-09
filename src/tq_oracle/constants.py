@@ -7,7 +7,7 @@ HL_MAINNET_API_URL = "https://api.hyperliquid.xyz"
 HL_TESTNET_API_URL = "https://api.hyperliquid-testnet.xyz"
 
 HL_PROD_EVM_RPC = "https://rpc.hyperliquid.xyz/evm"
-HL_TEST_EVM_RPC =  "https://rpc.hyperliquid-testnet.xyz/evm"
+HL_TEST_EVM_RPC = "https://rpc.hyperliquid-testnet.xyz/evm"
 
 DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
 DEFAULT_SEPOLIA_RPC_URL = "https://sepolia.drpc.org"
