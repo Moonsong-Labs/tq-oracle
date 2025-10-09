@@ -34,7 +34,28 @@ class IdleBalancesAdapter(BaseAssetAdapter):
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch asset data from Idle Balances for the given vault."""
-        return []
+        subvault_addresses, supported_assets = await asyncio.gather(
+            self._fetch_subvault_addresses(),
+            self._fetch_supported_assets(),
+        )
+
+        logger.debug(
+            "Fetching balances for %d subvaults x %d assets = %d total calls",
+            len(subvault_addresses),
+            len(supported_assets),
+            len(subvault_addresses) * len(supported_assets),
+        )
+
+        asset_tasks = [
+            self._fetch_asset_balance(self.w3_mainnet, subvault_addr, asset_addr)
+            for subvault_addr in subvault_addresses
+            for asset_addr in supported_assets
+        ]
+
+        assets = await asyncio.gather(*asset_tasks)
+
+        logger.debug("Fetched %d asset balances", len(assets))
+        return list(assets)
 
     async def _fetch_contract_list(
         self,
@@ -102,8 +123,11 @@ class IdleBalancesAdapter(BaseAssetAdapter):
 
     async def _fetch_asset_balance(
         self, w3: Web3, subvault_address: str, asset_address: str
-    ) -> int:
+    ) -> AssetData:
         """Fetch the balance of an asset for the given subvault."""
         erc20_abi = load_erc20_abi()
         erc20_contract = w3.eth.contract(address=asset_address, abi=erc20_abi)
-        return erc20_contract.functions.balanceOf(subvault_address).call()
+        balance = await asyncio.to_thread(
+            erc20_contract.functions.balanceOf(subvault_address).call
+        )
+        return AssetData(asset_address=asset_address, amount=balance)
