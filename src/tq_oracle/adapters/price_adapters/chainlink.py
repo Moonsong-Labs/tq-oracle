@@ -31,22 +31,27 @@ class ChainlinkAdapter(BasePriceAdapter):
         return int(answer), int(decimals)
 
     async def fetch_prices(
-        self, asset_addresses: list[str], price_data: PriceData
+        self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
-        """Fetch asset prices from Chainlink price feeds.
+        """Fetch and accumulate asset prices from Chainlink price feeds.
 
         Args:
-            asset_addresses: List of asset contract addresses to get prices for
-            price_data: Price data to update
+            asset_addresses: List of asset contract addresses to get prices for.
+            prices_accumulator: Existing price accumulator to update in place. Must
+                have base_asset set to ETH (wei). All prices are 18-decimal values
+                representing wei per 1 unit of the asset.
 
         Returns:
-            Price data with updated prices
+            The same accumulator with Chainlink-derived prices merged in.
+
+        Notes:
+            - Only ETH as base asset is supported.
         """
-        if price_data.base_asset != ETH_ASSET:
+        if prices_accumulator.base_asset != ETH_ASSET:
             raise ValueError("Chainlink adapter only supports ETH as base asset")
 
         if USDC_MAINNET not in asset_addresses:
-            return price_data
+            return prices_accumulator
 
         w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
         aggregator_abi = load_aggregator_abi()
@@ -62,6 +67,6 @@ class ChainlinkAdapter(BasePriceAdapter):
 
         usdc_eth_scaled = scale_to_18(usdc_eth_answer, usdc_eth_decimals)
 
-        price_data.prices[USDC_MAINNET] = usdc_eth_scaled
+        prices_accumulator.prices[USDC_MAINNET] = usdc_eth_scaled
 
-        return price_data
+        return prices_accumulator
