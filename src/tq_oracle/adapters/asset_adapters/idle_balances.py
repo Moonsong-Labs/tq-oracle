@@ -85,7 +85,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         logger.debug("Found %d %ss", count, item_type)
 
         async def fetch_item_at(index: int) -> str:
-            item = await asyncio.to_thread(
+            item: str = await asyncio.to_thread(
                 getattr(contract.functions, item_function)(index).call
             )
             logger.debug("%s %d: %s", item_type.capitalize(), index, item)
@@ -126,8 +126,10 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     ) -> AssetData:
         """Fetch the balance of an asset for the given subvault."""
         erc20_abi = load_erc20_abi()
-        erc20_contract = w3.eth.contract(address=asset_address, abi=erc20_abi)
+        checksum_asset_address = w3.to_checksum_address(asset_address)
+        checksum_subvault_address = w3.to_checksum_address(subvault_address)
+        erc20_contract = w3.eth.contract(address=checksum_asset_address, abi=erc20_abi)
         balance = await asyncio.to_thread(
-            erc20_contract.functions.balanceOf(subvault_address).call
+            erc20_contract.functions.balanceOf(checksum_subvault_address).call
         )
         return AssetData(asset_address=asset_address, amount=balance)
