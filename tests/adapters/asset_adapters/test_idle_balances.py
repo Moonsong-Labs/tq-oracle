@@ -23,10 +23,10 @@ def config():
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_get_subvault_addresses_integration(config):
+async def test_fetch_subvault_addresses_integration(config):
     adapter = IdleBalancesAdapter(config)
 
-    subvaults = await adapter.get_subvault_addresses()
+    subvaults = await adapter.fetch_subvault_addresses()
 
     expected_subvaults = [
         "0x90c983DC732e65DB6177638f0125914787b8Cb78",

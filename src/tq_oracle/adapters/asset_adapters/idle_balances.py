@@ -30,7 +30,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Fetch asset data from Idle Balances for the given vault."""
         return []
 
-    async def get_subvault_addresses(self) -> list[str]:
+    async def fetch_subvault_addresses(self) -> list[str]:
         """Get the subvault addresses for the given vault."""
         vault_abi = load_vault_abi()
         vault_address = self.w3_mainnet.to_checksum_address(self.config.vault_address)
