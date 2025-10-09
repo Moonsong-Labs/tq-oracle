@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...abi import load_aggregator_abi
-from ...constants import ETH_ASSET, USDC_MAINNET, PRICE_FEED_USDC_ETH
+from ...constants import ETH_ASSET, USDC_MAINNET, PRICE_FEED_USDC_ETH, USDC_SEPOLIA
 from ...units import scale_to_18
 
 from .base import BasePriceAdapter, PriceData
@@ -20,6 +20,7 @@ class ChainlinkAdapter(BasePriceAdapter):
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
+        self.usdc_address = USDC_SEPOLIA if config.testnet else USDC_MAINNET
 
     @property
     def adapter_name(self) -> str:
@@ -50,7 +51,7 @@ class ChainlinkAdapter(BasePriceAdapter):
         if prices_accumulator.base_asset != ETH_ASSET:
             raise ValueError("Chainlink adapter only supports ETH as base asset")
 
-        if USDC_MAINNET not in asset_addresses:
+        if self.usdc_address not in asset_addresses:
             return prices_accumulator
 
         w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
@@ -67,6 +68,6 @@ class ChainlinkAdapter(BasePriceAdapter):
 
         usdc_eth_scaled = scale_to_18(usdc_eth_answer, usdc_eth_decimals)
 
-        prices_accumulator.prices[USDC_MAINNET] = usdc_eth_scaled
+        prices_accumulator.prices[self.usdc_address] = usdc_eth_scaled
 
         return prices_accumulator
