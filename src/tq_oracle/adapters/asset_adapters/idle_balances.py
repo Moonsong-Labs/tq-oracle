@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from web3 import Web3
@@ -42,11 +43,16 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         subvault_count = vault_contract.functions.subvaults().call()
         logger.debug("Found %d subvaults", subvault_count)
 
-        subvault_addresses = []
-        for i in range(subvault_count):
-            subvault_address = vault_contract.functions.subvaultAt(i).call()
-            logger.debug("Subvault %d: %s", i, subvault_address)
-            subvault_addresses.append(subvault_address)
+        async def fetch_subvault_at(index: int) -> str:
+            address = await asyncio.to_thread(
+                vault_contract.functions.subvaultAt(index).call
+            )
+            logger.debug("Subvault %d: %s", index, address)
+            return address
+
+        subvault_addresses = await asyncio.gather(
+            *[fetch_subvault_at(i) for i in range(subvault_count)]
+        )
 
         logger.debug("Retrieved %d subvault addresses", len(subvault_addresses))
-        return subvault_addresses
+        return list(subvault_addresses)
