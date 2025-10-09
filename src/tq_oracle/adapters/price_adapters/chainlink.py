@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...abi import load_aggregator_abi
-from ...constants import ETH_ASSET, USDC_MAINNET
+from ...constants import ETH_ASSET, USDC_MAINNET, PRICE_FEED_USDC_ETH
 
 from .base import BasePriceAdapter, PriceData
 
@@ -15,8 +15,6 @@ if TYPE_CHECKING:
 
 class ChainlinkAdapter(BasePriceAdapter):
     """Adapter for querying Chainlink price feeds."""
-
-    PRICE_FEED_USDC_ETH = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
 
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
@@ -60,7 +58,7 @@ class ChainlinkAdapter(BasePriceAdapter):
         aggregator_abi = load_aggregator_abi()
 
         usdc_eth_feed = w3.eth.contract(
-            address=w3.to_checksum_address(self.PRICE_FEED_USDC_ETH),
+            address=w3.to_checksum_address(PRICE_FEED_USDC_ETH),
             abi=aggregator_abi,
         )
 
