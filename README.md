@@ -119,12 +119,33 @@ src/tq_oracle/
 ├── main.py                           # CLI entry point (Typer)
 ├── config.py                         # Configuration dataclass
 ├── orchestrator.py                   # Main control flow orchestration
-├── adapters/                         # Protocol adapters (asset/price)
+├── adapters/                         # Protocol adapters (asset/price/check)
 ├── processors/                       # Data processing pipeline
 ├── report/                           # Report generation and publishing
 ├── safe/                             # Safe transaction building
-├── checks/                           # Pre-flight validation
+├── checks/                           # Pre-flight validation orchestration
 └── abis/                             # Contract ABIs (JSON)
+```
+
+## Pre-Flight Checks
+
+Before processing TVL data, TQ Oracle runs automated pre-flight validation checks to ensure data integrity:
+
+- **Safe State Validation**: Ensures no duplicate or pending reports exist
+- **CCTP Bridge Detection**: Identifies in-flight USDC transfers between L1 and Hyperliquid
+- **Check Retry Logic**: Automatically retries failed checks with exponential backoff when recommended
+
+These checks prevent race conditions and ensure accurate TVL snapshots by detecting ongoing cross-chain transfers that could affect asset balances.
+
+### Testing CCTP Bridge Detection
+
+A standalone test script is available to verify CCTP bridge in-flight detection:
+
+```bash
+# Test on mainnet
+uv run python scripts/check_cctp_inflight.py \
+  0xL1SubvaultAddress \
+  0xHLSubvaultAddress
 ```
 
 ## Adding New Adapters

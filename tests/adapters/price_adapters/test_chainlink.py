@@ -13,6 +13,7 @@ def config():
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",
         safe_address=None,
+        l1_subvault_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
         l1_subvault_address=None,
