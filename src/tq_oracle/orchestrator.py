@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+from .constants import ETH_ASSET
+from .adapters.price_adapters.base import PriceData
 from .adapters import ASSET_ADAPTERS, PRICE_ADAPTERS
 from .adapters.asset_adapters.base import AssetData
 from .checks.pre_checks import PreCheckError, run_pre_checks
 from .logger import get_logger
 from .processors import (
-    calculate_relative_prices,
     compute_total_aggregated_assets,
     derive_final_prices,
     calculate_total_assets,
@@ -110,26 +111,17 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     asset_addresses = list(aggregated.assets.keys())
 
     logger.info("Fetching prices for %d assets...", len(asset_addresses))
-    price_data = []
+    price_data: PriceData = PriceData(base_asset=ETH_ASSET, prices={})
     for price_adapter in price_adapters:
-        prices = await price_adapter.fetch_prices(asset_addresses)
-        logger.debug("Price adapter returned %d prices", len(prices))
-        price_data.extend(prices)
-
-    base_asset = asset_addresses[0] if asset_addresses else ""
-    logger.info("Calculating relative prices (base: %s)...", base_asset)
-    relative_prices = await calculate_relative_prices(
-        asset_addresses,
-        price_data,
-        base_asset,
-    )
+        price_data = await price_adapter.fetch_prices(asset_addresses, price_data)
+        logger.debug("Price adapter returned %d prices", len(price_data.prices))
 
     logger.info("Calculating total assets in base asset...")
-    total_assets = calculate_total_assets(aggregated, relative_prices)
+    total_assets = calculate_total_assets(aggregated, price_data)
     logger.debug("Total assets in base asset: %d", total_assets)
 
     logger.info("Deriving final prices via OracleHelper...")
-    final_prices = await derive_final_prices(config, total_assets, relative_prices)
+    final_prices = await derive_final_prices(config, total_assets, price_data)
 
     logger.info("Generating report...")
     report = await generate_report(
