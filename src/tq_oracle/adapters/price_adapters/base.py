@@ -28,7 +28,7 @@ class PriceAdapter(Protocol):
 
         Args:
             asset_addresses: List of asset contract addresses to get prices for
-            prices_accumulator: Existing price accumulator to update in place. Must
+            prices_accumulator: Existing price accumulator to update. Must
                 have base_asset set to ETH (wei). All prices are 18-decimal values
                 representing wei per 1 unit of the asset.
 
