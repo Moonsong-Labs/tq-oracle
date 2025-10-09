@@ -15,6 +15,7 @@ def config():
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
+        l1_subvault_address=None,
         testnet=False,
         dry_run=False,
         private_key=None,

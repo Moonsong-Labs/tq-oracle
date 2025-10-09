@@ -34,12 +34,19 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Get the subvault addresses for the given vault."""
         vault_abi = load_vault_abi()
         vault_address = self.w3_mainnet.to_checksum_address(self.config.vault_address)
+        logger.debug("Fetching subvault addresses for vault: %s", vault_address)
+
         vault_contract = self.w3_mainnet.eth.contract(
             address=vault_address, abi=vault_abi
         )
         subvault_count = vault_contract.functions.subvaults().call()
+        logger.debug("Found %d subvaults", subvault_count)
+
         subvault_addresses = []
         for i in range(subvault_count):
             subvault_address = vault_contract.functions.subvaultAt(i).call()
+            logger.debug("Subvault %d: %s", i, subvault_address)
             subvault_addresses.append(subvault_address)
+
+        logger.debug("Retrieved %d subvault addresses", len(subvault_addresses))
         return subvault_addresses
