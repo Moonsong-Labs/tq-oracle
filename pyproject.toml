@@ -22,7 +22,7 @@ dev = [
 ]
 
 [tool.pyrefly]
-project-includes = ["src","tests"]
+project-includes = ["src","tests", "scripts"]
 
 [project.scripts]
 tq-oracle = "tq_oracle.main:run"

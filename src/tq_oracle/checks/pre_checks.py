@@ -1,55 +1,23 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import TYPE_CHECKING
+
+from ..adapters.check_adapters import CHECK_ADAPTERS
+from ..adapters.check_adapters.base import CheckResult
 
 if TYPE_CHECKING:
     from ..config import OracleCLIConfig
+
+logger = logging.getLogger(__name__)
 
 
 class PreCheckError(Exception):
     """Raised when a pre-check fails and execution should stop."""
 
-    pass
-
-
-async def check_already_published(
-    config: OracleCLIConfig,
-    vault_address: str,
-) -> bool:
-    """Check if a report has already been published for this vault.
-
-    Args:
-        config: CLI configuration with RPC endpoints
-        vault_address: The vault contract address
-
-    Returns:
-        True if already published, False otherwise
-
-    This corresponds to the "Already published?" decision in the flowchart.
-
-    TODO: Implement actual contract state check
-    """
-    return False
-
-
-async def check_pending_vote(
-    config: OracleCLIConfig,
-    vault_address: str,
-) -> bool:
-    """Check if a report is already pending vote for this vault.
-
-    Args:
-        config: CLI configuration with RPC endpoints
-        vault_address: The vault contract address
-
-    Returns:
-        True if report is pending, False otherwise
-
-    This corresponds to the "Report already being voted on?" decision in the flowchart.
-
-    TODO: Implement actual voting state check
-    """
-    return False
+    def __init__(self, message: str):
+        super().__init__(message)
 
 
 async def run_pre_checks(
@@ -65,16 +33,33 @@ async def run_pre_checks(
     Raises:
         PreCheckError: If any pre-check fails
 
-    This encapsulates the pre-check logic from the flowchart:
-    - Already published? -> STOP
-    - Report already being voted on? -> STOP
+    This runs adapter-based checks including:
+    - Safe state validation (already published, pending vote)
+    - CCTP bridge in-flight detection
+    - Other adapter checks
     """
-    if await check_already_published(config, vault_address):
-        raise PreCheckError(
-            f"Report already published for vault {vault_address}. Exiting."
-        )
+    logger.info("Running pre-checks...")
+    adapters = [adapter_cls(config) for adapter_cls in CHECK_ADAPTERS]
 
-    if await check_pending_vote(config, vault_address):
-        raise PreCheckError(
-            f"Report already pending vote for vault {vault_address}. Exiting."
-        )
+    results = await asyncio.gather(
+        *[adapter.run_check() for adapter in adapters],
+        return_exceptions=True,
+    )
+
+    failed_checks = []
+    for adapter, result in zip(adapters, results):
+        if isinstance(result, Exception):
+            logger.error(f"Check '{adapter.name}' raised exception: {result}")
+            failed_checks.append(f"{adapter.name}: {str(result)}")
+            continue
+
+        if isinstance(result, CheckResult):
+            if result.passed:
+                logger.info(f"✓ {adapter.name}: {result.message}")
+            else:
+                logger.warning(f"✗ {adapter.name}: {result.message}")
+                failed_checks.append(result.message)
+
+    if failed_checks:
+        error_msg = f"Pre-checks failed: {'; '.join(failed_checks)}"
+        raise PreCheckError(error_msg)

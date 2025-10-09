@@ -41,7 +41,7 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
 Create a `.env` file:
 
 ```env
-L1_RPC_URL=https://sepolia.drpc.org
+L1_RPC=https://sepolia.drpc.org
 HL_SUBVAULT_ADDRESS=0xYourHyperliquidSubvaultAddress
 PRIVATE_KEY=0xYourPrivateKey
 ```
@@ -67,7 +67,7 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
 |--------|---------------------|---------|-------------|
 | `VAULT_ADDRESS` | - | *required* | Vault contract address (positional argument) |
 | `--oracle-helper-address` `-h` | - | Auto (mainnet/testnet) | OracleHelper contract address |
-| `--l1-rpc` | `L1_RPC_URL` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
+| `--l1-rpc` | `L1_RPC` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
 | `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | Vault address | Hyperliquid subvault address to query |
 | `--hl-rpc` | `HL_RPC_URL` | - | Hyperliquid RPC endpoint (optional) |
 | `--safe-address` `-s` | - | - | Gnosis Safe address for multi-sig submission |
