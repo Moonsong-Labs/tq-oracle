@@ -40,7 +40,14 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         return "idle_balances"
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
-        """Fetch asset data from Idle Balances for the given vault."""
+        """Fetch asset data from Idle Balances for the given vault.
+
+        Args:
+            subvault_address: The subvault contract address to query (used as fallback if config doesn't specify hl_subvault_address)
+
+        Returns:
+            List of AssetData objects containing asset addresses and balances
+        """
         subvault_addresses, supported_assets = await asyncio.gather(
             self._fetch_subvault_addresses(),
             self._fetch_supported_assets(),
@@ -59,19 +66,20 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             for asset_addr in supported_assets
         ]
 
-        assets = await asyncio.gather(*asset_tasks)
+        assets = list(await asyncio.gather(*asset_tasks))
 
         # Fetch USDC balance from HL subvault
         usdc_address = USDC_HL_TESTNET if self.config.testnet else USDC_HL_MAINNET
+        hl_subvault_address = self.config.hl_subvault_address or subvault_address
         usdc_asset = await self._fetch_asset_balance(
-            self.w3_hl, self.config.hl_subvault_address, usdc_address
+            self.w3_hl, hl_subvault_address, usdc_address
         )
         # Overwrite USDC HL address with mainnet address
         usdc_asset.asset_address = USDC_SEPOLIA if self.config.testnet else USDC_MAINNET
         assets.append(usdc_asset)
 
         logger.debug("Fetched %d asset balances", len(assets))
-        return list(assets)
+        return assets
 
     async def _fetch_contract_list(
         self,
