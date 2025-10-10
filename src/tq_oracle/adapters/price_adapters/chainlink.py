@@ -5,7 +5,14 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...abi import load_aggregator_abi
-from ...constants import ETH_ASSET, USDC_MAINNET, PRICE_FEED_USDC_ETH, USDC_SEPOLIA
+from ...constants import (
+    ETH_ASSET,
+    USDC_MAINNET,
+    PRICE_FEED_USDC_ETH,
+    USDC_SEPOLIA,
+    USDT_MAINNET,
+    PRICE_FEED_USDT_ETH,
+)
 from ...units import scale_to_18
 
 from .base import BasePriceAdapter, PriceData
@@ -21,6 +28,7 @@ class ChainlinkAdapter(BasePriceAdapter):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
         self.usdc_address = USDC_SEPOLIA if config.testnet else USDC_MAINNET
+        self.usdt_address = None if config.testnet else USDT_MAINNET
 
     @property
     def adapter_name(self) -> str:
@@ -51,23 +59,31 @@ class ChainlinkAdapter(BasePriceAdapter):
         if prices_accumulator.base_asset != ETH_ASSET:
             raise ValueError("Chainlink adapter only supports ETH as base asset")
 
-        if self.usdc_address not in asset_addresses:
+        assets_to_fetch = [
+            (self.usdc_address, PRICE_FEED_USDC_ETH),
+            (self.usdt_address, PRICE_FEED_USDT_ETH),
+        ]
+
+        assets_to_fetch = [
+            (asset_address, price_feed)
+            for asset_address, price_feed in assets_to_fetch
+            if asset_address and asset_address in asset_addresses
+        ]
+
+        if not assets_to_fetch:
             return prices_accumulator
 
         w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
         aggregator_abi = load_aggregator_abi()
 
-        usdc_eth_feed = w3.eth.contract(
-            address=w3.to_checksum_address(PRICE_FEED_USDC_ETH),
-            abi=aggregator_abi,
-        )
+        for asset_address, price_feed in assets_to_fetch:
+            feed_contract = w3.eth.contract(
+                address=w3.to_checksum_address(price_feed),
+                abi=aggregator_abi,
+            )
 
-        usdc_eth_answer, usdc_eth_decimals = await self.latest_price_and_decimals(
-            usdc_eth_feed
-        )
-
-        usdc_eth_scaled = scale_to_18(usdc_eth_answer, usdc_eth_decimals)
-
-        prices_accumulator.prices[self.usdc_address] = usdc_eth_scaled
+            answer, decimals = await self.latest_price_and_decimals(feed_contract)
+            scaled_price = scale_to_18(answer, decimals)
+            prices_accumulator.prices[asset_address] = scaled_price
 
         return prices_accumulator
