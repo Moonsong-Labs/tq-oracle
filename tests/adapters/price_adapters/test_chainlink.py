@@ -132,3 +132,67 @@ async def test_fetch_prices_usdt_not_supported_on_testnet():
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_fetch_prices_usds_integration_with_previous_prices(config):
+    adapter = ChainlinkAdapter(config)
+    usds_address = "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
+    result = await adapter.fetch_prices(
+        [usds_address], PriceData(base_asset=ETH_ASSET, prices={"0x111": 1})
+    )
+    assert isinstance(result, PriceData)
+    assert len(result.prices) == 2
+    assert result.prices["0x111"] == 1
+    price = result.prices[usds_address]
+    assert isinstance(price, int)
+    assert price >= 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_fetch_prices_all_stablecoins_integration(config):
+    adapter = ChainlinkAdapter(config)
+    usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    usdt_address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
+    usds_address = "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
+    result = await adapter.fetch_prices(
+        [usdc_address, usdt_address, usds_address],
+        PriceData(base_asset=ETH_ASSET, prices={}),
+    )
+    assert isinstance(result, PriceData)
+    assert len(result.prices) == 3
+    usdc_price = result.prices[usdc_address]
+    usdt_price = result.prices[usdt_address]
+    usds_price = result.prices[usds_address]
+    assert isinstance(usdc_price, int)
+    assert isinstance(usdt_price, int)
+    assert isinstance(usds_price, int)
+    assert usdc_price >= 0
+    assert usdt_price >= 0
+    assert usds_price >= 0
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_usds_not_supported_on_testnet():
+    testnet_config = OracleCLIConfig(
+        vault_address="0xVault",
+        oracle_helper_address="0xOracleHelper",
+        l1_rpc="https://sepolia.drpc.org",
+        safe_address=None,
+        l1_subvault_address=None,
+        hl_rpc=None,
+        hl_subvault_address=None,
+        testnet=True,
+        dry_run=False,
+        private_key=None,
+        safe_txn_srvc_api_key=None,
+    )
+    adapter = ChainlinkAdapter(testnet_config)
+    usds_address = "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
+    result = await adapter.fetch_prices(
+        [usds_address], PriceData(base_asset=ETH_ASSET, prices={})
+    )
+    assert isinstance(result, PriceData)
+    assert len(result.prices) == 0
