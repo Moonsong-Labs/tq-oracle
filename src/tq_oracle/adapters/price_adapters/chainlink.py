@@ -5,7 +5,17 @@ from typing import TYPE_CHECKING
 from web3 import Web3
 
 from ...abi import load_aggregator_abi
-from ...constants import ETH_ASSET, USDC_MAINNET, PRICE_FEED_USDC_ETH, USDC_SEPOLIA
+from ...constants import (
+    ETH_ASSET,
+    USDC_MAINNET,
+    PRICE_FEED_USDC_ETH,
+    USDC_SEPOLIA,
+    USDT_MAINNET,
+    PRICE_FEED_USDT_ETH,
+    USDS_MAINNET,
+    PRICE_FEED_USDS_USD,
+    PRICE_FEED_ETH_USD,
+)
 from ...units import scale_to_18
 
 from .base import BasePriceAdapter, PriceData
@@ -21,6 +31,8 @@ class ChainlinkAdapter(BasePriceAdapter):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
         self.usdc_address = USDC_SEPOLIA if config.testnet else USDC_MAINNET
+        self.usdt_address = None if config.testnet else USDT_MAINNET
+        self.usds_address = None if config.testnet else USDS_MAINNET
 
     @property
     def adapter_name(self) -> str:
@@ -47,27 +59,62 @@ class ChainlinkAdapter(BasePriceAdapter):
 
         Notes:
             - Only ETH as base asset is supported.
+            - For assets without direct ETH price feeds, derives prices by
+              combining USD-denominated feeds (e.g., USDS/USD ÷ ETH/USD).
         """
         if prices_accumulator.base_asset != ETH_ASSET:
             raise ValueError("Chainlink adapter only supports ETH as base asset")
 
-        if self.usdc_address not in asset_addresses:
+        direct_feed_assets = [
+            (self.usdc_address, PRICE_FEED_USDC_ETH),
+            (self.usdt_address, PRICE_FEED_USDT_ETH),
+        ]
+
+        direct_feed_assets = [
+            (asset_address, price_feed)
+            for asset_address, price_feed in direct_feed_assets
+            if asset_address and asset_address in asset_addresses
+        ]
+
+        has_usds = self.usds_address and self.usds_address in asset_addresses
+
+        if not direct_feed_assets and not has_usds:
             return prices_accumulator
 
         w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
         aggregator_abi = load_aggregator_abi()
 
-        usdc_eth_feed = w3.eth.contract(
-            address=w3.to_checksum_address(PRICE_FEED_USDC_ETH),
-            abi=aggregator_abi,
-        )
+        for asset_address, price_feed in direct_feed_assets:
+            feed_contract = w3.eth.contract(
+                address=w3.to_checksum_address(price_feed),
+                abi=aggregator_abi,
+            )
 
-        usdc_eth_answer, usdc_eth_decimals = await self.latest_price_and_decimals(
-            usdc_eth_feed
-        )
+            answer, decimals = await self.latest_price_and_decimals(feed_contract)
+            scaled_price = scale_to_18(answer, decimals)
+            prices_accumulator.prices[asset_address] = scaled_price
 
-        usdc_eth_scaled = scale_to_18(usdc_eth_answer, usdc_eth_decimals)
+        if has_usds and self.usds_address:
+            usds_usd_feed = w3.eth.contract(
+                address=w3.to_checksum_address(PRICE_FEED_USDS_USD),
+                abi=aggregator_abi,
+            )
+            eth_usd_feed = w3.eth.contract(
+                address=w3.to_checksum_address(PRICE_FEED_ETH_USD),
+                abi=aggregator_abi,
+            )
 
-        prices_accumulator.prices[self.usdc_address] = usdc_eth_scaled
+            usds_usd_answer, usds_usd_decimals = await self.latest_price_and_decimals(
+                usds_usd_feed
+            )
+            eth_usd_answer, eth_usd_decimals = await self.latest_price_and_decimals(
+                eth_usd_feed
+            )
+
+            usds_usd_scaled = scale_to_18(usds_usd_answer, usds_usd_decimals)
+            eth_usd_scaled = scale_to_18(eth_usd_answer, eth_usd_decimals)
+
+            usds_eth_price = (usds_usd_scaled * 10**18) // eth_usd_scaled
+            prices_accumulator.prices[self.usds_address] = usds_eth_price
 
         return prices_accumulator
