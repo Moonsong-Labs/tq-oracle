@@ -82,4 +82,8 @@ def test_as_safe_dict_preserves_all_fields():
         "pre_check_timeout",
         "_chain_id",
         "_oracle_address",
+        "rpc_delay",
+        "rpc_max_concurrent_calls",
+        "max_calls",
+        "rpc_jitter",
     }

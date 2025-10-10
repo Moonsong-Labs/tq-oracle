@@ -123,8 +123,8 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         try:
             if not self._config.l1_subvault_address:
                 return CheckResult(
-                    passed=False,
-                    message="L1 subvault address is required for CCTP bridge checks",
+                    passed=True,
+                    message="Skipping CCTP bridge checks - L1 subvault address not configured",
                     retry_recommended=False,
                 )
             if not self._config.hl_subvault_address:

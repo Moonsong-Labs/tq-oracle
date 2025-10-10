@@ -12,9 +12,11 @@ if TYPE_CHECKING:
 
 ABIS_DIR = Path(__file__).parent / "abis"
 
+ORACLE_ABI_PATH = ABIS_DIR / "IOracle.json"
 ORACLE_HELPER_ABI_PATH = ABIS_DIR / "OracleHelper.json"
 VAULT_ABI_PATH = ABIS_DIR / "Vault.json"
 AGGREGATOR_ABI_PATH = ABIS_DIR / "AggregatorV3Interface.json"
+ERC20_ABI_PATH = ABIS_DIR / "ERC20.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -37,6 +39,11 @@ def load_abi(path: str | Path) -> list[dict]:
     return data["abi"]
 
 
+def load_oracle_abi() -> list[dict]:
+    """Load the Oracle ABI."""
+    return load_abi(ORACLE_ABI_PATH)
+
+
 def load_oracle_helper_abi() -> list[dict]:
     """Load the OracleHelper ABI."""
     return load_abi(ORACLE_HELPER_ABI_PATH)
@@ -50,6 +57,11 @@ def load_vault_abi() -> list[dict]:
 def load_aggregator_abi() -> list[dict]:
     """Load the Aggregator ABI."""
     return load_abi(AGGREGATOR_ABI_PATH)
+
+
+def load_erc20_abi() -> list[dict]:
+    """Load the ERC20 ABI."""
+    return load_abi(ERC20_ABI_PATH)
 
 
 def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumAddress:
