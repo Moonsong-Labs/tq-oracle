@@ -19,6 +19,7 @@ from tq_oracle.constants import (
     CCTP_RATE_LIMITED_LOOKBACK_BLOCKS,
     HL_BLOCK_TIME,
     L1_BLOCK_TIME,
+    RPC_RATE_LIMIT_DELAY,
     TOKEN_MESSENGER_V2_PROD,
     TOKEN_MESSENGER_V2_TEST,
 )
@@ -71,6 +72,11 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
             Lowercase checksummed Ethereum address
         """
         return w3.to_checksum_address(bytes32_value[-20:]).lower()
+
+    async def _delay(self) -> None:
+        logger.info(f"Sleeping for {RPC_RATE_LIMIT_DELAY}s ...")
+        logger.info("tip: 💡 provide custom RPC to speed up checks")
+        await asyncio.sleep(RPC_RATE_LIMIT_DELAY)
 
     async def _cleanup_providers(self, *providers: AsyncWeb3 | None) -> None:
         """Safely disconnect Web3 providers."""
@@ -154,29 +160,33 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
                 address=messenger_checksum, abi=messenger_abi
             )
 
-            l1_to_hl_inflight, hl_to_l1_inflight = await asyncio.gather(
-                self._check_direction(
-                    l1_w3,
-                    hl_w3,
-                    l1_messenger,
-                    hl_messenger,
-                    l1_subvault_checksum,
-                    hl_subvault_checksum,
-                    "L1→HL",
-                    source_block_time=L1_BLOCK_TIME,
-                    dest_block_time=HL_BLOCK_TIME,
-                ),
-                self._check_direction(
-                    hl_w3,
-                    l1_w3,
-                    hl_messenger,
-                    l1_messenger,
-                    hl_subvault_checksum,
-                    l1_subvault_checksum,
-                    "HL→L1",
-                    source_block_time=HL_BLOCK_TIME,
-                    dest_block_time=L1_BLOCK_TIME,
-                ),
+            l1_to_hl_inflight = await self._check_direction(
+                l1_w3,
+                hl_w3,
+                l1_messenger,
+                hl_messenger,
+                l1_subvault_checksum,
+                hl_subvault_checksum,
+                "L1→HL",
+                source_block_time=L1_BLOCK_TIME,
+                dest_block_time=HL_BLOCK_TIME,
+                using_default_rpc=self._config.using_default_rpc,
+            )
+
+            if self._config.using_default_rpc:
+                await self._delay()
+
+            hl_to_l1_inflight = await self._check_direction(
+                hl_w3,
+                l1_w3,
+                hl_messenger,
+                l1_messenger,
+                hl_subvault_checksum,
+                l1_subvault_checksum,
+                "HL→L1",
+                source_block_time=HL_BLOCK_TIME,
+                dest_block_time=L1_BLOCK_TIME,
+                using_default_rpc=self._config.using_default_rpc,
             )
 
             total_inflight = l1_to_hl_inflight + hl_to_l1_inflight
@@ -215,6 +225,7 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         direction: Literal["HL→L1", "L1→HL"],
         source_block_time: int,
         dest_block_time: int,
+        using_default_rpc: bool = False,
     ) -> int:
         """Check for in-flight transactions in one direction.
 
@@ -228,6 +239,7 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
             direction: Human-readable direction label for logging
             source_block_time: Block time of source chain in seconds
             dest_block_time: Block time of destination chain in seconds
+            using_default_rpc: Whether using standard RPC (triggers rate limiting delays)
 
         Returns:
             Number of in-flight transactions detected
@@ -260,26 +272,25 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
             f"{direction}: Querying DepositForBurn events from block {source_from_block} to {source_current_block} "
             f"with depositor={source_subvault_address}"
         )
-        logger.debug(
-            f"{direction}: Querying MintAndWithdraw events from block {dest_from_block} to {dest_current_block} "
-            f"with mintRecipient={dest_subvault_address}"
-        )
-
-        deposit_events_task = source_messenger.events.DepositForBurn.get_logs(
+        deposit_events = await source_messenger.events.DepositForBurn.get_logs(
             from_block=source_from_block,
             to_block=source_current_block,
             argument_filters={"depositor": source_subvault_address},
         )
-        mint_events_task = dest_messenger.events.MintAndWithdraw.get_logs(
+
+        if using_default_rpc:
+            await self._delay()
+
+        logger.debug(
+            f"{direction}: Querying MintAndWithdraw events from block {dest_from_block} to {dest_current_block} "
+            f"with mintRecipient={dest_subvault_address}"
+        )
+        mint_events = await dest_messenger.events.MintAndWithdraw.get_logs(
             from_block=dest_from_block,
             to_block=dest_current_block,
             argument_filters={
                 "mintRecipient": dest_subvault_address,
             },
-        )
-
-        deposit_events, mint_events = await asyncio.gather(
-            deposit_events_task, mint_events_task
         )
         logger.info(
             "Fetched %d DepositForBurn events for %s %s",

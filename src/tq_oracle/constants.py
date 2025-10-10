@@ -27,6 +27,9 @@ CCTP_FINALITY_THRESHOLD_SLOW = 2000  # ~15 minutes
 
 CCTP_LOOKBACK_BLOCKS = 80
 CCTP_RATE_LIMITED_LOOKBACK_BLOCKS = 80  # 24 hours
+RPC_RATE_LIMIT_DELAY = (
+    5  # Delay in seconds between RPC calls to avoid rate limits with get_logs()
+)
 HL_BLOCK_TIME = 1  # Hyperliquid block time in seconds
 L1_BLOCK_TIME = 12  # Ethereum L1 block time in seconds
 
