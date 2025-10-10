@@ -129,8 +129,8 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
                 )
             if not self._config.hl_subvault_address:
                 return CheckResult(
-                    passed=False,
-                    message="HL subvault address is required for CCTP bridge checks",
+                    passed=True,
+                    message="Skipping CCTP bridge checks - HL subvault address not configured",
                     retry_recommended=False,
                 )
             logger.debug(f"Connecting to L1 RPC: {self._config.l1_rpc}")
