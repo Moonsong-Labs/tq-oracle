@@ -63,7 +63,6 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
             break
 
         except PreCheckError as e:
-            # Only retry if the check recommends it (e.g., transient failures like in-flight CCTP)
             if not e.retry_recommended:
                 logger.error("Pre-check failed (retry not recommended): %s", e)
                 raise
