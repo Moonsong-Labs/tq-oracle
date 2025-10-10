@@ -136,6 +136,7 @@ async def test_fetch_asset_balance_hyperevm_integration(hl_config):
 
     hl_subvault_address = "0x90c983DC732e65DB6177638f0125914787b8Cb78"
 
+    assert adapter.w3_hl is not None, "HL RPC should be configured"
     usdc_hl_asset = await adapter._fetch_asset_balance(
         adapter.w3_hl, hl_subvault_address, USDC_HL_MAINNET
     )

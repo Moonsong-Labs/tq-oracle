@@ -48,5 +48,5 @@ def test_calculate_total_assets_mismatched_keys_raises():
         },
     )
 
-    with pytest.raises(ValueError, match="different keys"):
+    with pytest.raises(ValueError, match="Missing prices for assets"):
         calculate_total_assets(aggregated, prices)

@@ -21,6 +21,7 @@ class OracleCLIConfig:
     safe_txn_srvc_api_key: Optional[str]
     private_key: Optional[str]
     ignore_empty_vault: bool = False
+    ignore_timeout_check: bool = False
     using_default_rpc: bool = False
     pre_check_retries: int = 3
     pre_check_timeout: float = 10.0
