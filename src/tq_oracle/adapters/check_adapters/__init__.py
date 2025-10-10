@@ -1,13 +1,15 @@
 """Check adapters registry."""
 
+from tq_oracle.adapters.check_adapters.active_submit_report_proposal_check import (
+    ActiveSubmitReportProposalCheck,
+)
 from tq_oracle.adapters.check_adapters.cctp_bridge import CCTPBridgeAdapter
 from tq_oracle.adapters.check_adapters.safe_state import SafeStateAdapter
-
-# TODO: Add DeBridge adapter when implemented
-# from tq_oracle.adapters.check_adapters.debridge import DeBridgeAdapter
+from tq_oracle.adapters.check_adapters.timeout_check import TimeoutCheckAdapter
 
 CHECK_ADAPTERS = [
     SafeStateAdapter,
+    ActiveSubmitReportProposalCheck,
     CCTPBridgeAdapter,
-    # DeBridgeAdapter,  # TODO: Implement DeBridge in-flight detection
+    TimeoutCheckAdapter,
 ]

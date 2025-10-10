@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from hyperliquid.info import Info
 
@@ -41,8 +41,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
             Account portfolio value as USDC asset
         """
         # Use config's hl_subvault_address if set, otherwise fall back to passed address
-        config = cast("OracleCLIConfig", self.config)
-        address_to_query = config.hl_subvault_address or subvault_address
+        address_to_query = self.config.hl_subvault_address or subvault_address
 
         base_url = HL_TESTNET_API_URL if self.testnet else HL_MAINNET_API_URL
         logger.info(

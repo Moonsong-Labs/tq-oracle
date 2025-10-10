@@ -21,17 +21,25 @@ class OracleCLIConfig:
     safe_txn_srvc_api_key: Optional[str]
     private_key: Optional[str]
     ignore_empty_vault: bool = False
+    ignore_timeout_check: bool = False
+    ignore_active_proposal_check: bool = False
     using_default_rpc: bool = False
     pre_check_retries: int = 3
     pre_check_timeout: float = 10.0
     _chain_id: Optional[int] = None
     _oracle_address: Optional[str] = None
+    max_calls: int = 3
+    rpc_max_concurrent_calls: int = 5
+    rpc_delay: float = 0.15
+    rpc_jitter: float = 0.10
 
     @property
     def chain_id(self) -> int:
         """Derive chain ID from the RPC endpoint."""
         if self._chain_id is None:
-            w3 = Web3(Web3.HTTPProvider(URI(self.l1_rpc)))
+            w3 = Web3(
+                Web3.HTTPProvider(URI(self.l1_rpc), request_kwargs={"timeout": 15})
+            )
             if not w3.is_connected():
                 raise ConnectionError(f"Failed to connect to RPC: {self.l1_rpc}")
             self._chain_id = w3.eth.chain_id

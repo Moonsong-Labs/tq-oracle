@@ -121,6 +121,20 @@ def report(
             help="Suppress errors when vault has no assets or OracleHelper doesn't recognize assets (useful for testing pre-deployment).",
         ),
     ] = False,
+    ignore_timeout_check: Annotated[
+        bool,
+        typer.Option(
+            "--ignore-timeout-check/--no-ignore-timeout-check",
+            help="Warn but don't block when timeout hasn't elapsed since last report (allows forced submission).",
+        ),
+    ] = False,
+    ignore_active_proposal_check: Annotated[
+        bool,
+        typer.Option(
+            "--ignore-active-proposal-check/--no-ignore-active-proposal-check",
+            help="Warn but don't block when there are active submitReports() proposals in the Safe (allows duplicate submission).",
+        ),
+    ] = False,
     pre_check_retries: Annotated[
         int,
         typer.Option(
@@ -176,6 +190,8 @@ def report(
         private_key=private_key,
         safe_txn_srvc_api_key=safe_txn_srvc_api_key,
         ignore_empty_vault=ignore_empty_vault,
+        ignore_timeout_check=ignore_timeout_check,
+        ignore_active_proposal_check=ignore_active_proposal_check,
         pre_check_retries=pre_check_retries,
         pre_check_timeout=pre_check_timeout,
     )
