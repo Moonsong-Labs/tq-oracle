@@ -35,7 +35,9 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
         self.w3_mainnet = Web3(Web3.HTTPProvider(config.l1_rpc))
-        self.w3_hl = Web3(Web3.HTTPProvider(config.hl_rpc))
+        self.w3_hl = None
+        if config.hl_rpc:
+            self.w3_hl = Web3(Web3.HTTPProvider(config.hl_rpc))
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
         self._rpc_jitter = getattr(self.config, "rpc_jitter", 0.10)  # seconds
@@ -86,15 +88,22 @@ class IdleBalancesAdapter(BaseAssetAdapter):
 
         assets = list(await asyncio.gather(*asset_tasks))
 
-        # Fetch USDC balance from HL subvault
-        usdc_address = USDC_HL_TESTNET if self.config.testnet else USDC_HL_MAINNET
-        hl_subvault_address = self.config.hl_subvault_address or subvault_address
-        usdc_asset = await self._fetch_asset_balance(
-            self.w3_hl, hl_subvault_address, usdc_address
-        )
-        # Overwrite USDC HL address with mainnet address
-        usdc_asset.asset_address = USDC_SEPOLIA if self.config.testnet else USDC_MAINNET
-        assets.append(usdc_asset)
+        # Fetch USDC balance from HL subvault if configured
+        if self.w3_hl:
+            usdc_address = USDC_HL_TESTNET if self.config.testnet else USDC_HL_MAINNET
+            hl_subvault_address = self.config.hl_subvault_address or subvault_address
+            usdc_asset = await self._fetch_asset_balance(
+                self.w3_hl, hl_subvault_address, usdc_address
+            )
+            # Overwrite USDC HL address with mainnet address
+            usdc_asset.asset_address = (
+                USDC_SEPOLIA if self.config.testnet else USDC_MAINNET
+            )
+            assets.append(usdc_asset)
+        else:
+            logger.warning(
+                "Hyperliquid RPC not configured, skipping HL USDC balance fetch"
+            )
 
         logger.debug("Fetched %d asset balances", len(assets))
         return assets

@@ -168,3 +168,28 @@ async def test_fetch_assets_integration(hl_config):
         assert asset.asset_address in expected_asset_addresses
         assert isinstance(asset.amount, int)
         assert asset.amount >= 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_fetch_assets_without_hl_integration(config):
+    adapter = IdleBalancesAdapter(config)
+
+    assets = await adapter.fetch_assets("unused_param")
+
+    expected_asset_addresses = {
+        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
+    }
+
+    assert len(assets) == 24
+
+    for asset in assets:
+        assert isinstance(asset, AssetData)
+        assert asset.asset_address in expected_asset_addresses
+        assert isinstance(asset.amount, int)
+        assert asset.amount >= 0
