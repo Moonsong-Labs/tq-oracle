@@ -143,15 +143,15 @@ async def test_run_check_missing_l1_subvault_address(config):
 @pytest.mark.asyncio
 async def test_run_check_missing_hl_subvault_address(config):
     """
-    Checks should fail immediately with a clear message if the HL subvault
+    Checks should pass and skip CCTP checks when the HL subvault
     address is missing from the configuration.
     """
     config.hl_subvault_address = None
     adapter = CCTPBridgeAdapter(config)
     result = await adapter.run_check()
-    assert not result.passed
+    assert result.passed
     assert not result.retry_recommended
-    assert "HL subvault address is required" in result.message
+    assert "Skipping CCTP bridge checks" in result.message
 
 
 @pytest.mark.asyncio
