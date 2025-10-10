@@ -131,7 +131,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 getattr(contract.functions, item_function)(index).call
             )
             logger.debug("%s %d: %s", item_type.capitalize(), index, item)
-            return
+            return item
 
         items = await asyncio.gather(*[fetch_item_at(i) for i in range(count)])
 
