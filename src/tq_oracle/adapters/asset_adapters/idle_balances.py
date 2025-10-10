@@ -35,7 +35,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
         self.w3_mainnet = Web3(Web3.HTTPProvider(config.l1_rpc))
-        self.w3_hl = None
+        self.w3_hl: Web3 | None = None
         if config.hl_rpc:
             self.w3_hl = Web3(Web3.HTTPProvider(config.hl_rpc))
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))

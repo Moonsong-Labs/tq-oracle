@@ -94,7 +94,7 @@ class ChainlinkAdapter(BasePriceAdapter):
             scaled_price = scale_to_18(answer, decimals)
             prices_accumulator.prices[asset_address] = scaled_price
 
-        if has_usds:
+        if has_usds and self.usds_address:
             usds_usd_feed = w3.eth.contract(
                 address=w3.to_checksum_address(PRICE_FEED_USDS_USD),
                 abi=aggregator_abi,
