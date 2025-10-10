@@ -77,6 +77,7 @@ def test_as_safe_dict_preserves_all_fields():
         "private_key",
         "safe_txn_srvc_api_key",
         "ignore_empty_vault",
+        "ignore_timeout_check",
         "using_default_rpc",
         "pre_check_retries",
         "pre_check_timeout",
