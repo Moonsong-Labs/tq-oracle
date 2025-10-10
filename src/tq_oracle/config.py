@@ -22,6 +22,7 @@ class OracleCLIConfig:
     private_key: Optional[str]
     ignore_empty_vault: bool = False
     ignore_timeout_check: bool = False
+    ignore_active_proposal_check: bool = False
     using_default_rpc: bool = False
     pre_check_retries: int = 3
     pre_check_timeout: float = 10.0
