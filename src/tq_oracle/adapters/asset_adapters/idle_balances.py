@@ -4,7 +4,9 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from web3 import Web3
-
+import backoff
+import random
+from web3.exceptions import ProviderConnectionError
 from ...constants import (
     ETH_ASSET,
     USDC_HL_MAINNET,
@@ -34,6 +36,22 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         super().__init__(config)
         self.w3_mainnet = Web3(Web3.HTTPProvider(config.l1_rpc))
         self.w3_hl = Web3(Web3.HTTPProvider(config.hl_rpc))
+        self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
+        self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
+        self._rpc_jitter = getattr(self.config, "rpc_jitter", 0.10)  # seconds
+
+    @backoff.on_exception(
+        backoff.expo, (ProviderConnectionError), max_time=30, jitter=backoff.full_jitter
+    )
+    async def _rpc(self, fn, *args, **kwargs):
+        """Throttle + backoff a single RPC."""
+        async with self._rpc_sem:
+            try:
+                return await asyncio.to_thread(fn, *args, **kwargs)
+            finally:
+                delay = self._rpc_delay + random.random() * self._rpc_jitter
+                if delay > 0:
+                    await asyncio.sleep(delay)
 
     @property
     def adapter_name(self) -> str:
@@ -105,15 +123,15 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         logger.debug("Fetching %ss from contract: %s", item_type, checksum_address)
 
         contract = self.w3_mainnet.eth.contract(address=checksum_address, abi=abi)
-        count = getattr(contract.functions, count_function)().call()
+        count = await self._rpc(getattr(contract.functions, count_function)().call)
         logger.debug("Found %d %ss", count, item_type)
 
         async def fetch_item_at(index: int) -> str:
-            item: str = await asyncio.to_thread(
+            item: str = await self._rpc(
                 getattr(contract.functions, item_function)(index).call
             )
             logger.debug("%s %d: %s", item_type.capitalize(), index, item)
-            return item
+            return
 
         items = await asyncio.gather(*[fetch_item_at(i) for i in range(count)])
 
@@ -152,16 +170,14 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         checksum_subvault_address = w3.to_checksum_address(subvault_address)
 
         if asset_address == ETH_ASSET:
-            balance = await asyncio.to_thread(
-                w3.eth.get_balance, checksum_subvault_address
-            )
+            balance = await self._rpc(w3.eth.get_balance, checksum_subvault_address)
         else:
             erc20_abi = load_erc20_abi()
             checksum_asset_address = w3.to_checksum_address(asset_address)
             erc20_contract = w3.eth.contract(
                 address=checksum_asset_address, abi=erc20_abi
             )
-            balance = await asyncio.to_thread(
+            balance = await self._rpc(
                 erc20_contract.functions.balanceOf(checksum_subvault_address).call
             )
 

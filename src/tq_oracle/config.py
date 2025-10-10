@@ -26,12 +26,18 @@ class OracleCLIConfig:
     pre_check_timeout: float = 10.0
     _chain_id: Optional[int] = None
     _oracle_address: Optional[str] = None
+    max_calls: int = 3
+    rpc_max_concurrent_calls: int = 5
+    rpc_delay: float = 0.15
+    rpc_jitter: float = 0.10
 
     @property
     def chain_id(self) -> int:
         """Derive chain ID from the RPC endpoint."""
         if self._chain_id is None:
-            w3 = Web3(Web3.HTTPProvider(URI(self.l1_rpc)))
+            w3 = Web3(
+                Web3.HTTPProvider(URI(self.l1_rpc), request_kwargs={"timeout": 15})
+            )
             if not w3.is_connected():
                 raise ConnectionError(f"Failed to connect to RPC: {self.l1_rpc}")
             self._chain_id = w3.eth.chain_id

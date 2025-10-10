@@ -97,11 +97,15 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     price_adapters = [AdapterClass(config) for AdapterClass in PRICE_ADAPTERS]
 
     asset_data: list[list[AssetData]] = []
-    for i, result in enumerate(asset_results):
+    for adapter, result in zip(asset_adapters, asset_results):
         if isinstance(result, Exception):
-            logger.error("Asset adapter %d failed: %s", i, result)
+            logger.error("Asset adapter '%s' failed: %s", adapter.adapter_name, result)
         elif isinstance(result, list):
-            logger.debug("Asset adapter %d returned %d assets", i, len(result))
+            logger.debug(
+                "Asset adapter '%s' returned %d assets",
+                adapter.adapter_name,
+                len(result),
+            )
             asset_data.append(result)
 
     logger.info("Computing agreggated assets...")
