@@ -38,7 +38,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         self.w3_hl: Optional[Web3] = None
         if config.hl_rpc:
             self.w3_hl = Web3(Web3.HTTPProvider(config.hl_rpc))
-        self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
+        self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 3))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
         self._rpc_jitter = getattr(self.config, "rpc_jitter", 0.10)  # seconds
 
