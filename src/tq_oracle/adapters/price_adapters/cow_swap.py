@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+import backoff
 import requests
 
 from ...constants import (
@@ -33,6 +34,15 @@ class CowSwapAdapter(BasePriceAdapter):
     def adapter_name(self) -> str:
         return "cow_swap"
 
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.exceptions.RequestException, requests.exceptions.HTTPError),
+        max_time=30,
+        giveup=lambda e: isinstance(e, requests.exceptions.HTTPError)
+        and e.response is not None
+        and e.response.status_code != 429,
+        jitter=backoff.full_jitter,
+    )
     async def fetch_native_price(self, token_address: str) -> float:
         """Fetch native price (ETH) for a token from CoW Protocol API.
 
@@ -51,7 +61,7 @@ class CowSwapAdapter(BasePriceAdapter):
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
-        """Fetch and accumulate asset prices from CoW Protocol API.
+        """Fetch and accumulate asset prices from CoW Swap API.
 
         Args:
             asset_addresses: List of asset contract addresses to get prices for.
@@ -60,11 +70,11 @@ class CowSwapAdapter(BasePriceAdapter):
                 representing wei per 1 unit of the asset.
 
         Returns:
-            The same accumulator with CoW Protocol-derived prices merged in.
+            The same accumulator with CoW Swap-derived prices merged in.
 
         Notes:
             - Only ETH as base asset is supported.
-            - Fetches native prices directly from CoW Protocol API.
+            - Fetches native prices directly from CoW Swap API.
             - Supports USDC, USDT, and USDS.
         """
         if prices_accumulator.base_asset != ETH_ASSET:
