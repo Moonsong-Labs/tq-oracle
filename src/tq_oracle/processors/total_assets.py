@@ -9,6 +9,9 @@ def calculate_total_assets(
     prices: PriceData,
 ) -> int:
     """Calculate total assets in base asset terms.
+    missing_assets = aggregated_assets.assets.keys() - prices.prices.keys()
+    if missing_assets:
+        raise ValueError(f"Prices missing for assets: {sorted(missing_assets)}")
 
     Args:
         aggregated_assets: Aggregated asset amounts by address

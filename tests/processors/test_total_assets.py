@@ -34,7 +34,7 @@ def test_calculate_total_assets_empty_returns_zero():
     assert result == 0
 
 
-def test_calculate_total_assets_mismatched_keys_raises():
+def test_calculate_total_assets_missing_prices_raises():
     aggregated = AggregatedAssets(
         assets={
             "0xA": 1,
@@ -48,5 +48,47 @@ def test_calculate_total_assets_mismatched_keys_raises():
         },
     )
 
-    with pytest.raises(ValueError, match="Missing prices for assets"):
+    with pytest.raises(ValueError, match=r"Prices missing for assets: \['0xB'\]"):
         calculate_total_assets(aggregated, prices)
+
+
+def test_calculate_total_assets_multiple_missing_prices_raises():
+    aggregated = AggregatedAssets(
+        assets={
+            "0xA": 1,
+            "0xB": 2,
+            "0xC": 3,
+        }
+    )
+    prices = PriceData(
+        base_asset="0xA",
+        prices={
+            "0xA": 10**18,
+        },
+    )
+
+    with pytest.raises(
+        ValueError, match=r"Prices missing for assets: \['0xB', '0xC'\]"
+    ):
+        calculate_total_assets(aggregated, prices)
+
+
+def test_calculate_total_assets_with_extra_prices():
+    aggregated = AggregatedAssets(
+        assets={
+            "0xA": 2,
+            "0xB": 3,
+        }
+    )
+    prices = PriceData(
+        base_asset="0xA",
+        prices={
+            "0xA": 10**18,
+            "0xB": 2 * 10**18,
+            "0xC": 5 * 10**18,
+        },
+    )
+
+    result = calculate_total_assets(aggregated, prices)
+
+    assert result == (2 * 10**18) + (3 * 2 * 10**18)

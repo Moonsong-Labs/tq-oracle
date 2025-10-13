@@ -18,6 +18,7 @@ VAULT_ABI_PATH = ABIS_DIR / "Vault.json"
 AGGREGATOR_ABI_PATH = ABIS_DIR / "AggregatorV3Interface.json"
 ERC20_ABI_PATH = ABIS_DIR / "ERC20.json"
 GNOSIS_SAFE_ABI_PATH = ABIS_DIR / "SafeL2.json"
+WSTETH_ABI_PATH = ABIS_DIR / "WstETH.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -65,9 +66,9 @@ def load_erc20_abi() -> list[dict]:
     return load_abi(ERC20_ABI_PATH)
 
 
-def load_safe_l2() -> list[dict]:
-    """Load the Gnosis Safe ABI."""
-    return load_abi(GNOSIS_SAFE_ABI_PATH)
+def load_wsteth_abi() -> list[dict]:
+    """Load the WstETH ABI."""
+    return load_abi(WSTETH_ABI_PATH)
 
 
 def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumAddress:
