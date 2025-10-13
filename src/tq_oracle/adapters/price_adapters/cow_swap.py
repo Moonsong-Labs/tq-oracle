@@ -37,7 +37,7 @@ class CowSwapAdapter(BasePriceAdapter):
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException, requests.exceptions.HTTPError),
-        max_time=30,
+        max_time=5,
         giveup=lambda e: isinstance(e, requests.exceptions.HTTPError)
         and e.response is not None
         and e.response.status_code != 429,

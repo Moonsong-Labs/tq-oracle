@@ -5,7 +5,6 @@ from .cow_swap import CowSwapAdapter
 from .wsteth import WstETHAdapter
 
 PRICE_ADAPTERS = [
-    ChainlinkAdapter,
     CowSwapAdapter,
     WstETHAdapter,
 ]
