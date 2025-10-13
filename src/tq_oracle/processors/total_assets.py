@@ -31,7 +31,7 @@ def calculate_total_assets(
         if asset != prices.base_asset and asset not in prices.prices
     ]
     if missing_prices:
-        raise ValueError(f"Missing prices for assets: {missing_prices}")
+        raise ValueError(f"Prices missing for assets: {missing_prices}")
 
     # Calculate total, treating base asset as having price of 10**18
     total = 0
