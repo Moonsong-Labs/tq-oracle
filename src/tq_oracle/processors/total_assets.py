@@ -8,8 +8,9 @@ def calculate_total_assets(
     aggregated_assets: AggregatedAssets,
     prices: PriceData,
 ) -> int:
-    if aggregated_assets.assets.keys() != prices.prices.keys():
-        raise ValueError("Aggregated assets and relative prices have different keys")
+    missing_assets = aggregated_assets.assets.keys() - prices.prices.keys()
+    if missing_assets:
+        raise ValueError(f"Prices missing for assets: {sorted(missing_assets)}")
 
     return sum(
         aggregated_assets.assets[i] * prices.prices[i] for i in aggregated_assets.assets
