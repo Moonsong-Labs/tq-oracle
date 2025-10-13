@@ -17,6 +17,7 @@ ORACLE_HELPER_ABI_PATH = ABIS_DIR / "OracleHelper.json"
 VAULT_ABI_PATH = ABIS_DIR / "Vault.json"
 AGGREGATOR_ABI_PATH = ABIS_DIR / "AggregatorV3Interface.json"
 ERC20_ABI_PATH = ABIS_DIR / "ERC20.json"
+GNOSIS_SAFE_ABI_PATH = ABIS_DIR / "SafeL2.json"
 WSTETH_ABI_PATH = ABIS_DIR / "WstETH.json"
 
 
