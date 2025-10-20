@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from web3 import Web3
 import backoff
@@ -35,12 +35,12 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
         self.w3_mainnet = Web3(Web3.HTTPProvider(config.l1_rpc))
-        self.w3_hl: Optional[Web3] = None
+        self.w3_hl: Web3 | None = None
         if config.hl_rpc:
             self.w3_hl = Web3(Web3.HTTPProvider(config.hl_rpc))
-        self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 3))
+        self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
-        self._rpc_jitter = self.config.rpc_jitter  # seconds
+        self._rpc_jitter = getattr(self.config, "rpc_jitter", 0.10)  # seconds
 
     @backoff.on_exception(
         backoff.expo, (ProviderConnectionError), max_time=30, jitter=backoff.full_jitter
