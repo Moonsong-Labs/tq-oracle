@@ -134,6 +134,7 @@ async def test_validate_prices_all_stablecoins_integration(config):
 
 
 @pytest.mark.asyncio
+@pytest.mark.integration
 async def test_validate_prices_fails_on_excessive_deviation(config):
     validator = ChainlinkValidator(config)
 
