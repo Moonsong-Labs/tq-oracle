@@ -154,25 +154,18 @@ def report(
     ] = 12.0,
 ) -> None:
     """Collect TVL data and submit via Safe (optional)."""
-    cli_args: dict[str, Any] = {}
-    if vault_address is not None:
-        cli_args["vault_address"] = vault_address
-    if oracle_helper_address is not None:
-        cli_args["oracle_helper_address"] = oracle_helper_address
-    if l1_rpc is not None:
-        cli_args["l1_rpc"] = l1_rpc
-    if safe_address is not None:
-        cli_args["safe_address"] = safe_address
-    if hl_rpc is not None:
-        cli_args["hl_rpc"] = hl_rpc
-    if l1_subvault_address is not None:
-        cli_args["l1_subvault_address"] = l1_subvault_address
-    if hl_subvault_address is not None:
-        cli_args["hl_subvault_address"] = hl_subvault_address
-    if private_key is not None:
-        cli_args["private_key"] = private_key
-    if safe_txn_srvc_api_key is not None:
-        cli_args["safe_txn_srvc_api_key"] = safe_txn_srvc_api_key
+    optional_args = {
+        "vault_address": vault_address,
+        "oracle_helper_address": oracle_helper_address,
+        "l1_rpc": l1_rpc,
+        "safe_address": safe_address,
+        "hl_rpc": hl_rpc,
+        "l1_subvault_address": l1_subvault_address,
+        "hl_subvault_address": hl_subvault_address,
+        "private_key": private_key,
+        "safe_txn_srvc_api_key": safe_txn_srvc_api_key,
+    }
+    cli_args: dict[str, Any] = {k: v for k, v in optional_args.items() if v is not None}
 
     cli_args["testnet"] = testnet
     cli_args["dry_run"] = dry_run
@@ -188,12 +181,6 @@ def report(
         raise typer.BadParameter(str(e), param_hint=["--config"])
     except ValueError as e:
         raise typer.BadParameter(str(e))
-
-    if not cfg.vault_address:
-        raise typer.BadParameter(
-            "vault_address is required (provide as argument, in config file, or via VAULT_ADDRESS env var)",
-            param_hint=["vault_address"],
-        )
 
     updates: dict[str, Any] = {}
     if cfg.l1_rpc is None:
@@ -221,11 +208,6 @@ def report(
         raise typer.BadParameter("oracle_helper_address must be configured")
     if not cfg.hl_rpc:
         raise typer.BadParameter("hl_rpc must be configured")
-
-    assert cfg.vault_address is not None
-    assert cfg.l1_rpc is not None
-    assert cfg.oracle_helper_address is not None
-    assert cfg.hl_rpc is not None
 
     if not cfg.dry_run and not cfg.safe_address and not cfg.private_key:
         raise typer.BadParameter(
