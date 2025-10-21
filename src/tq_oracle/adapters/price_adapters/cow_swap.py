@@ -8,6 +8,7 @@ import requests
 
 from ...constants import (
     ETH_ASSET,
+    TOKEN_DECIMALS,
     USDC_MAINNET,
     USDC_SEPOLIA,
     USDT_MAINNET,
@@ -76,6 +77,7 @@ class CowSwapAdapter(BasePriceAdapter):
             - Only ETH as base asset is supported.
             - Fetches native prices directly from CoW Swap API.
             - Supports USDC, USDT, and USDS.
+            - CoW API returns price per 1 whole token in ETH.
         """
         if prices_accumulator.base_asset != ETH_ASSET:
             raise ValueError("CowSwap adapter only supports ETH as base asset")
@@ -85,8 +87,14 @@ class CowSwapAdapter(BasePriceAdapter):
         for asset_address in asset_addresses:
             if asset_address not in supported_assets:
                 continue
+
+            token_decimals = TOKEN_DECIMALS.get(asset_address)
+            if token_decimals is None:
+                continue
+
             native_price = await self.fetch_native_price(asset_address)
             price_wei = int(native_price * 10**18)
-            prices_accumulator.prices[asset_address] = price_wei
+            price_wei_normalized = price_wei // (10 ** (18 - token_decimals))
+            prices_accumulator.prices[asset_address] = price_wei_normalized
 
         return prices_accumulator

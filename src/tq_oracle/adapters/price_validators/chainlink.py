@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from tq_oracle.adapters.check_adapters.base import CheckResult
 from tq_oracle.adapters.price_validators.base import BasePriceValidator
 from tq_oracle.adapters.price_adapters.chainlink import ChainlinkAdapter
 
-if TYPE_CHECKING:
-    from tq_oracle.adapters.price_adapters.base import PriceData
-    from tq_oracle.config import OracleCLIConfig
+from tq_oracle.adapters.price_adapters.base import PriceData
+from tq_oracle.config import OracleCLIConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +37,10 @@ class ChainlinkValidator(BasePriceValidator):
             )
 
             if delta_percentage > self.failure_tolerance:
+                # print all prices
+                print(f"Chainlink prices: {chainlink_prices.prices}")
+                print(f"Actual prices: {price_data.prices}")
+                print(f"Delta percentage: {delta_percentage}")
                 return CheckResult(
                     passed=False,
                     message=f"Chainlink price for {asset_address} is {delta_percentage:.2f}% off from the actual price (failure threshold: {self.failure_tolerance}%)",
