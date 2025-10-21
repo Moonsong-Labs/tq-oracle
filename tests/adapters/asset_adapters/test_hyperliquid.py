@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import time
 
 from tq_oracle.adapters.asset_adapters.hyperliquid import HyperliquidAdapter
 from tq_oracle.config import OracleCLIConfig
@@ -9,6 +10,7 @@ from tq_oracle.constants import (
     HL_TESTNET_API_URL,
     USDC_MAINNET,
     USDC_SEPOLIA,
+    HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
 
 
@@ -53,8 +55,9 @@ async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
-            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+            return_value=[("day", {"accountValueHistory": [[now_ms, "100.0"]]})]
         )
         mock_info_class.return_value = mock_info
 
@@ -74,8 +77,9 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
-            return_value=[("day", {"accountValueHistory": [[1, "50.0"]]})]
+            return_value=[("day", {"accountValueHistory": [[now_ms, "50.0"]]})]
         )
         mock_info_class.return_value = mock_info
 
@@ -89,21 +93,22 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
 
 
 @pytest.mark.asyncio
-async def test_twap_calculation_with_multiple_values(mainnet_config):
-    """TWAP should be correctly calculated as average of multiple values."""
+async def test_uses_latest_value_with_multiple_history_points(mainnet_config):
+    """Adapter uses the latest value from history."""
     adapter = HyperliquidAdapter(mainnet_config)
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
             return_value=[
                 (
                     "day",
                     {
                         "accountValueHistory": [
-                            [1, "100.0"],
-                            [2, "200.0"],
-                            [3, "300.0"],
+                            [now_ms - 10_000, "100.0"],
+                            [now_ms - 5_000, "200.0"],
+                            [now_ms, "300.0"],
                         ]
                     },
                 )
@@ -113,20 +118,20 @@ async def test_twap_calculation_with_multiple_values(mainnet_config):
 
         assets = await adapter.fetch_assets("0xSubvault")
 
-        expected_twap = (100.0 + 200.0 + 300.0) / 3
-        expected_amount = int(expected_twap * 1e18)
+        expected_amount = int(300.0 * 1e18)
         assert assets[0].amount == expected_amount
 
 
 @pytest.mark.asyncio
-async def test_single_value_twap_equals_that_value(mainnet_config):
-    """Single value in history should result in TWAP equal to that value."""
+async def test_single_value_returns_that_value(mainnet_config):
+    """Single value in history returns that value."""
     adapter = HyperliquidAdapter(mainnet_config)
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
-            return_value=[("day", {"accountValueHistory": [[1, "42.5"]]})]
+            return_value=[("day", {"accountValueHistory": [[now_ms, "42.5"]]})]
         )
         mock_info_class.return_value = mock_info
 
@@ -137,8 +142,8 @@ async def test_single_value_twap_equals_that_value(mainnet_config):
 
 
 @pytest.mark.asyncio
-async def test_empty_account_history_returns_empty(mainnet_config):
-    """Empty account history should return empty asset list, not error."""
+async def test_empty_account_history_raises_error(mainnet_config):
+    """Empty account history should raise a ValueError."""
     adapter = HyperliquidAdapter(mainnet_config)
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
@@ -148,29 +153,29 @@ async def test_empty_account_history_returns_empty(mainnet_config):
         )
         mock_info_class.return_value = mock_info
 
-        assets = await adapter.fetch_assets("0xSubvault")
-
-        assert assets == []
+        with pytest.raises(ValueError, match="empty account history"):
+            await adapter.fetch_assets("0xSubvault")
 
 
 @pytest.mark.asyncio
 async def test_mixed_valid_invalid_values_skips_invalid(mainnet_config):
-    """Invalid values in history should be skipped, TWAP calculated from valid ones only."""
+    """Invalid values in history should be skipped; latest valid value is used."""
     adapter = HyperliquidAdapter(mainnet_config)
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
             return_value=[
                 (
                     "day",
                     {
                         "accountValueHistory": [
-                            [1, "100.0"],
-                            [2, "not_a_number"],
-                            [3, "200.0"],
-                            [4, None],
-                            [5, "300.0"],
+                            [now_ms - 30_000, "100.0"],
+                            [now_ms - 20_000, "not_a_number"],
+                            [now_ms - 10_000, "200.0"],
+                            [now_ms - 5_000, None],
+                            [now_ms, "300.0"],
                         ]
                     },
                 )
@@ -180,14 +185,13 @@ async def test_mixed_valid_invalid_values_skips_invalid(mainnet_config):
 
         assets = await adapter.fetch_assets("0xSubvault")
 
-        expected_twap = (100.0 + 200.0 + 300.0) / 3
-        expected_amount = int(expected_twap * 1e18)
+        expected_amount = int(300.0 * 1e18)
         assert assets[0].amount == expected_amount
 
 
 @pytest.mark.asyncio
-async def test_all_invalid_values_returns_empty(mainnet_config):
-    """All invalid values should result in empty asset list, not crash."""
+async def test_all_invalid_values_raises_error(mainnet_config):
+    """All invalid values should raise ValueError (no valid latest value)."""
     adapter = HyperliquidAdapter(mainnet_config)
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
@@ -208,9 +212,8 @@ async def test_all_invalid_values_returns_empty(mainnet_config):
         )
         mock_info_class.return_value = mock_info
 
-        assets = await adapter.fetch_assets("0xSubvault")
-
-        assert assets == []
+        with pytest.raises(ValueError, match="no valid latest value"):
+            await adapter.fetch_assets("0xSubvault")
 
 
 @pytest.mark.asyncio
@@ -236,8 +239,9 @@ async def test_fetch_succeeds_with_valid_data(mainnet_config):
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
-            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+            return_value=[("day", {"accountValueHistory": [[now_ms, "100.0"]]})]
         )
         mock_info_class.return_value = mock_info
 
@@ -263,13 +267,14 @@ async def test_exception_propagates_on_api_failure(mainnet_config):
 
 @pytest.mark.asyncio
 async def test_amount_precision_conversion(mainnet_config):
-    """Float TWAP should be converted to int with 1e18 precision."""
+    """Float latest value should be converted to int with 1e18 precision."""
     adapter = HyperliquidAdapter(mainnet_config)
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
-            return_value=[("day", {"accountValueHistory": [[1, "123.456789"]]})]
+            return_value=[("day", {"accountValueHistory": [[now_ms, "123.456789"]]})]
         )
         mock_info_class.return_value = mock_info
 
@@ -299,8 +304,9 @@ async def test_hl_subvault_address_from_config_overrides_parameter(mainnet_confi
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
-            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+            return_value=[("day", {"accountValueHistory": [[now_ms, "100.0"]]})]
         )
         mock_info_class.return_value = mock_info
 
@@ -317,8 +323,9 @@ async def test_fallback_to_parameter_when_no_hl_subvault_in_config(mainnet_confi
 
     with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
         mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
         mock_info.portfolio = MagicMock(
-            return_value=[("day", {"accountValueHistory": [[1, "100.0"]]})]
+            return_value=[("day", {"accountValueHistory": [[now_ms, "100.0"]]})]
         )
         mock_info_class.return_value = mock_info
 
@@ -326,3 +333,44 @@ async def test_fallback_to_parameter_when_no_hl_subvault_in_config(mainnet_confi
 
         # Verify portfolio was called with the passed parameter
         mock_info.portfolio.assert_called_once_with(user="0xPassedSubvault")
+
+
+@pytest.mark.asyncio
+async def test_accepts_timestamp_exactly_at_staleness_threshold(mainnet_config):
+    """Should accept portfolio value exactly at the staleness threshold."""
+    adapter = HyperliquidAdapter(mainnet_config)
+
+    with (
+        patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class,
+        patch("tq_oracle.adapters.asset_adapters.hyperliquid.time.time") as mock_time,
+    ):
+        mock_info = MagicMock()
+        now_ms = 1000000000000  # Fixed timestamp
+        mock_time.return_value = now_ms / 1000
+        boundary_ts = now_ms - (HL_MAX_PORTFOLIO_STALENESS_SECONDS * 1000)
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[boundary_ts, "100.0"]]})]
+        )
+        mock_info_class.return_value = mock_info
+
+        assets = await adapter.fetch_assets("0xSubvault")
+        assert len(assets) == 1
+        assert assets[0].amount == int(100.0 * 1e18)
+
+
+@pytest.mark.asyncio
+async def test_raises_on_stale_portfolio_value(mainnet_config):
+    """Should raise ValueError if portfolio value exceeds staleness threshold."""
+    adapter = HyperliquidAdapter(mainnet_config)
+
+    with patch("tq_oracle.adapters.asset_adapters.hyperliquid.Info") as mock_info_class:
+        mock_info = MagicMock()
+        now_ms = int(time.time() * 1000)
+        stale_ts = now_ms - (HL_MAX_PORTFOLIO_STALENESS_SECONDS * 1000 + 1)
+        mock_info.portfolio = MagicMock(
+            return_value=[("day", {"accountValueHistory": [[stale_ts, "100.0"]]})]
+        )
+        mock_info_class.return_value = mock_info
+
+        with pytest.raises(ValueError, match="stale portfolio value"):
+            await adapter.fetch_assets("0xSubvault")

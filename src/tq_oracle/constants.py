@@ -45,3 +45,8 @@ L1_BLOCK_TIME = 12  # Ethereum L1 block time in seconds
 # Retry Configuration for Post-Checks
 MAX_RETRY_ATTEMPTS = 5
 RETRY_DELAY_SECONDS = 120  # 2 minutes
+
+
+# Maximum allowed staleness (in seconds) for Hyperliquid portfolio values.
+# Reject portfolio values older than this threshold.
+HL_MAX_PORTFOLIO_STALENESS_SECONDS = 120  # 2 minutes
