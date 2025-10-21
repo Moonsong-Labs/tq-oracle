@@ -1,0 +1,96 @@
+# TQ Oracle Configuration File
+
+# ============================================================================
+# Main Oracle Settings
+# ============================================================================
+
+# Vault contract address to query (required)
+# Can be overridden by positional argument: tq-oracle <vault_address>
+vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
+
+# OracleHelper contract address
+# If not set, defaults based on testnet flag:
+#   - Mainnet: 0x... (from constants)
+#   - Testnet: 0x... (from constants)
+# oracle_helper_address = "0x..."
+
+# Use testnet instead of mainnet
+testnet = false
+
+# ============================================================================
+# RPC Configuration
+# ============================================================================
+
+[rpc]
+# Ethereum L1 RPC endpoint
+# Environment variable: L1_RPC
+# If not set, defaults based on testnet flag
+l1_rpc = "https://ethereum-rpc.publicnode.com"
+
+# Hyperliquid EVM RPC endpoint
+# Environment variable: HL_EVM_RPC
+# If not set, defaults based on testnet flag
+hl_rpc = "https://api.hyperliquid.xyz/evm"
+
+# Maximum number of retry attempts for RPC calls
+max_calls = 3
+
+# Maximum concurrent RPC calls
+max_concurrent_calls = 5
+
+# Delay between RPC calls (seconds)
+delay = 0.15
+
+# Random jitter to add to delay (seconds)
+jitter = 0.10
+
+# ============================================================================
+# Subvault Configuration
+# ============================================================================
+
+[subvaults]
+# L1 subvault address for CCTP bridge monitoring (optional)
+# Environment variable: L1_SUBVAULT_ADDRESS
+# l1_subvault_address = "0x..."
+
+# Hyperliquid subvault address to query (optional)
+# Environment variable: HL_SUBVAULT_ADDRESS
+# Defaults to vault_address if not specified
+# hl_subvault_address = "0x..."
+
+# ============================================================================
+# Safe (Gnosis) Configuration
+# ============================================================================
+
+[safe]
+# Gnosis Safe address for multi-sig submission (optional)
+# Required when running with dry_run = false
+# safe_address = "0x..."
+
+# Preview actions without sending transactions
+dry_run = true
+
+# SECURITY WARNING: Do NOT store API keys or private keys in this file!
+# Use environment variables instead:
+# - SAFE_TRANSACTION_SERVICE_API_KEY for Safe API key
+# - PRIVATE_KEY for transaction signing
+
+# ============================================================================
+# Pre-Check Configuration
+# ============================================================================
+
+[checks]
+# Suppress errors when vault has no assets (useful for testing pre-deployment)
+ignore_empty_vault = false
+
+# Warn but don't block when timeout hasn't elapsed since last report
+ignore_timeout = false
+
+# Warn but don't block when there are active submitReports() proposals
+ignore_active_proposal = false
+
+# Number of times to retry pre-checks if they fail
+retries = 3
+
+# Timeout in seconds between pre-check retries
+timeout = 12.0

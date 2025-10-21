@@ -30,11 +30,52 @@ uv sync
 
 ## Usage
 
+### Configuration Methods
+
+TQ Oracle supports three ways to configure the application, with the following precedence (highest to lowest):
+
+1. **CLI Arguments** - Explicit command-line flags
+2. **Environment Variables** - Set via shell or `.env` file
+3. **TOML Configuration File** - Persistent configuration
+
 ### Basic Command
 
 ```bash
 uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
 ```
+
+### Using a Configuration File (Recommended)
+
+Create a `tq-oracle.toml` file in your project directory or `~/.config/tq-oracle/config.toml`:
+
+```toml
+vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
+testnet = false
+
+[rpc]
+l1_rpc = "https://ethereum-rpc.publicnode.com"
+hl_rpc = "https://api.hyperliquid.xyz/evm"
+
+[safe]
+dry_run = true
+
+[checks]
+ignore_empty_vault = false
+retries = 3
+timeout = 12.0
+```
+
+Then run with minimal arguments:
+
+```bash
+# Config file is automatically detected
+uv run tq-oracle
+
+# Or specify config file explicitly
+uv run tq-oracle --config ./my-config.toml
+```
+
+See `tq-oracle.toml.example` for a complete configuration template with all available options.
 
 ### With Environment Variables
 
@@ -52,6 +93,9 @@ Then run:
 uv run tq-oracle <VAULT_ADDRESS> [OPTIONS]
 ```
 
+> [!IMPORTANT]  
+> Always use environment variables or CLI flags for secrets (private keys, API keys). Never store them in TOML configuration files.
+
 #### Example
 
 ```bash
@@ -61,21 +105,38 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
   --hl-subvault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A
 ```
 
-### CLI Options
+### Configuration Options
 
-| Option | Environment Variable | Default | Description |
-|--------|---------------------|---------|-------------|
-| `VAULT_ADDRESS` | - | *required* | Vault contract address (positional argument) |
-| `--oracle-helper-address` `-h` | - | Auto (mainnet/testnet) | OracleHelper contract address |
-| `--l1-rpc` | `L1_RPC` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
-| `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | Vault address | Hyperliquid subvault address to query |
-| `--hl-rpc` | `HL_RPC_URL` | - | Hyperliquid RPC endpoint (optional) |
-| `--safe-address` `-s` | - | - | Gnosis Safe address for multi-sig submission |
-| `--testnet/--no-testnet` | - | `False` | Use testnet instead of mainnet |
-| `--dry-run/--no-dry-run` | - | `True` | Preview without sending transaction |
-| `--private-key` | `PRIVATE_KEY` | - | Private key for signing (required with Safe on --no-dry-run) |
-| `--safe-key` | `SAFE_TRANSACTION_SERVICE_API_KEY` | - | API key for Safe Transaction Service |
-| `--ignore-empty-vault` | - | `False` | Suppress errors for empty vaults (useful for testing) |
+All configuration options can be set via CLI arguments, environment variables, or TOML config file.
+
+| CLI Option | Environment Variable | TOML Path | Default | Description |
+|------------|---------------------|-----------|---------|-------------|
+| `VAULT_ADDRESS` | - | `vault_address` | *required* | Vault contract address (positional argument) |
+| `--config` `-c` | - | - | Auto-detect | Path to TOML configuration file |
+| `--oracle-helper-address` `-h` | - | `oracle_helper_address` | Auto (mainnet/testnet) | OracleHelper contract address |
+| `--l1-rpc` | `L1_RPC` | `rpc.l1_rpc` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
+| `--hl-rpc` | `HL_EVM_RPC` | `rpc.hl_rpc` | Auto (mainnet/testnet) | Hyperliquid RPC endpoint |
+| `--l1-subvault-address` | `L1_SUBVAULT_ADDRESS` | `subvaults.l1_subvault_address` | - | L1 subvault for CCTP monitoring |
+| `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | `subvaults.hl_subvault_address` | Vault address | Hyperliquid subvault address |
+| `--safe-address` `-s` | - | `safe.address` | - | Gnosis Safe address for multi-sig |
+| `--testnet/--no-testnet` | - | `testnet` | `false` | Use testnet instead of mainnet |
+| `--dry-run/--no-dry-run` | - | `safe.dry_run` | `true` | Preview without sending transaction |
+| `--private-key` | `PRIVATE_KEY` | ❌ *Never use TOML* | - | Private key for signing (required with Safe on --no-dry-run) |
+| `--safe-key` | `SAFE_TRANSACTION_SERVICE_API_KEY` | ❌ *Never use TOML* | - | API key for Safe Transaction Service |
+| `--ignore-empty-vault` | - | `checks.ignore_empty_vault` | `false` | Suppress errors for empty vaults |
+| `--ignore-timeout-check` | - | `checks.ignore_timeout` | `false` | Allow forced submission bypassing timeout |
+| `--ignore-active-proposal-check` | - | `checks.ignore_active_proposal` | `false` | Allow duplicate submissions |
+| `--pre-check-retries` | - | `checks.retries` | `3` | Number of pre-check retry attempts |
+| `--pre-check-timeout` | - | `checks.timeout` | `12.0` | Timeout between pre-check retries (seconds) |
+
+#### TOML-Only Options (Not available via CLI)
+
+| TOML Path | Default | Description |
+|-----------|---------|-------------|
+| `rpc.max_calls` | `3` | Maximum number of RPC retry attempts |
+| `rpc.max_concurrent_calls` | `5` | Maximum concurrent RPC connections |
+| `rpc.delay` | `0.15` | Delay between RPC calls (seconds) |
+| `rpc.jitter` | `0.10` | Random jitter for RPC delays (seconds) |
 
 ### Examples
 

@@ -151,7 +151,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Get the subvault addresses for the given vault."""
         vault_abi = load_vault_abi()
         return await self._fetch_contract_list(
-            contract_address=self.config.vault_address,
+            contract_address=self.config.vault_address_required,
             abi=vault_abi,
             count_function="subvaults",
             item_function="subvaultAt",
@@ -162,7 +162,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Get the supported assets for the given vault."""
         oracle_abi = load_oracle_abi()
         oracle_address = get_oracle_address_from_vault(
-            self.config.vault_address, self.config.l1_rpc
+            self.config.vault_address_required, self.config.l1_rpc_required
         )
         return await self._fetch_contract_list(
             contract_address=oracle_address,

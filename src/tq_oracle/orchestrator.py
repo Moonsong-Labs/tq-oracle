@@ -58,7 +58,7 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
                     config.pre_check_retries,
                 )
 
-            await run_pre_checks(config, config.vault_address)
+            await run_pre_checks(config, config.vault_address_required)
             logger.info("Pre-checks passed successfully")
             break
 
@@ -93,8 +93,9 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     asset_adapters = [AdapterClass(config) for AdapterClass in ASSET_ADAPTERS]
 
     logger.info("Fetching assets from %d adapters in parallel...", len(asset_adapters))
+    vault_address = config.vault_address_required
     asset_results = await asyncio.gather(
-        *[adapter.fetch_assets(config.vault_address) for adapter in asset_adapters],
+        *[adapter.fetch_assets(vault_address) for adapter in asset_adapters],
         return_exceptions=True,
     )
 
@@ -133,7 +134,7 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
 
     logger.info("Generating report...")
     report = await generate_report(
-        config.vault_address,
+        vault_address,
         aggregated,
         final_prices,
     )

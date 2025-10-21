@@ -9,17 +9,17 @@ from web3 import Web3
 
 @dataclass
 class OracleCLIConfig:
-    vault_address: str
-    oracle_helper_address: str
-    l1_rpc: str
-    l1_subvault_address: Optional[str]
-    safe_address: Optional[str]
-    hl_rpc: Optional[str]
-    hl_subvault_address: Optional[str]
-    testnet: bool
-    dry_run: bool
-    safe_txn_srvc_api_key: Optional[str]
-    private_key: Optional[str]
+    vault_address: Optional[str] = None
+    oracle_helper_address: Optional[str] = None
+    l1_rpc: Optional[str] = None
+    l1_subvault_address: Optional[str] = None
+    safe_address: Optional[str] = None
+    hl_rpc: Optional[str] = None
+    hl_subvault_address: Optional[str] = None
+    testnet: bool = False
+    dry_run: bool = True
+    safe_txn_srvc_api_key: Optional[str] = None
+    private_key: Optional[str] = None
     ignore_empty_vault: bool = False
     ignore_timeout_check: bool = False
     ignore_active_proposal_check: bool = False
@@ -37,6 +37,8 @@ class OracleCLIConfig:
     def chain_id(self) -> int:
         """Derive chain ID from the RPC endpoint."""
         if self._chain_id is None:
+            if not self.l1_rpc:
+                raise ValueError("l1_rpc must be set before accessing chain_id")
             w3 = Web3(
                 Web3.HTTPProvider(URI(self.l1_rpc), request_kwargs={"timeout": 15})
             )
@@ -49,6 +51,10 @@ class OracleCLIConfig:
     def oracle_address(self) -> str:
         """Fetch oracle address from the vault contract."""
         if self._oracle_address is None:
+            if not self.vault_address or not self.l1_rpc:
+                raise ValueError(
+                    "vault_address and l1_rpc must be set before accessing oracle_address"
+                )
             from .abi import get_oracle_address_from_vault
 
             self._oracle_address = get_oracle_address_from_vault(
@@ -60,6 +66,20 @@ class OracleCLIConfig:
     def is_broadcast(self) -> bool:
         """Check if Broadcast mode is enabled (Safe address provided and not dry-run)."""
         return self.safe_address is not None and not self.dry_run
+
+    @property
+    def vault_address_required(self) -> str:
+        """Get vault_address, raising ValueError if not set."""
+        if self.vault_address is None:
+            raise ValueError("vault_address must be configured")
+        return self.vault_address
+
+    @property
+    def l1_rpc_required(self) -> str:
+        """Get l1_rpc, raising ValueError if not set."""
+        if self.l1_rpc is None:
+            raise ValueError("l1_rpc must be configured")
+        return self.l1_rpc
 
     def as_safe_dict(self) -> dict[str, object]:
         """Return the config as a dict with secrets redacted."""
