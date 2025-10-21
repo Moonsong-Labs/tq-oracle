@@ -1,9 +1,7 @@
 """Price validators registry."""
 
-from tq_oracle.adapters.price_validators.chainlink_last_look import (
-    ChainLinkLastLookValidator,
-)
+from tq_oracle.adapters.price_validators.chainlink import ChainlinkValidator
 
 PRICE_VALIDATORS = [
-    ChainLinkLastLookValidator,
+    ChainlinkValidator,
 ]
