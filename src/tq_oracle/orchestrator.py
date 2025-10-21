@@ -8,6 +8,7 @@ from .adapters.price_adapters.base import PriceData
 from .adapters import ASSET_ADAPTERS, PRICE_ADAPTERS
 from .adapters.asset_adapters.base import AssetData
 from .checks.pre_checks import PreCheckError, run_pre_checks
+from .checks.price_validators import PriceValidationError, run_price_validations
 from .logger import get_logger
 from .processors import (
     compute_total_aggregated_assets,
@@ -119,6 +120,14 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     for price_adapter in price_adapters:
         price_data = await price_adapter.fetch_prices(asset_addresses, price_data)
         logger.debug("Price adapter returned %d prices", len(price_data.prices))
+
+    logger.info("Running price validations...")
+    try:
+        await run_price_validations(config, price_data)
+        logger.info("Price validations passed successfully")
+    except PriceValidationError as e:
+        logger.error("Price validations failed: %s", e)
+        raise
 
     logger.info("Calculating total assets in base asset...")
     total_assets = calculate_total_assets(aggregated, price_data)

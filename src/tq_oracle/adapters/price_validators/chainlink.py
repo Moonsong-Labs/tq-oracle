@@ -37,10 +37,6 @@ class ChainlinkValidator(BasePriceValidator):
             )
 
             if delta_percentage > self.failure_tolerance:
-                # print all prices
-                print(f"Chainlink prices: {chainlink_prices.prices}")
-                print(f"Actual prices: {price_data.prices}")
-                print(f"Delta percentage: {delta_percentage}")
                 return CheckResult(
                     passed=False,
                     message=f"Chainlink price for {asset_address} is {delta_percentage:.2f}% off from the actual price (failure threshold: {self.failure_tolerance}%)",
