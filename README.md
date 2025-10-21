@@ -52,17 +52,14 @@ Create a `tq-oracle.toml` file in your project directory or `~/.config/tq-oracle
 vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
 testnet = false
 
-[rpc]
 l1_rpc = "https://ethereum-rpc.publicnode.com"
 hl_rpc = "https://api.hyperliquid.xyz/evm"
 
-[safe]
 dry_run = true
 
-[checks]
 ignore_empty_vault = false
-retries = 3
-timeout = 12.0
+pre_check_retries = 3
+pre_check_timeout = 12.0
 ```
 
 Then run with minimal arguments:
@@ -109,34 +106,34 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
 
 All configuration options can be set via CLI arguments, environment variables, or TOML config file.
 
-| CLI Option | Environment Variable | TOML Path | Default | Description |
+| CLI Option | Environment Variable | TOML Key | Default | Description |
 |------------|---------------------|-----------|---------|-------------|
 | `VAULT_ADDRESS` | - | `vault_address` | *required* | Vault contract address (positional argument) |
 | `--config` `-c` | - | - | Auto-detect | Path to TOML configuration file |
 | `--oracle-helper-address` `-h` | - | `oracle_helper_address` | Auto (mainnet/testnet) | OracleHelper contract address |
-| `--l1-rpc` | `L1_RPC` | `rpc.l1_rpc` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
-| `--hl-rpc` | `HL_EVM_RPC` | `rpc.hl_rpc` | Auto (mainnet/testnet) | Hyperliquid RPC endpoint |
-| `--l1-subvault-address` | `L1_SUBVAULT_ADDRESS` | `subvaults.l1_subvault_address` | - | L1 subvault for CCTP monitoring |
-| `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | `subvaults.hl_subvault_address` | Vault address | Hyperliquid subvault address |
-| `--safe-address` `-s` | - | `safe.address` | - | Gnosis Safe address for multi-sig |
+| `--l1-rpc` | `L1_RPC` | `l1_rpc` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
+| `--hl-rpc` | `HL_EVM_RPC` | `hl_rpc` | Auto (mainnet/testnet) | Hyperliquid RPC endpoint |
+| `--l1-subvault-address` | `L1_SUBVAULT_ADDRESS` | `l1_subvault_address` | - | L1 subvault for CCTP monitoring |
+| `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | `hl_subvault_address` | Vault address | Hyperliquid subvault address |
+| `--safe-address` `-s` | - | `safe_address` | - | Gnosis Safe address for multi-sig |
 | `--testnet/--no-testnet` | - | `testnet` | `false` | Use testnet instead of mainnet |
-| `--dry-run/--no-dry-run` | - | `safe.dry_run` | `true` | Preview without sending transaction |
+| `--dry-run/--no-dry-run` | - | `dry_run` | `true` | Preview without sending transaction |
 | `--private-key` | `PRIVATE_KEY` | ❌ *Never use TOML* | - | Private key for signing (required with Safe on --no-dry-run) |
 | `--safe-key` | `SAFE_TRANSACTION_SERVICE_API_KEY` | ❌ *Never use TOML* | - | API key for Safe Transaction Service |
-| `--ignore-empty-vault` | - | `checks.ignore_empty_vault` | `false` | Suppress errors for empty vaults |
-| `--ignore-timeout-check` | - | `checks.ignore_timeout` | `false` | Allow forced submission bypassing timeout |
-| `--ignore-active-proposal-check` | - | `checks.ignore_active_proposal` | `false` | Allow duplicate submissions |
-| `--pre-check-retries` | - | `checks.retries` | `3` | Number of pre-check retry attempts |
-| `--pre-check-timeout` | - | `checks.timeout` | `12.0` | Timeout between pre-check retries (seconds) |
+| `--ignore-empty-vault` | - | `ignore_empty_vault` | `false` | Suppress errors for empty vaults |
+| `--ignore-timeout-check` | - | `ignore_timeout_check` | `false` | Allow forced submission bypassing timeout |
+| `--ignore-active-proposal-check` | - | `ignore_active_proposal_check` | `false` | Allow duplicate submissions |
+| `--pre-check-retries` | - | `pre_check_retries` | `3` | Number of pre-check retry attempts |
+| `--pre-check-timeout` | - | `pre_check_timeout` | `12.0` | Timeout between pre-check retries (seconds) |
 
 #### TOML-Only Options (Not available via CLI)
 
-| TOML Path | Default | Description |
-|-----------|---------|-------------|
-| `rpc.max_calls` | `3` | Maximum number of RPC retry attempts |
-| `rpc.max_concurrent_calls` | `5` | Maximum concurrent RPC connections |
-| `rpc.delay` | `0.15` | Delay between RPC calls (seconds) |
-| `rpc.jitter` | `0.10` | Random jitter for RPC delays (seconds) |
+| TOML Key | Default | Description |
+|----------|---------|-------------|
+| `max_calls` | `3` | Maximum number of RPC retry attempts |
+| `rpc_max_concurrent_calls` | `5` | Maximum concurrent RPC connections |
+| `rpc_delay` | `0.15` | Delay between RPC calls (seconds) |
+| `rpc_jitter` | `0.10` | Random jitter for RPC delays (seconds) |
 
 ### Examples
 

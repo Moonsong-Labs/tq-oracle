@@ -20,6 +20,27 @@ from .config import OracleCLIConfig
 SECRET_FIELDS = {"private_key", "safe_txn_srvc_api_key"}
 
 
+def _check_for_secrets(data: dict[str, Any], path: str = "") -> None:
+    """Recursively check dict for secret fields.
+
+    Args:
+        data: Dictionary to check
+        path: Current path for error messages
+
+    Raises:
+        ValueError: If secret field found in TOML
+    """
+    for key, value in data.items():
+        current_path = f"{path}.{key}" if path else key
+        if key in SECRET_FIELDS:
+            raise ValueError(
+                f"Security violation: '{key}' found in TOML config file at path '{current_path}'. "
+                f"Secrets must only be provided via environment variables or CLI flags."
+            )
+        if isinstance(value, dict):
+            _check_for_secrets(value, current_path)
+
+
 def find_config_file(config_path: Optional[str] = None) -> Optional[Path]:
     """Find configuration file using standard search paths.
 
@@ -56,11 +77,12 @@ def find_config_file(config_path: Optional[str] = None) -> Optional[Path]:
 def load_toml_config(config_path: Path) -> dict[str, Any]:
     """Load and parse TOML configuration file.
 
+
     Args:
         config_path: Path to TOML configuration file
 
     Returns:
-        Flat dictionary of configuration values (sections flattened)
+        Dictionary of configuration values
 
     Raises:
         ValueError: If TOML file contains secret fields
@@ -68,74 +90,9 @@ def load_toml_config(config_path: Path) -> dict[str, Any]:
     with open(config_path, "rb") as f:
         raw_config = tomllib.load(f)
 
-    # Security check: ensure no secrets in TOML (check all levels)
-    def check_for_secrets(data: dict[str, Any], path: str = "") -> None:
-        for key, value in data.items():
-            current_path = f"{path}.{key}" if path else key
-            if key in SECRET_FIELDS:
-                raise ValueError(
-                    f"Security violation: '{key}' found in TOML config file at path '{current_path}'. "
-                    f"Secrets must only be provided via environment variables or CLI flags."
-                )
-            if isinstance(value, dict):
-                check_for_secrets(value, current_path)
+    _check_for_secrets(raw_config)
 
-    check_for_secrets(raw_config)
-
-    flat_config: dict[str, Any] = {}
-
-    if "vault_address" in raw_config:
-        flat_config["vault_address"] = raw_config["vault_address"]
-    if "oracle_helper_address" in raw_config:
-        flat_config["oracle_helper_address"] = raw_config["oracle_helper_address"]
-    if "testnet" in raw_config:
-        flat_config["testnet"] = raw_config["testnet"]
-
-    if "rpc" in raw_config:
-        rpc = raw_config["rpc"]
-        if "l1_rpc" in rpc:
-            flat_config["l1_rpc"] = rpc["l1_rpc"]
-        if "hl_rpc" in rpc:
-            flat_config["hl_rpc"] = rpc["hl_rpc"]
-        if "max_calls" in rpc:
-            flat_config["max_calls"] = rpc["max_calls"]
-        if "max_concurrent_calls" in rpc:
-            flat_config["rpc_max_concurrent_calls"] = rpc["max_concurrent_calls"]
-        if "delay" in rpc:
-            flat_config["rpc_delay"] = rpc["delay"]
-        if "jitter" in rpc:
-            flat_config["rpc_jitter"] = rpc["jitter"]
-
-    if "subvaults" in raw_config:
-        subvaults = raw_config["subvaults"]
-        if "l1_subvault_address" in subvaults:
-            flat_config["l1_subvault_address"] = subvaults["l1_subvault_address"]
-        if "hl_subvault_address" in subvaults:
-            flat_config["hl_subvault_address"] = subvaults["hl_subvault_address"]
-
-    if "safe" in raw_config:
-        safe = raw_config["safe"]
-        if "address" in safe:
-            flat_config["safe_address"] = safe["address"]
-        if "dry_run" in safe:
-            flat_config["dry_run"] = safe["dry_run"]
-
-    if "checks" in raw_config:
-        checks = raw_config["checks"]
-        if "ignore_empty_vault" in checks:
-            flat_config["ignore_empty_vault"] = checks["ignore_empty_vault"]
-        if "ignore_timeout" in checks:
-            flat_config["ignore_timeout_check"] = checks["ignore_timeout"]
-        if "ignore_active_proposal" in checks:
-            flat_config["ignore_active_proposal_check"] = checks[
-                "ignore_active_proposal"
-            ]
-        if "retries" in checks:
-            flat_config["pre_check_retries"] = checks["retries"]
-        if "timeout" in checks:
-            flat_config["pre_check_timeout"] = checks["timeout"]
-
-    return flat_config
+    return raw_config
 
 
 def load_env_vars() -> dict[str, Any]:

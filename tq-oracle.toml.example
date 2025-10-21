@@ -1,17 +1,15 @@
 # TQ Oracle Configuration File
+# All settings use flat keys matching the internal field names
 
 # ============================================================================
 # Main Oracle Settings
 # ============================================================================
 
-# Vault contract address to query (required)
-# Can be overridden by positional argument: tq-oracle <vault_address>
+# Vault contract address to query (required unless provided as CLI argument)
 vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
 
 # OracleHelper contract address
-# If not set, defaults based on testnet flag:
-#   - Mainnet: 0x... (from constants)
-#   - Testnet: 0x... (from constants)
+# If not set, defaults based on testnet flag
 # oracle_helper_address = "0x..."
 
 # Use testnet instead of mainnet
@@ -21,7 +19,6 @@ testnet = false
 # RPC Configuration
 # ============================================================================
 
-[rpc]
 # Ethereum L1 RPC endpoint
 # Environment variable: L1_RPC
 # If not set, defaults based on testnet flag
@@ -36,19 +33,18 @@ hl_rpc = "https://api.hyperliquid.xyz/evm"
 max_calls = 3
 
 # Maximum concurrent RPC calls
-max_concurrent_calls = 5
+rpc_max_concurrent_calls = 5
 
 # Delay between RPC calls (seconds)
-delay = 0.15
+rpc_delay = 0.15
 
 # Random jitter to add to delay (seconds)
-jitter = 0.10
+rpc_jitter = 0.10
 
 # ============================================================================
 # Subvault Configuration
 # ============================================================================
 
-[subvaults]
 # L1 subvault address for CCTP bridge monitoring (optional)
 # Environment variable: L1_SUBVAULT_ADDRESS
 # l1_subvault_address = "0x..."
@@ -62,7 +58,6 @@ jitter = 0.10
 # Safe (Gnosis) Configuration
 # ============================================================================
 
-[safe]
 # Gnosis Safe address for multi-sig submission (optional)
 # Required when running with dry_run = false
 # safe_address = "0x..."
@@ -79,18 +74,17 @@ dry_run = true
 # Pre-Check Configuration
 # ============================================================================
 
-[checks]
 # Suppress errors when vault has no assets (useful for testing pre-deployment)
 ignore_empty_vault = false
 
 # Warn but don't block when timeout hasn't elapsed since last report
-ignore_timeout = false
+ignore_timeout_check = false
 
 # Warn but don't block when there are active submitReports() proposals
-ignore_active_proposal = false
+ignore_active_proposal_check = false
 
 # Number of times to retry pre-checks if they fail
-retries = 3
+pre_check_retries = 3
 
 # Timeout in seconds between pre-check retries
-timeout = 12.0
+pre_check_timeout = 12.0

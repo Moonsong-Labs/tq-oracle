@@ -73,35 +73,27 @@ def test_find_config_file_none_if_not_found(tmp_path, monkeypatch):
 
 
 def test_load_toml_config_basic(tmp_path):
-    """Should load and flatten basic TOML config."""
+    """Should load flat TOML config."""
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         """
 vault_address = "0xVAULT"
 testnet = true
-
-[rpc]
 l1_rpc = "https://sepolia.example.com"
 hl_rpc = "https://hl.example.com"
 max_calls = 5
-max_concurrent_calls = 10
-delay = 0.2
-jitter = 0.05
-
-[subvaults]
+rpc_max_concurrent_calls = 10
+rpc_delay = 0.2
+rpc_jitter = 0.05
 l1_subvault_address = "0xL1SUB"
 hl_subvault_address = "0xHLSUB"
-
-[safe]
-address = "0xSAFE"
+safe_address = "0xSAFE"
 dry_run = false
-
-[checks]
 ignore_empty_vault = true
-ignore_timeout = true
-ignore_active_proposal = false
-retries = 5
-timeout = 15.0
+ignore_timeout_check = true
+ignore_active_proposal_check = false
+pre_check_retries = 5
+pre_check_timeout = 15.0
 """
     )
 
@@ -195,18 +187,13 @@ def test_load_toml_config_handles_empty_file(tmp_path):
 
 
 def test_load_toml_config_ignores_unknown_fields(tmp_path):
-    """Should ignore unknown fields and sections in the TOML file."""
+    """Should load all fields from flat TOML (including unknown ones)."""
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         """
 vault_address = "0xVAULT"
-unknown_top_level = "should be ignored"
-
-[rpc]
+unknown_top_level = "will be present but ignored by dataclass"
 l1_rpc = "https://eth.example.com"
-
-[unknown_section]
-key = "value"
 """
     )
 
@@ -215,9 +202,8 @@ key = "value"
     # Check that known fields are loaded
     assert result["vault_address"] == "0xVAULT"
     assert result["l1_rpc"] == "https://eth.example.com"
-    # Check that unknown fields are NOT loaded
-    assert "unknown_top_level" not in result
-    assert "key" not in result
+    # Unknown fields ARE loaded (dataclass will ignore them when constructing)
+    assert result["unknown_top_level"] == "will be present but ignored by dataclass"
 
 
 def test_load_env_vars(monkeypatch):
@@ -312,8 +298,6 @@ def test_build_config_full_precedence(tmp_path, monkeypatch):
         """
 vault_address = "0xTOML"
 testnet = false
-
-[rpc]
 l1_rpc = "https://toml.com"
 hl_rpc = "https://hl-toml.com"
 """
@@ -360,15 +344,13 @@ def test_build_config_minimal():
 
 
 def test_build_config_partial_toml(tmp_path):
-    """Should work with TOML file containing only some sections."""
+    """Should work with TOML file containing only some fields."""
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         """
 vault_address = "0xVAULT"
-
-[rpc]
 l1_rpc = "https://eth.example.com"
-# Only one section, missing [subvaults], [safe], [checks]
+# Only some fields, missing others
 """
     )
 
