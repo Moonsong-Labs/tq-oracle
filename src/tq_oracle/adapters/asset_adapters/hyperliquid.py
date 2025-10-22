@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+import time
+import math
+from typing import TYPE_CHECKING, Optional, Any
 
 from hyperliquid.info import Info
 
@@ -10,6 +12,7 @@ from ...constants import (
     HL_TESTNET_API_URL,
     USDC_MAINNET,
     USDC_SEPOLIA,
+    HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
 from ...logger import get_logger
 from .base import AssetData, BaseAssetAdapter
@@ -21,7 +24,14 @@ logger = get_logger(__name__)
 
 
 class HyperliquidAdapter(BaseAssetAdapter):
-    """Adapter for querying Hyperliquid protocol assets."""
+    """Hyperliquid asset adapter.
+
+    Derives NAV from the latest timestamped portfolio value returned
+    by the portfolio endpoint.
+
+    Rejects stale portfolio values older than HL_MAX_PORTFOLIO_STALENESS_SECONDS.
+    Raises ValueError on empty/invalid history or stale portfolio values.
+    """
 
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
@@ -32,13 +42,23 @@ class HyperliquidAdapter(BaseAssetAdapter):
         return "hyperliquid"
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
-        """Fetch asset data from Hyperliquid for the given vault.
+        """Fetch current portfolio value (NAV) for the given subvault.
+
+        Selects the most recent valid point from accountValueHistory
+        and returns it as a USDC AssetData scaled to 18 decimals.
 
         Args:
-            subvault_address: The subvault contract address to query (used as fallback if config doesn't specify hl_subvault_address)
+            subvault_address: Subvault address to query (overridden by
+                config.hl_subvault_address if set).
 
         Returns:
-            Account portfolio value as USDC asset
+            list[AssetData]: Single USDC asset with amount set to the latest NAV
+            scaled to 1e18.
+
+        Raises:
+            ValueError: If the 'day' period is missing, the history is empty,
+                no valid numeric values can be parsed, or if the latest value
+                is stale (older than HL_MAX_PORTFOLIO_STALENESS_SECONDS).
         """
         # Use config's hl_subvault_address if set, otherwise fall back to passed address
         address_to_query = self.config.hl_subvault_address or subvault_address
@@ -54,7 +74,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
         info = await asyncio.to_thread(Info, base_url=base_url, skip_ws=True)
 
         try:
-            logger.debug("Calling portfolio API to fetch TWAP data...")
+            logger.debug("Calling portfolio API to fetch latest NAV data...")
             portfolio_data = await asyncio.to_thread(
                 info.portfolio, user=address_to_query
             )
@@ -67,37 +87,59 @@ class HyperliquidAdapter(BaseAssetAdapter):
 
             account_history = day_data.get("accountValueHistory", [])
             if not account_history:
-                logger.warning(
-                    "Empty account history for %s, returning 0", address_to_query
-                )
-                return []
+                logger.warning("Empty account history for %s", address_to_query)
+                raise ValueError("Hyperliquid: empty account history")
 
-            values = []
-            for timestamp, value_str in account_history:
+            # Normalize, filter invalid entries, and sort by timestamp ascending
+            def _parse_point(ts: Any, value_str: Any) -> Optional[tuple[int, float]]:
                 try:
-                    values.append(float(value_str))
-                except (ValueError, TypeError) as e:
-                    logger.warning(
-                        "Invalid value at timestamp %s: %s (error: %s)",
-                        timestamp,
-                        value_str,
-                        e,
+                    ts_ms = int(ts)
+                    x = float(value_str)
+                    if math.isfinite(x):
+                        return ts_ms, x
+                except Exception as e:
+                    logger.debug(
+                        "Skipping invalid point (%s, %s): %s", ts, value_str, e
                     )
+                return None
 
-            if not values:
-                logger.warning("No valid values in account history, returning 0")
-                return []
+            clean: list[tuple[int, float]] = [
+                point
+                for point in (
+                    _parse_point(ts, value_str) for ts, value_str in account_history
+                )
+                if point is not None
+            ]
 
-            twap = sum(values) / len(values)
+            if not clean:
+                logger.warning(
+                    "No valid numeric values in account history for %s",
+                    address_to_query,
+                )
+                raise ValueError("Hyperliquid: no valid latest value")
+
+            clean.sort(key=lambda p: p[0])
+            last_ts_ms, latest_value = clean[-1]
+
+            # Reject stale portfolio values
+            now_ms = int(time.time() * 1000)
+            max_staleness_ms = HL_MAX_PORTFOLIO_STALENESS_SECONDS * 1000
+            age_ms = now_ms - last_ts_ms
+            if age_ms > max_staleness_ms:
+                msg = (
+                    f"Hyperliquid: stale portfolio value; "
+                    f"age={age_ms / 1000:.1f}s exceeds {max_staleness_ms / 1000:.0f}s"
+                )
+                logger.error(msg)
+                raise ValueError(msg)
+
             logger.info(
-                "TWAP over %d hourly snapshots: $%.2f (min: $%.2f, max: $%.2f)",
-                len(values),
-                twap,
-                min(values),
-                max(values),
+                "Hyperliquid latest NAV: $%.2f (age=%.1fs)",
+                latest_value,
+                max(0, age_ms) / 1000.0,
             )
 
-            amount_native = int(twap * 1e18)
+            amount_native = int(latest_value * 1e18)
             usdc_address = USDC_SEPOLIA if self.testnet else USDC_MAINNET
 
             logger.debug("Using USDC address: %s", usdc_address)
