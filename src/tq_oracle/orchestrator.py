@@ -179,7 +179,9 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     adapter_tasks: list[tuple[str, BaseAssetAdapter, str]] = [
         create_adapter_task(subvault_addr, adapter_name)
         for subvault_addr in subvault_addresses
-        for adapter_name in config.get_subvault_config(subvault_addr).additional_adapters
+        for adapter_name in config.get_subvault_config(
+            subvault_addr
+        ).additional_adapters
     ]
 
     # Fetch assets from all adapters in parallel

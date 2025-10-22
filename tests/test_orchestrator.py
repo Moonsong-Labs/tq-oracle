@@ -4,7 +4,7 @@ import pytest
 
 from tq_oracle.adapters.asset_adapters.base import AssetData
 from tq_oracle.checks.pre_checks import PreCheckError
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.config import OracleCLIConfig, SubvaultAdapterConfig
 from tq_oracle.orchestrator import execute_oracle_flow
 from tq_oracle.processors.asset_aggregator import AggregatedAssets
 from tq_oracle.processors.oracle_helper import FinalPrices
@@ -14,8 +14,8 @@ from tq_oracle.report.generator import OracleReport
 @pytest.fixture
 def test_config():
     return OracleCLIConfig(
-        vault_address="0xVault",
-        oracle_helper_address="0xOracleHelper",
+        vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
+        oracle_helper_address="0x1234567890123456789012345678901234567890",
         l1_rpc="https://rpc",
         l1_subvault_address=None,
         safe_address=None,
@@ -33,11 +33,28 @@ def test_config():
 @pytest.mark.asyncio
 async def test_all_adapters_succeed_processes_all_data(test_config):
     """All adapters succeeding should result in all asset data being processed."""
+    # Configure subvault adapters
+    test_config.subvault_adapters = [
+        SubvaultAdapterConfig(
+            subvault_address="0xSubvault1",
+            chain="l1",
+            additional_adapters=["adapter1"],
+            skip_idle_balances=True,
+        ),
+        SubvaultAdapterConfig(
+            subvault_address="0xSubvault2",
+            chain="l1",
+            additional_adapters=["adapter2"],
+            skip_idle_balances=True,
+        ),
+    ]
+
     with (
         patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock),
         patch(
             "tq_oracle.orchestrator._fetch_subvault_addresses", new_callable=AsyncMock
         ) as mock_fetch_subvaults,
+        patch("tq_oracle.orchestrator.IdleBalancesAdapter") as mock_idle_adapter_class,
         patch("tq_oracle.orchestrator.get_adapter_class") as mock_get_adapter,
         patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters,
         patch(
@@ -59,6 +76,11 @@ async def test_all_adapters_succeed_processes_all_data(test_config):
     ):
         # Mock two subvaults
         mock_fetch_subvaults.return_value = ["0xSubvault1", "0xSubvault2"]
+
+        # Mock IdleBalancesAdapter
+        mock_idle_adapter = MagicMock()
+        mock_idle_adapter.fetch_all_assets = AsyncMock(return_value=[])
+        mock_idle_adapter_class.return_value = mock_idle_adapter
 
         # Create two mock adapters
         adapter1 = MagicMock()
@@ -95,11 +117,28 @@ async def test_all_adapters_succeed_processes_all_data(test_config):
 @pytest.mark.asyncio
 async def test_some_adapters_fail_processes_successful_ones(test_config):
     """Failed adapters should be logged but successful ones should still be processed."""
+    # Configure subvault adapters
+    test_config.subvault_adapters = [
+        SubvaultAdapterConfig(
+            subvault_address="0xSubvault1",
+            chain="l1",
+            additional_adapters=["adapter1"],
+            skip_idle_balances=True,
+        ),
+        SubvaultAdapterConfig(
+            subvault_address="0xSubvault2",
+            chain="l1",
+            additional_adapters=["adapter2"],
+            skip_idle_balances=True,
+        ),
+    ]
+
     with (
         patch("tq_oracle.orchestrator.run_pre_checks", new_callable=AsyncMock),
         patch(
             "tq_oracle.orchestrator._fetch_subvault_addresses", new_callable=AsyncMock
         ) as mock_fetch_subvaults,
+        patch("tq_oracle.orchestrator.IdleBalancesAdapter") as mock_idle_adapter_class,
         patch("tq_oracle.orchestrator.get_adapter_class") as mock_get_adapter,
         patch("tq_oracle.orchestrator.PRICE_ADAPTERS") as mock_price_adapters,
         patch(
@@ -118,6 +157,11 @@ async def test_some_adapters_fail_processes_successful_ones(test_config):
         patch("tq_oracle.orchestrator.publish_report", new_callable=AsyncMock),
     ):
         mock_fetch_subvaults.return_value = ["0xSubvault1", "0xSubvault2"]
+
+        # Mock IdleBalancesAdapter
+        mock_idle_adapter = MagicMock()
+        mock_idle_adapter.fetch_all_assets = AsyncMock(return_value=[])
+        mock_idle_adapter_class.return_value = mock_idle_adapter
 
         adapter_success = MagicMock()
         adapter_success.fetch_assets = AsyncMock(return_value=[AssetData("0xA", 100)])
