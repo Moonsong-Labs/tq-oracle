@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 import math
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 
 from hyperliquid.info import Info
 
@@ -91,9 +91,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
                 raise ValueError("Hyperliquid: empty account history")
 
             # Normalize, filter invalid entries, and sort by timestamp ascending
-            def _parse_point(
-                ts: object, value_str: object
-            ) -> Optional[tuple[int, float]]:
+            def _parse_point(ts: Any, value_str: Any) -> Optional[tuple[int, float]]:
                 try:
                     ts_ms = int(ts)
                     x = float(value_str)
