@@ -181,6 +181,9 @@ def report(
     }
     cli_args: dict[str, Any] = {k: v for k, v in optional_args.items() if v is not None}
 
+    # Boolean and numeric args are always added. merge_config_sources handles
+    # the precedence smartly: if a CLI arg matches its default value and a
+    # non-default value exists in TOML/ENV, the TOML/ENV value wins.
     cli_args["testnet"] = testnet
     cli_args["dry_run"] = dry_run
     cli_args["ignore_empty_vault"] = ignore_empty_vault

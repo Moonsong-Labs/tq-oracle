@@ -29,3 +29,5 @@ CLAUDE.md
 .env
 
 test.toml
+config.toml
+tq-oracle.toml

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+from dataclasses import MISSING, fields
 from pathlib import Path
 from typing import Any, Optional
 
@@ -105,6 +106,10 @@ def _check_for_secrets(data: dict[str, Any], path: str = "") -> None:
             )
         if isinstance(value, dict):
             _check_for_secrets(value, current_path)
+        elif isinstance(value, list):
+            for i, item in enumerate(value):
+                if isinstance(item, dict):
+                    _check_for_secrets(item, f"{current_path}[{i}]")
 
 
 def find_config_file(config_path: Optional[str] = None) -> Optional[Path]:
@@ -202,6 +207,10 @@ def merge_config_sources(
     2. Environment variables
     3. TOML configuration file
 
+    Special handling: CLI arguments that match their dataclass defaults are
+    only used if the key doesn't exist in TOML/ENV. This allows TOML configs
+    to override boolean/numeric defaults without requiring explicit CLI flags.
+
     Args:
         cli_args: Arguments from CLI (non-None values only)
         env_vars: Configuration from environment variables
@@ -210,6 +219,13 @@ def merge_config_sources(
     Returns:
         Merged configuration dictionary
     """
+    # Get default values from OracleCLIConfig dataclass
+    defaults = {
+        field.name: field.default
+        for field in fields(OracleCLIConfig)
+        if field.default is not MISSING
+    }
+
     merged = toml_config.copy()
 
     for key, value in env_vars.items():
@@ -217,6 +233,10 @@ def merge_config_sources(
 
     for key, value in cli_args.items():
         if value is not None:
+            # If this CLI arg matches its default value and the key already exists
+            # in merged config (from TOML or ENV), skip it to allow TOML/ENV to win
+            if key in defaults and value == defaults[key] and key in merged:
+                continue
             merged[key] = value
 
     return merged
