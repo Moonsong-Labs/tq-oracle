@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING
+import math
+from typing import TYPE_CHECKING, Optional
 
 from hyperliquid.info import Info
 
@@ -25,7 +26,7 @@ logger = get_logger(__name__)
 class HyperliquidAdapter(BaseAssetAdapter):
     """Hyperliquid asset adapter.
 
-    Stateless: derives NAV from the latest timestamped portfolio value returned
+    Derives NAV from the latest timestamped portfolio value returned
     by the portfolio endpoint.
 
     Rejects stale portfolio values older than HL_MAX_PORTFOLIO_STALENESS_SECONDS.
@@ -43,7 +44,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch current portfolio value (NAV) for the given subvault.
 
-        Stateless: selects the most recent valid point from accountValueHistory
+        Selects the most recent valid point from accountValueHistory
         and returns it as a USDC AssetData scaled to 18 decimals.
 
         Args:
@@ -90,18 +91,27 @@ class HyperliquidAdapter(BaseAssetAdapter):
                 raise ValueError("Hyperliquid: empty account history")
 
             # Normalize, filter invalid entries, and sort by timestamp ascending
-            clean: list[tuple[int, float]] = []
-            for ts, value_str in account_history:
+            def _parse_point(
+                ts: object, value_str: object
+            ) -> Optional[tuple[int, float]]:
                 try:
                     ts_ms = int(ts)
                     x = float(value_str)
-                    if x == x and abs(x) != float("inf"):
-                        clean.append((ts_ms, x))
+                    if math.isfinite(x):
+                        return ts_ms, x
                 except Exception as e:
                     logger.debug(
                         "Skipping invalid point (%s, %s): %s", ts, value_str, e
                     )
-                    continue
+                return None
+
+            clean: list[tuple[int, float]] = [
+                point
+                for point in (
+                    _parse_point(ts, value_str) for ts, value_str in account_history
+                )
+                if point is not None
+            ]
 
             if not clean:
                 logger.warning(
