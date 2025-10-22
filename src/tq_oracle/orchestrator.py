@@ -178,9 +178,20 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
         )
         return (subvault_addr, adapter, adapter_name)
 
+    subvaults_to_process = set(subvault_addresses)
+
+    if config.subvault_adapters:
+        for sv_config in config.subvault_adapters:
+            if sv_config.skip_subvault_existence_check:
+                subvaults_to_process.add(sv_config.subvault_address)
+                logger.debug(
+                    "Including non-vault address for adapters: %s (skip_subvault_existence_check=true)",
+                    sv_config.subvault_address,
+                )
+
     adapter_tasks: list[tuple[str, BaseAssetAdapter, str]] = [
         create_adapter_task(subvault_addr, adapter_name)
-        for subvault_addr in subvault_addresses
+        for subvault_addr in subvaults_to_process
         for adapter_name in config.get_subvault_config(
             subvault_addr
         ).additional_adapters
