@@ -91,7 +91,7 @@ def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
     """
     # Always sets the base asset to price 0
     if prices.base_asset in prices.prices:
-      prices.prices[prices.base_asset] = 0
+        prices.prices[prices.base_asset] = 0
     # Sort by numeric value of address (as Solidity does), not lexicographically
     asset_prices = sorted(prices.prices.items(), key=lambda item: int(item[0], 16))
     return EncodedAssetPrices(asset_prices=asset_prices)
