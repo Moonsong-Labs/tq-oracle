@@ -220,6 +220,8 @@ def report(
     if updates:
         cfg = replace(cfg, **updates)
 
+    setup_logging(cfg.log_level)
+
     if not cfg.vault_address:
         raise typer.BadParameter("vault_address must be configured")
     if not cfg.l1_rpc:

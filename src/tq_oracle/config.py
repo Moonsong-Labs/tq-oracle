@@ -15,6 +15,7 @@ class SubvaultAdapterConfig:
     chain: str = "l1"  # Which chain this subvault is on: "l1" or "hyperliquid"
     additional_adapters: list[str] = field(default_factory=list)
     skip_idle_balances: bool = False
+    skip_subvault_existence_check: bool = False
 
 
 @dataclass
@@ -44,6 +45,7 @@ class OracleCLIConfig:
     rpc_jitter: float = 0.10
     chainlink_price_warning_tolerance_percentage: float = 0.5
     chainlink_price_failure_tolerance_percentage: float = 1.0
+    log_level: str = "INFO"
     subvault_adapters: list[SubvaultAdapterConfig] = field(default_factory=list)
 
     @property

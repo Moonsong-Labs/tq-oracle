@@ -67,6 +67,9 @@ def parse_subvault_adapters(
 
         additional_adapters_raw = raw_config.get("additional_adapters", [])
         skip_idle_balances = raw_config.get("skip_idle_balances", False)
+        skip_subvault_existence_check = raw_config.get(
+            "skip_subvault_existence_check", False
+        )
 
         adapter_names = [
             validate_and_normalize_adapter(name) for name in additional_adapters_raw
@@ -77,6 +80,7 @@ def parse_subvault_adapters(
             chain=chain,
             additional_adapters=adapter_names,
             skip_idle_balances=skip_idle_balances,
+            skip_subvault_existence_check=skip_subvault_existence_check,
         )
 
     return [parse_single_config(raw_config) for raw_config in raw_configs]
@@ -181,6 +185,8 @@ def load_env_vars() -> dict[str, Any]:
         env_config["private_key"] = val
     if val := os.getenv("SAFE_TRANSACTION_SERVICE_API_KEY"):
         env_config["safe_txn_srvc_api_key"] = val
+    if val := os.getenv("LOG_LEVEL"):
+        env_config["log_level"] = val
 
     return env_config
 

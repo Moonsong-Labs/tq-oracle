@@ -130,10 +130,12 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
     # Validate subvault_adapters config references existing subvaults
     if config.subvault_adapters:
         normalized_subvault_addrs = {addr.lower() for addr in subvault_addresses}
-        invalid_subvaults = []
-        for sv_config in config.subvault_adapters:
-            if sv_config.subvault_address.lower() not in normalized_subvault_addrs:
-                invalid_subvaults.append(sv_config.subvault_address)
+        invalid_subvaults = [
+            sv_config.subvault_address
+            for sv_config in config.subvault_adapters
+            if not sv_config.skip_subvault_existence_check
+            and sv_config.subvault_address.lower() not in normalized_subvault_addrs
+        ]
 
         if invalid_subvaults:
             raise ValueError(
