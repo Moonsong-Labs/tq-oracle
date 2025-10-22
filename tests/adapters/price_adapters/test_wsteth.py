@@ -66,14 +66,14 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(config)
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_eth_returns_zero(config):
+async def test_fetch_prices_eth_returns_one(config):
     adapter = WstETHAdapter(config)
     result = await adapter.fetch_prices(
         [ETH_ASSET], PriceData(base_asset=ETH_ASSET, prices={})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
-    assert result.prices[ETH_ASSET] == 0
+    assert result.prices[ETH_ASSET] == 1
 
 
 @pytest.mark.asyncio
@@ -95,7 +95,7 @@ async def test_fetch_prices_all_three_assets(config):
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
-    assert result.prices[ETH_ASSET] == 0
+    assert result.prices[ETH_ASSET] == 1
     assert result.prices[WETH_MAINNET] == 10**18
 
 
@@ -137,7 +137,7 @@ async def test_fetch_prices_all_assets_integration(config):
     assert isinstance(result, PriceData)
     assert len(result.prices) == 4
     assert result.prices["0x111"] == 456
-    assert result.prices[ETH_ASSET] == 0
+    assert result.prices[ETH_ASSET] == 1
     assert result.prices[WETH_MAINNET] == 10**18
     wsteth_price = result.prices[WSTETH_MAINNET]
     assert isinstance(wsteth_price, int)

@@ -34,7 +34,7 @@ def report(
     vault_address: Annotated[
         Optional[str],
         typer.Argument(
-            help="Vault contract address to query (can be set in config file).",
+            help="Vault contract address to query (optional; must be provided via CLI argument, environment variable, or config file).",
         ),
     ] = None,
     config: Annotated[

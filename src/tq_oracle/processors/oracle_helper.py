@@ -89,6 +89,9 @@ def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
     Sorts addresses numerically (as integers) to match Solidity's address comparison.
     Python's default string sort is case-sensitive and doesn't match Solidity's behavior.
     """
+    # Always sets the base asset to price 0
+    if prices.base_asset in prices.prices:
+      prices.prices[prices.base_asset] = 0
     # Sort by numeric value of address (as Solidity does), not lexicographically
     asset_prices = sorted(prices.prices.items(), key=lambda item: int(item[0], 16))
     return EncodedAssetPrices(asset_prices=asset_prices)

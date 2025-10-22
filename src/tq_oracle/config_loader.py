@@ -143,7 +143,6 @@ def find_config_file(config_path: Optional[str] = None) -> Optional[Path]:
 def load_toml_config(config_path: Path) -> dict[str, Any]:
     """Load and parse TOML configuration file.
 
-
     Args:
         config_path: Path to TOML configuration file
 
