@@ -141,5 +141,6 @@ async def test_fetch_prices_all_assets_integration(config):
     assert result.prices[WETH_MAINNET] == 10**18
     wsteth_price = result.prices[WSTETH_MAINNET]
     assert isinstance(wsteth_price, int)
+
     assert wsteth_price > 10**18
     assert wsteth_price < 2 * 10**18
