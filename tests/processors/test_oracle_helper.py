@@ -1,6 +1,7 @@
 import pytest
 
 from tq_oracle.adapters.price_adapters.base import PriceData
+from tq_oracle.constants import ETH_ASSET
 from tq_oracle.processors.oracle_helper import (
     encode_asset_prices,
     EncodedAssetPrices,
@@ -41,6 +42,20 @@ def test_encode_asset_prices_single():
     encoded = encode_asset_prices(rp)
     assert isinstance(encoded, EncodedAssetPrices)
     assert encoded.asset_prices == [("0xABC", 123)]
+
+
+def test_encode_asset_prices_overwrites_base_asset_to_zero():
+    rp = PriceData(
+        base_asset=ETH_ASSET,
+        prices={
+            ETH_ASSET: 999999999,
+            "0xAAA": 1000000000000000,
+        },
+    )
+    encoded = encode_asset_prices(rp)
+
+    prices_dict = dict(encoded.asset_prices)
+    assert prices_dict[ETH_ASSET] == 0
 
 
 @pytest.mark.integration
