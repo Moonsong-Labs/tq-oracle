@@ -160,3 +160,55 @@ async def test_validate_prices_passes_with_empty_prices(validator):
 
     assert result.passed
     assert "within acceptable deviation" in result.message.lower()
+
+
+@pytest.mark.asyncio
+async def test_validate_prices_zero_price_fails(validator):
+    price_data = PriceData(
+        base_asset=ETH_ASSET,
+        prices={
+            USDC_MAINNET: 0,
+            USDT_MAINNET: 1000000000000000,
+        },
+    )
+
+    result = await validator.validate_prices(price_data)
+
+    assert not result.passed
+    assert "non-positive" in result.message.lower()
+    assert USDC_MAINNET in result.message
+
+
+@pytest.mark.asyncio
+async def test_validate_prices_negative_price_fails(validator):
+    price_data = PriceData(
+        base_asset=ETH_ASSET,
+        prices={
+            USDC_MAINNET: -1000000000000000,
+            USDT_MAINNET: 1000000000000000,
+        },
+    )
+
+    result = await validator.validate_prices(price_data)
+
+    assert not result.passed
+    assert "non-positive" in result.message.lower()
+    assert USDC_MAINNET in result.message
+
+
+@pytest.mark.asyncio
+async def test_validate_prices_multiple_invalid(validator):
+    price_data = PriceData(
+        base_asset=ETH_ASSET,
+        prices={
+            USDC_MAINNET: 0,
+            USDT_MAINNET: -100,
+        },
+    )
+
+    result = await validator.validate_prices(price_data)
+
+    assert not result.passed
+    assert "2" in result.message
+    assert USDC_MAINNET in result.message
+    assert USDT_MAINNET in result.message

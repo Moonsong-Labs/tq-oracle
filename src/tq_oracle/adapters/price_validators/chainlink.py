@@ -24,6 +24,23 @@ class ChainlinkValidator(BasePriceValidator):
         return "Chainlink Validator"
 
     async def validate_prices(self, price_data: PriceData) -> CheckResult:
+        invalid_prices = []
+
+        for asset_address, price in price_data.prices.items():
+            if price <= 0:
+                invalid_prices.append((asset_address, price))
+                logger.error(f"Invalid price for {asset_address}: {price}")
+
+        if invalid_prices:
+            invalid_details = ", ".join(
+                f"{addr}: {price}" for addr, price in invalid_prices
+            )
+            return CheckResult(
+                passed=False,
+                message=f"Found {len(invalid_prices)} asset(s) with non-positive prices: {invalid_details}",
+                retry_recommended=False,
+            )
+
         asset_addresses = list(price_data.prices.keys())
         chainlink_prices = PriceData(base_asset=price_data.base_asset, prices={})
         chainlink_prices = await self.chainlink_adapter.fetch_prices(
