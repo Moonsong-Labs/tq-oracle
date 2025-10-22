@@ -1,10 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 from eth_typing import URI
 from web3 import Web3
+
+
+@dataclass
+class SubvaultAdapterConfig:
+    """Configuration for additional adapters on a specific subvault."""
+
+    subvault_address: str
+    chain: str = "l1"  # Which chain this subvault is on: "l1" or "hyperliquid"
+    additional_adapters: list[str] = field(default_factory=list)
+    skip_idle_balances: bool = False
 
 
 @dataclass
@@ -34,6 +44,7 @@ class OracleCLIConfig:
     rpc_jitter: float = 0.10
     chainlink_price_warning_tolerance_percentage: float = 0.5
     chainlink_price_failure_tolerance_percentage: float = 1.0
+    subvault_adapters: list[SubvaultAdapterConfig] = field(default_factory=list)
 
     @property
     def chain_id(self) -> int:
@@ -82,6 +93,27 @@ class OracleCLIConfig:
         if self.l1_rpc is None:
             raise ValueError("l1_rpc must be configured")
         return self.l1_rpc
+
+    def get_subvault_config(self, subvault_address: str) -> SubvaultAdapterConfig:
+        """Get adapter configuration for a specific subvault.
+
+        Args:
+            subvault_address: The subvault address to look up
+
+        Returns:
+            SubvaultAdapterConfig for this subvault, or default config if not configured
+        """
+        normalized_address = subvault_address.lower()
+        for config in self.subvault_adapters:
+            if config.subvault_address.lower() == normalized_address:
+                return config
+        # Return default config: L1 chain, no additional adapters, don't skip idle_balances
+        return SubvaultAdapterConfig(
+            subvault_address=subvault_address,
+            chain="l1",
+            additional_adapters=[],
+            skip_idle_balances=False,
+        )
 
     def as_safe_dict(self) -> dict[str, object]:
         """Return the config as a dict with secrets redacted."""

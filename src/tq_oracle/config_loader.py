@@ -14,10 +14,72 @@ import tomllib
 from pathlib import Path
 from typing import Any, Optional
 
-from .config import OracleCLIConfig
+from .config import OracleCLIConfig, SubvaultAdapterConfig
+from .adapters.asset_adapters import ADAPTER_REGISTRY
 
 
 SECRET_FIELDS = {"private_key", "safe_txn_srvc_api_key"}
+
+
+def parse_subvault_adapters(
+    raw_configs: list[dict[str, Any]],
+) -> list[SubvaultAdapterConfig]:
+    """Parse and normalize subvault adapter configurations from TOML.
+
+    Args:
+        raw_configs: List of dicts from TOML [[subvault_adapters]] sections
+
+    Returns:
+        List of SubvaultAdapterConfig objects
+
+    Raises:
+        ValueError: If an invalid adapter name or chain is specified
+    """
+
+    def validate_and_normalize_adapter(adapter_name: Any) -> str:
+        """Validate and normalize a single adapter name."""
+        if not isinstance(adapter_name, str):
+            raise ValueError(
+                f"Invalid adapter specification: {adapter_name}. "
+                "Must be a string (adapter name)."
+            )
+        normalized = adapter_name.lower()
+        if normalized not in ADAPTER_REGISTRY:
+            valid_adapters = ", ".join(ADAPTER_REGISTRY.keys())
+            raise ValueError(
+                f"Invalid adapter '{adapter_name}'. "
+                f"Available adapters: {valid_adapters}"
+            )
+        return normalized
+
+    def parse_single_config(raw_config: dict[str, Any]) -> SubvaultAdapterConfig:
+        """Parse and validate a single subvault adapter configuration."""
+        subvault_address = raw_config.get("subvault_address", "").lower()
+        if not subvault_address:
+            raise ValueError("subvault_address is required in [[subvault_adapters]]")
+
+        chain = raw_config.get("chain", "l1").lower()
+        if chain not in ("l1", "hyperliquid"):
+            raise ValueError(
+                f"Invalid chain '{chain}' for subvault {subvault_address}. "
+                "Must be 'l1' or 'hyperliquid'."
+            )
+
+        additional_adapters_raw = raw_config.get("additional_adapters", [])
+        skip_idle_balances = raw_config.get("skip_idle_balances", False)
+
+        adapter_names = [
+            validate_and_normalize_adapter(name) for name in additional_adapters_raw
+        ]
+
+        return SubvaultAdapterConfig(
+            subvault_address=subvault_address,
+            chain=chain,
+            additional_adapters=adapter_names,
+            skip_idle_balances=skip_idle_balances,
+        )
+
+    return [parse_single_config(raw_config) for raw_config in raw_configs]
 
 
 def _check_for_secrets(data: dict[str, Any], path: str = "") -> None:
@@ -91,6 +153,10 @@ def load_toml_config(config_path: Path) -> dict[str, Any]:
         raw_config = tomllib.load(f)
 
     _check_for_secrets(raw_config)
+
+    if "subvault_adapters" in raw_config:
+        raw_adapters = raw_config.pop("subvault_adapters")
+        raw_config["subvault_adapters"] = parse_subvault_adapters(raw_adapters)
 
     return raw_config
 

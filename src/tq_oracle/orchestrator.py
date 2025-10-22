@@ -3,10 +3,14 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+from web3 import Web3
+
 from .constants import ETH_ASSET
 from .adapters.price_adapters.base import PriceData
-from .adapters import ASSET_ADAPTERS, PRICE_ADAPTERS
-from .adapters.asset_adapters.base import AssetData
+from .adapters import PRICE_ADAPTERS
+from .adapters.asset_adapters import get_adapter_class
+from .adapters.asset_adapters.base import AssetData, BaseAssetAdapter
+from .adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from .checks.pre_checks import PreCheckError, run_pre_checks
 from .checks.price_validators import PriceValidationError, run_price_validations
 from .logger import get_logger
@@ -15,6 +19,7 @@ from .processors import (
     derive_final_prices,
     calculate_total_assets,
 )
+from .abi import load_vault_abi
 
 from .report import generate_report, publish_report
 
@@ -22,6 +27,34 @@ if TYPE_CHECKING:
     from .config import OracleCLIConfig
 
 logger = get_logger(__name__)
+
+
+async def _fetch_subvault_addresses(config: OracleCLIConfig) -> list[str]:
+    """Discover all subvault addresses from the vault contract.
+
+    Args:
+        config: CLI configuration containing vault address and RPC endpoint
+
+    Returns:
+        List of subvault addresses
+    """
+    w3 = Web3(Web3.HTTPProvider(config.l1_rpc_required))
+    vault_abi = load_vault_abi()
+    vault_address = w3.to_checksum_address(config.vault_address_required)
+    contract = w3.eth.contract(address=vault_address, abi=vault_abi)
+
+    count = await asyncio.to_thread(contract.functions.subvaults().call)
+    logger.debug("Vault has %d subvaults", count)
+
+    # Fetch all subvault addresses in parallel to avoid thread pool exhaustion
+    subvault_addresses = await asyncio.gather(
+        *[
+            asyncio.to_thread(contract.functions.subvaultAt(i).call)
+            for i in range(count)
+        ]
+    )
+
+    return list(subvault_addresses)
 
 
 async def execute_oracle_flow(config: OracleCLIConfig) -> None:
@@ -90,26 +123,113 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
             )
             await asyncio.sleep(config.pre_check_timeout)
 
-    logger.info("Initializing %d asset adapters", len(ASSET_ADAPTERS))
-    asset_adapters = [AdapterClass(config) for AdapterClass in ASSET_ADAPTERS]
+    logger.info("Discovering subvaults from vault contract...")
+    subvault_addresses = await _fetch_subvault_addresses(config)
+    logger.info("Found %d subvaults", len(subvault_addresses))
 
-    logger.info("Fetching assets from %d adapters in parallel...", len(asset_adapters))
-    vault_address = config.vault_address_required
-    asset_results = await asyncio.gather(
-        *[adapter.fetch_assets(vault_address) for adapter in asset_adapters],
+    # Validate subvault_adapters config references existing subvaults
+    if config.subvault_adapters:
+        normalized_subvault_addrs = {addr.lower() for addr in subvault_addresses}
+        invalid_subvaults = []
+        for sv_config in config.subvault_adapters:
+            if sv_config.subvault_address.lower() not in normalized_subvault_addrs:
+                invalid_subvaults.append(sv_config.subvault_address)
+
+        if invalid_subvaults:
+            raise ValueError(
+                f"Config specifies adapters for non-existent subvaults: "
+                f"{', '.join(invalid_subvaults)}"
+            )
+
+    # Collect asset fetching tasks
+    logger.info("Setting up asset adapters...")
+    asset_fetch_tasks = []
+
+    # 1. Add default L1 idle_balances (runs against ALL subvaults unless globally skipped)
+    #    Check if ANY subvault has skip_idle_balances=false (which means we should run it)
+    should_run_default_idle_balances = any(
+        not config.get_subvault_config(addr).skip_idle_balances
+        for addr in subvault_addresses
+    )
+
+    if should_run_default_idle_balances:
+        idle_l1_adapter = IdleBalancesAdapter(config, chain="l1")
+        asset_fetch_tasks.append(
+            ("idle_balances_l1", idle_l1_adapter.fetch_all_assets())
+        )
+        logger.debug("Added default L1 idle_balances adapter (all subvaults)")
+
+    # 2. Add additional adapters per subvault
+    def create_adapter_task(
+        subvault_addr: str, adapter_name: str
+    ) -> tuple[str, BaseAssetAdapter, str]:
+        """Create an adapter instance for the given subvault and adapter name."""
+        sv_config = config.get_subvault_config(subvault_addr)
+        adapter_class = get_adapter_class(adapter_name)
+        adapter = adapter_class(config, chain=sv_config.chain)
+
+        logger.debug(
+            "Subvault %s → additional adapter: %s (chain: %s)",
+            subvault_addr,
+            adapter_name,
+            sv_config.chain,
+        )
+        return (subvault_addr, adapter, adapter_name)
+
+    adapter_tasks: list[tuple[str, BaseAssetAdapter, str]] = [
+        create_adapter_task(subvault_addr, adapter_name)
+        for subvault_addr in subvault_addresses
+        for adapter_name in config.get_subvault_config(subvault_addr).additional_adapters
+    ]
+
+    # Fetch assets from all adapters in parallel
+    logger.info(
+        "Fetching assets: %d adapter tasks + %d additional per-subvault tasks...",
+        len(asset_fetch_tasks),
+        len(adapter_tasks),
+    )
+
+    # Execute default adapters
+    default_results = await asyncio.gather(
+        *[task for _, task in asset_fetch_tasks], return_exceptions=True
+    )
+
+    # Execute per-subvault adapters
+    per_subvault_results = await asyncio.gather(
+        *[
+            adapter.fetch_assets(subvault_addr)
+            for subvault_addr, adapter, _ in adapter_tasks
+        ],
         return_exceptions=True,
     )
 
     price_adapters = [AdapterClass(config) for AdapterClass in PRICE_ADAPTERS]
 
+    # Process default adapter results
     asset_data: list[list[AssetData]] = []
-    for adapter, result in zip(asset_adapters, asset_results):
+    for (name, _), result in zip(asset_fetch_tasks, default_results):
         if isinstance(result, Exception):
-            logger.error("Asset adapter '%s' failed: %s", adapter.adapter_name, result)
+            logger.error("Adapter '%s' failed: %s", name, result)
+        elif isinstance(result, list):
+            logger.debug("Adapter '%s' returned %d assets", name, len(result))
+            asset_data.append(result)
+
+    # Process per-subvault adapter results
+    for (subvault_addr, adapter, name), result in zip(
+        adapter_tasks, per_subvault_results
+    ):
+        if isinstance(result, Exception):
+            logger.error(
+                "Adapter '%s' failed for subvault %s: %s",
+                name,
+                subvault_addr,
+                result,
+            )
         elif isinstance(result, list):
             logger.debug(
-                "Asset adapter '%s' returned %d assets",
-                adapter.adapter_name,
+                "Adapter '%s' for subvault %s returned %d assets",
+                name,
+                subvault_addr,
                 len(result),
             )
             asset_data.append(result)
@@ -143,7 +263,7 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
 
     logger.info("Generating report...")
     report = await generate_report(
-        vault_address,
+        config.vault_address_required,
         aggregated,
         final_prices,
     )

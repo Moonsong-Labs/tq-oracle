@@ -12,7 +12,7 @@ from ...constants import (
     USDC_SEPOLIA,
 )
 from ...logger import get_logger
-from .base import AssetData, BaseAssetAdapter
+from .base import AssetData, BaseAssetAdapter, AdapterChain
 
 if TYPE_CHECKING:
     from ...config import OracleCLIConfig
@@ -23,13 +23,23 @@ logger = get_logger(__name__)
 class HyperliquidAdapter(BaseAssetAdapter):
     """Adapter for querying Hyperliquid protocol assets."""
 
-    def __init__(self, config: OracleCLIConfig):
-        super().__init__(config)
+    def __init__(self, config: OracleCLIConfig, chain: str = "hyperliquid"):
+        """Initialize the Hyperliquid adapter.
+
+        Args:
+            config: Oracle configuration
+            chain: Which chain to operate on (defaults to "hyperliquid")
+        """
+        super().__init__(config, chain=chain)
         self.testnet = config.testnet
 
     @property
     def adapter_name(self) -> str:
         return "hyperliquid"
+
+    @property
+    def chain(self) -> AdapterChain:
+        return AdapterChain.HYPERLIQUID
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch asset data from Hyperliquid for the given vault.
