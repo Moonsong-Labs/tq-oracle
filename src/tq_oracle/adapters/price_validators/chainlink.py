@@ -72,4 +72,4 @@ class ChainlinkValidator(BasePriceValidator):
         if actual_price == 0:
             raise ValueError("actual_price cannot be zero")
 
-        return float(abs((reference_price - actual_price) * 100 // actual_price))
+        return abs((reference_price - actual_price) / actual_price * 100)
