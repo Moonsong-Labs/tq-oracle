@@ -84,6 +84,11 @@ def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
 
 
 def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
-    """Encode asset prices for OracleHelper contract."""
-    asset_prices = sorted(prices.prices.items(), key=lambda item: item[0])
+    """Encode asset prices for OracleHelper contract.
+
+    Sorts addresses numerically (as integers) to match Solidity's address comparison.
+    Python's default string sort is case-sensitive and doesn't match Solidity's behavior.
+    """
+    # Sort by numeric value of address (as Solidity does), not lexicographically
+    asset_prices = sorted(prices.prices.items(), key=lambda item: int(item[0], 16))
     return EncodedAssetPrices(asset_prices=asset_prices)
