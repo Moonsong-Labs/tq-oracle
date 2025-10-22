@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import backoff
 from web3 import Web3
 
 from .constants import ETH_ASSET
-from .adapters.price_adapters.base import PriceData
+from .adapters.price_adapters.base import BasePriceAdapter, PriceData
 from .adapters import PRICE_ADAPTERS
 from .adapters.asset_adapters import get_adapter_class
 from .adapters.asset_adapters.base import AssetData, BaseAssetAdapter
@@ -27,6 +28,47 @@ if TYPE_CHECKING:
     from .config import OracleCLIConfig
 
 logger = get_logger(__name__)
+
+
+def _process_adapter_results(
+    tasks_info: list[Any],
+    results: tuple[BaseException | list[AssetData], ...],
+    asset_data: list[list[AssetData]],
+) -> None:
+    """Process asyncio.gather results from adapter tasks.
+
+    Args:
+        tasks_info: List of task information tuples (varying structure)
+        results: Results from asyncio.gather (may contain exceptions)
+        asset_data: List to append successful asset results to
+    """
+    for task_info, result in zip(tasks_info, results):
+        match result:
+            case Exception() as e:
+                if len(task_info) == 2:  # (name, _)
+                    name = task_info[0]
+                    logger.error("Adapter '%s' failed: %s", name, e)
+                elif len(task_info) == 3:  # (subvault_addr, adapter, name)
+                    subvault_addr, _, name = task_info
+                    logger.error(
+                        "Adapter '%s' failed for subvault %s: %s",
+                        name,
+                        subvault_addr,
+                        e,
+                    )
+            case list() as assets:
+                if len(task_info) == 2:  # (name, _)
+                    name = task_info[0]
+                    logger.debug("Adapter '%s' returned %d assets", name, len(assets))
+                elif len(task_info) == 3:  # (subvault_addr, adapter, name)
+                    subvault_addr, _, name = task_info
+                    logger.debug(
+                        "Adapter '%s' for subvault %s returned %d assets",
+                        name,
+                        subvault_addr,
+                        len(assets),
+                    )
+                asset_data.append(assets)
 
 
 async def _fetch_subvault_addresses(config: OracleCLIConfig) -> list[str]:
@@ -81,47 +123,46 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
         config.pre_check_timeout,
     )
 
-    retry_count = 0
+    def _should_giveup(e: Exception) -> bool:
+        """Determine if we should give up retrying based on the exception."""
+        return isinstance(e, PreCheckError) and not e.retry_recommended
 
-    while retry_count <= config.pre_check_retries:
-        try:
-            if retry_count > 0:
-                logger.info(
-                    "Pre-check retry attempt %d of %d...",
-                    retry_count,
-                    config.pre_check_retries,
-                )
+    def _on_backoff(details: Any) -> None:
+        """Log retry attempts."""
+        logger.warning(
+            "Pre-check failed (attempt %d of %d): %s",
+            details["tries"],
+            config.pre_check_retries + 1,
+            details.get("exception", details.get("value")),
+        )
 
-            await run_pre_checks(config, config.vault_address_required)
-            logger.info("Pre-checks passed successfully")
-            break
-
-        except PreCheckError as e:
-            if not e.retry_recommended:
-                logger.error("Pre-check failed (retry not recommended): %s", e)
-                raise
-
-            retry_count += 1
-
-            if retry_count > config.pre_check_retries:
-                logger.error(
-                    "Pre-checks failed after %d attempts: %s",
-                    config.pre_check_retries + 1,
-                    e,
-                )
-                raise
-
-            logger.warning(
-                "Pre-check failed (attempt %d of %d): %s",
-                retry_count,
-                config.pre_check_retries + 1,
-                e,
+    def _on_giveup(details: Any) -> None:
+        """Log when we give up retrying."""
+        exc = details.get("exception", details.get("value"))
+        if isinstance(exc, PreCheckError) and not exc.retry_recommended:
+            logger.error("Pre-check failed (retry not recommended): %s", exc)
+        else:
+            logger.error(
+                "Pre-checks failed after %d attempts: %s",
+                details["tries"],
+                exc,
             )
-            logger.info(
-                "Waiting %.1f seconds before retry...",
-                config.pre_check_timeout,
-            )
-            await asyncio.sleep(config.pre_check_timeout)
+
+    @backoff.on_exception(
+        backoff.constant,
+        PreCheckError,
+        max_tries=config.pre_check_retries + 1,
+        interval=config.pre_check_timeout,
+        giveup=_should_giveup,
+        on_backoff=_on_backoff,
+        on_giveup=_on_giveup,
+    )
+    async def _run_pre_checks_with_retry() -> None:
+        """Run pre-checks with automatic retry on retriable errors."""
+        await run_pre_checks(config, config.vault_address_required)
+
+    await _run_pre_checks_with_retry()
+    logger.info("Pre-checks passed successfully")
 
     logger.info("Discovering subvaults from vault contract...")
     subvault_addresses = await _fetch_subvault_addresses(config)
@@ -218,42 +259,19 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
         return_exceptions=True,
     )
 
-    price_adapters = [AdapterClass(config) for AdapterClass in PRICE_ADAPTERS]
+    price_adapters: list[BasePriceAdapter] = [
+        AdapterClass(config) for AdapterClass in PRICE_ADAPTERS
+    ]
 
-    # Process default adapter results
     asset_data: list[list[AssetData]] = []
-    for (name, _), result in zip(asset_fetch_tasks, default_results):
-        if isinstance(result, Exception):
-            logger.error("Adapter '%s' failed: %s", name, result)
-        elif isinstance(result, list):
-            logger.debug("Adapter '%s' returned %d assets", name, len(result))
-            asset_data.append(result)
-
-    # Process per-subvault adapter results
-    for (subvault_addr, adapter, name), result in zip(
-        adapter_tasks, per_subvault_results
-    ):
-        if isinstance(result, Exception):
-            logger.error(
-                "Adapter '%s' failed for subvault %s: %s",
-                name,
-                subvault_addr,
-                result,
-            )
-        elif isinstance(result, list):
-            logger.debug(
-                "Adapter '%s' for subvault %s returned %d assets",
-                name,
-                subvault_addr,
-                len(result),
-            )
-            asset_data.append(result)
+    _process_adapter_results(asset_fetch_tasks, default_results, asset_data)
+    _process_adapter_results(adapter_tasks, per_subvault_results, asset_data)
 
     logger.info("Computing agreggated assets...")
     aggregated = await compute_total_aggregated_assets(asset_data)
     logger.debug("Total aggregated assets: %d", len(aggregated.assets))
 
-    asset_addresses = list(aggregated.assets.keys())
+    asset_addresses = list(aggregated.assets)
 
     logger.info("Fetching prices for %d assets...", len(asset_addresses))
     price_data: PriceData = PriceData(base_asset=ETH_ASSET, prices={})
