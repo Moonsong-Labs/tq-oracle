@@ -41,7 +41,7 @@ class WstETHAdapter(BasePriceAdapter):
 
         Notes:
             - Only ETH as base asset is supported.
-            - ETH is the base asset and is set to 0.
+            - ETH is the base asset and is set to 1.
             - WETH is 1:1 with ETH (10**18).
             - wstETH price is derived from the wstETH contract's getStETHByWstETH function.
         """
@@ -53,7 +53,7 @@ class WstETHAdapter(BasePriceAdapter):
         has_wsteth = self.wsteth_address in asset_addresses
 
         if has_eth:
-            prices_accumulator.prices[ETH_ASSET] = 0
+            prices_accumulator.prices[ETH_ASSET] = 1
 
         if has_weth:
             prices_accumulator.prices[self.weth_address] = 10**18

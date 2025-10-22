@@ -84,6 +84,12 @@ def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
 
 
 def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
-    """Encode asset prices for OracleHelper contract."""
+    """Encode asset prices for OracleHelper contract.
+
+    Always sets the base asset to price 0.
+    """
+    if prices.base_asset in prices.prices:
+        prices.prices[prices.base_asset] = 0
+
     asset_prices = sorted(prices.prices.items(), key=lambda item: item[0])
     return EncodedAssetPrices(asset_prices=asset_prices)
