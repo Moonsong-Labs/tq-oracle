@@ -32,6 +32,8 @@ class OracleCLIConfig:
     rpc_max_concurrent_calls: int = 5
     rpc_delay: float = 0.15
     rpc_jitter: float = 0.10
+    chainlink_price_warning_tolerance_percentage: float = 0.5
+    chainlink_price_failure_tolerance_percentage: float = 1.0
 
     @property
     def chain_id(self) -> int:

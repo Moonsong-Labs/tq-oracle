@@ -149,6 +149,20 @@ def report(
             help="Timeout in seconds between pre-check retries (default: 12.0).",
         ),
     ] = 12.0,
+    chainlink_price_warning_tolerance_percentage: Annotated[
+        float,
+        typer.Option(
+            "--chainlink-warning-tolerance",
+            help="Chainlink price deviation percentage to trigger warning (default: 0.5).",
+        ),
+    ] = 0.5,
+    chainlink_price_failure_tolerance_percentage: Annotated[
+        float,
+        typer.Option(
+            "--chainlink-failure-tolerance",
+            help="Chainlink price deviation percentage to fail validation (default: 1.0).",
+        ),
+    ] = 1.0,
 ) -> None:
     """Collect TVL data and submit via Safe (optional)."""
     if not dry_run and not safe_address and not private_key:
@@ -194,6 +208,8 @@ def report(
         ignore_active_proposal_check=ignore_active_proposal_check,
         pre_check_retries=pre_check_retries,
         pre_check_timeout=pre_check_timeout,
+        chainlink_price_warning_tolerance_percentage=chainlink_price_warning_tolerance_percentage,
+        chainlink_price_failure_tolerance_percentage=chainlink_price_failure_tolerance_percentage,
     )
 
     asyncio.run(execute_oracle_flow(config))
