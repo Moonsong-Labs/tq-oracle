@@ -188,8 +188,12 @@ def report(
     cli_args["ignore_active_proposal_check"] = ignore_active_proposal_check
     cli_args["pre_check_retries"] = pre_check_retries
     cli_args["pre_check_timeout"] = pre_check_timeout
-    cli_args["chainlink_price_warning_tolerance_percentage"] = chainlink_price_warning_tolerance_percentage
-    cli_args["chainlink_price_failure_tolerance_percentage"] = chainlink_price_failure_tolerance_percentage
+    cli_args["chainlink_price_warning_tolerance_percentage"] = (
+        chainlink_price_warning_tolerance_percentage
+    )
+    cli_args["chainlink_price_failure_tolerance_percentage"] = (
+        chainlink_price_failure_tolerance_percentage
+    )
 
     try:
         cfg = build_config(config_file_path=config, **cli_args)
