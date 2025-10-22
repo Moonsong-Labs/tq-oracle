@@ -64,6 +64,10 @@ async def execute_oracle_flow(config: OracleCLIConfig) -> None:
             break
 
         except PreCheckError as e:
+            if not e.retry_recommended:
+                logger.error("Pre-check failed (retry not recommended): %s", e)
+                raise
+
             retry_count += 1
 
             if retry_count > config.pre_check_retries:

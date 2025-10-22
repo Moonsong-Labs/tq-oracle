@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 class PreCheckError(Exception):
     """Raised when a pre-check fails and execution should stop."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, retry_recommended: bool = False):
         super().__init__(message)
+        self.retry_recommended = retry_recommended
 
 
 async def run_pre_checks(
@@ -47,6 +48,7 @@ async def run_pre_checks(
     )
 
     failed_checks = []
+    retry_recommended = False
     for adapter, result in zip(adapters, results):
         if isinstance(result, Exception):
             logger.error(f"Check '{adapter.name}' raised exception: {result}")
@@ -59,7 +61,10 @@ async def run_pre_checks(
             else:
                 logger.warning(f"✗ {adapter.name}: {result.message}")
                 failed_checks.append(result.message)
+                # Retry if ANY failed check recommends it
+                if result.retry_recommended:
+                    retry_recommended = True
 
     if failed_checks:
         error_msg = f"Pre-checks failed: {'; '.join(failed_checks)}"
-        raise PreCheckError(error_msg)
+        raise PreCheckError(error_msg, retry_recommended=retry_recommended)
