@@ -146,7 +146,7 @@ async def test_fetch_prices_usdc_and_usdt_integration(
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_usdt_not_supported_on_testnet(usdt_address):
+async def test_fetch_prices_usdt_not_supported_on_testnet(eth_address, usdt_address):
     testnet_config = OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
@@ -162,7 +162,6 @@ async def test_fetch_prices_usdt_not_supported_on_testnet(usdt_address):
         safe_txn_srvc_api_key=None,
     )
     adapter = ChainlinkAdapter(testnet_config)
-    eth_address = testnet_config.assets["ETH"]
     result = await adapter.fetch_prices(
         [usdt_address], PriceData(base_asset=eth_address, prices={})
     )
@@ -211,7 +210,7 @@ async def test_fetch_prices_all_stablecoins_integration(
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_usds_not_supported_on_testnet(usds_address):
+async def test_fetch_prices_usds_not_supported_on_testnet(eth_address, usds_address):
     testnet_config = OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
@@ -227,7 +226,6 @@ async def test_fetch_prices_usds_not_supported_on_testnet(usds_address):
         safe_txn_srvc_api_key=None,
     )
     adapter = ChainlinkAdapter(testnet_config)
-    eth_address = testnet_config.assets["ETH"]
     result = await adapter.fetch_prices(
         [usds_address], PriceData(base_asset=eth_address, prices={})
     )
