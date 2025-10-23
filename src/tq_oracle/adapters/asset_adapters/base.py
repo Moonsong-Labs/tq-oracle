@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol
 from ...settings import OracleSettings
 
 
@@ -20,31 +19,6 @@ class AssetData:
 
     asset_address: str
     amount: int  # in native units
-
-
-class AssetAdapter(Protocol):
-    """Protocol defining the interface for asset adapters."""
-
-    @property
-    def adapter_name(self) -> str:
-        """Return the name of this adapter."""
-        ...
-
-    @property
-    def chain(self) -> AdapterChain:
-        """Return which chain this adapter operates on."""
-        ...
-
-    async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
-        """Fetch asset data for the given vault.
-
-        Args:
-            subvault_address: The subvault contract address to query
-
-        Returns:
-            List of asset data from this protocol
-        """
-        ...
 
 
 class BaseAssetAdapter(ABC):
