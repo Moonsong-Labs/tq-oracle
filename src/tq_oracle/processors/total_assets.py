@@ -12,10 +12,11 @@ def calculate_total_assets(
     if missing_assets:
         raise ValueError(f"Prices missing for assets: {sorted(missing_assets)}")
 
-    invalid_prices = []
-    for asset, price in prices.prices.items():
-        if price <= 0:
-            invalid_prices.append((asset, price))
+    invalid_prices = [
+        (asset_address, price)
+        for asset_address, price in prices.prices.items()
+        if price <= 0
+    ]
 
     if invalid_prices:
         invalid_details = ", ".join(
