@@ -2,13 +2,13 @@ import pytest
 
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
-from tq_oracle.config import OracleCLIConfig
-from tq_oracle.config import Network
+from tq_oracle.settings import OracleSettings
+from tq_oracle.settings import Network
 
 
 @pytest.fixture
 def config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",
@@ -147,7 +147,7 @@ async def test_fetch_prices_usdc_and_usdt_integration(
 
 @pytest.mark.asyncio
 async def test_fetch_prices_usdt_not_supported_on_testnet(eth_address, usdt_address):
-    testnet_config = OracleCLIConfig(
+    testnet_config = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://sepolia.drpc.org",
@@ -211,7 +211,7 @@ async def test_fetch_prices_all_stablecoins_integration(
 
 @pytest.mark.asyncio
 async def test_fetch_prices_usds_not_supported_on_testnet(eth_address, usds_address):
-    testnet_config = OracleCLIConfig(
+    testnet_config = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://sepolia.drpc.org",

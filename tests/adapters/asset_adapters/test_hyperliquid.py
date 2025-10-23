@@ -4,7 +4,7 @@ import pytest
 import time
 
 from tq_oracle.adapters.asset_adapters.hyperliquid import HyperliquidAdapter
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 from tq_oracle.constants import (
     HL_MAINNET_API_URL,
     HL_TESTNET_API_URL,
@@ -15,7 +15,7 @@ from tq_oracle.config import Network
 
 @pytest.fixture
 def mainnet_config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://mainnet.rpc",
@@ -33,7 +33,7 @@ def mainnet_config():
 
 @pytest.fixture
 def testnet_config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://testnet.rpc",
@@ -302,7 +302,7 @@ async def test_amount_precision_conversion(mainnet_config):
 @pytest.mark.asyncio
 async def test_hl_subvault_address_from_config_overrides_parameter(mainnet_config):
     """Config's hl_subvault_address should override the fetch_assets parameter."""
-    config_with_subvault = OracleCLIConfig(
+    config_with_subvault = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://mainnet.rpc",

@@ -16,7 +16,7 @@ from ...units import scale_to_18
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 
 class ChainlinkAdapter(BasePriceAdapter):
@@ -24,7 +24,7 @@ class ChainlinkAdapter(BasePriceAdapter):
 
     eth_address: str
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
         assets = config.assets

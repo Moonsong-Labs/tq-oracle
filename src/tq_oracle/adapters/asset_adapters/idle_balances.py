@@ -21,7 +21,7 @@ from ...abi import (
 from .base import AssetData, BaseAssetAdapter, AdapterChain
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 logger = get_logger(__name__)
 
@@ -32,7 +32,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     eth_address: str
     usdc_address: str
 
-    def __init__(self, config: OracleCLIConfig, chain: str = "l1"):
+    def __init__(self, config: OracleSettings, chain: str = "l1"):
         """Initialize the adapter.
 
         Args:

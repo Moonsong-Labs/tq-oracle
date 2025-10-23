@@ -25,7 +25,7 @@ from tq_oracle.constants import (
 )
 
 if TYPE_CHECKING:
-    from tq_oracle.config import OracleCLIConfig
+    from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         "mainnet": TOKEN_MESSENGER_V2_PROD,
     }
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self._config = config
         self.testnet = config.testnet

@@ -11,7 +11,7 @@ from ...config import Network
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 
 class CowSwapAdapter(BasePriceAdapter):
@@ -25,7 +25,7 @@ class CowSwapAdapter(BasePriceAdapter):
         Network.BASE: "https://api.cow.fi/base/api/v1",
     }
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self.api_base_url = self.NETWORK_API_URLS[config.network]
         assets = config.assets

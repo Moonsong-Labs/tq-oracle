@@ -8,7 +8,7 @@ from ...abi import load_wsteth_abi
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 
 class WstETHAdapter(BasePriceAdapter):
@@ -16,7 +16,7 @@ class WstETHAdapter(BasePriceAdapter):
 
     eth_address: str
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
         assets = config.assets

@@ -4,13 +4,13 @@ import pytest
 
 from tq_oracle.adapters.check_adapters.base import CheckResult
 from tq_oracle.checks.pre_checks import PreCheckError, run_pre_checks
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 
 
 @pytest.fixture
 def config():
     """Minimal config for testing."""
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
         l1_rpc="https://eth.example",

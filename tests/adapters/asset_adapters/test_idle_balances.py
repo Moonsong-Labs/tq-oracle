@@ -2,13 +2,13 @@ import pytest
 
 from tq_oracle.adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from tq_oracle.adapters.asset_adapters.base import AssetData
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 from tq_oracle.constants import ETH_ASSET, USDC_HL_MAINNET, HL_PROD_EVM_RPC
 
 
 @pytest.fixture
 def config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",
@@ -114,7 +114,7 @@ async def test_fetch_eth_balance_integration(config):
 
 @pytest.fixture
 def hl_config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",

@@ -16,7 +16,7 @@ from ...logger import get_logger
 from .base import AssetData, BaseAssetAdapter, AdapterChain
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 logger = get_logger(__name__)
 
@@ -33,7 +33,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
 
     usdc_address: str
 
-    def __init__(self, config: OracleCLIConfig, chain: str = "hyperliquid"):
+    def __init__(self, config: OracleSettings, chain: str = "hyperliquid"):
         """Initialize the Hyperliquid adapter.
 
         Args:

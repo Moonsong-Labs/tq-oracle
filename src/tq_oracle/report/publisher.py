@@ -17,7 +17,7 @@ from web3 import Web3
 from ..safe.transaction_builder import encode_submit_reports
 
 if TYPE_CHECKING:
-    from ..config import OracleCLIConfig
+    from ..settings import OracleSettings
     from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ async def publish_to_stdout(report: OracleReport) -> None:
 
 
 async def build_transaction(
-    config: OracleCLIConfig,
+    config: OracleSettings,
     report: OracleReport,
 ) -> dict[str, str | bytes | int]:
     """Build a submitReports() transaction.
@@ -65,7 +65,7 @@ async def build_transaction(
 
 
 async def send_to_safe(
-    config: OracleCLIConfig,
+    config: OracleSettings,
     transaction: dict[str, str | bytes | int],
 ) -> str:
     """Send transaction to Gnosis Safe for signing.
@@ -88,14 +88,24 @@ async def send_to_safe(
     if not config.private_key:
         raise ValueError("private_key required for Broadcast mode")
 
-    account: LocalAccount = Account.from_key(config.private_key)  # type: ignore[arg-type]
+    private_key_str = (
+        config.private_key.get_secret_value() if config.private_key else None
+    )
+    if not private_key_str:
+        raise ValueError("private_key required for Broadcast mode")
+
+    account: LocalAccount = Account.from_key(private_key_str)  # pyrefly: ignore
     logger.info("Proposing transaction as: %s", account.address)
 
     network = EthereumNetwork(config.chain_id)
     ethereum_client = EthereumClient(URI(config.l1_rpc_required))
-    tx_service = TransactionServiceApi(
-        network, ethereum_client, api_key=config.safe_txn_srvc_api_key
+
+    api_key = (
+        config.safe_txn_srvc_api_key.get_secret_value()
+        if config.safe_txn_srvc_api_key
+        else None
     )
+    tx_service = TransactionServiceApi(network, ethereum_client, api_key=api_key)
 
     safe_checksum = Web3.to_checksum_address(config.safe_address)
 
@@ -145,7 +155,7 @@ async def send_to_safe(
         chain_id=config.chain_id,
     )
 
-    safe_tx.sign(config.private_key)
+    safe_tx.sign(private_key_str)
 
     await asyncio.to_thread(tx_service.post_transaction, safe_tx)
 
@@ -171,7 +181,7 @@ async def send_to_safe(
 
 
 async def publish_report(
-    config: OracleCLIConfig,
+    config: OracleSettings,
     report: OracleReport,
 ) -> None:
     """Publish the oracle report based on configuration.

@@ -3,13 +3,13 @@ import pytest
 from tq_oracle.adapters.price_validators.chainlink import ChainlinkValidator
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
 from tq_oracle.adapters.price_adapters.base import PriceData
-from tq_oracle.config import OracleCLIConfig
-from tq_oracle.config import Network
+from tq_oracle.settings import OracleSettings
+from tq_oracle.settings import Network
 
 
 @pytest.fixture
 def config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",
