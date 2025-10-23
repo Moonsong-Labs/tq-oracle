@@ -69,4 +69,6 @@ class WstETHAdapter(BasePriceAdapter):
             wsteth_price = wsteth_contract.functions.getStETHByWstETH(10**18).call()
             prices_accumulator.prices[self.wsteth_address] = int(wsteth_price)
 
+        self.validate_prices(prices_accumulator)
+
         return prices_accumulator
