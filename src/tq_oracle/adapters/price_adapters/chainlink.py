@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from web3 import Web3
 
 from ...abi import load_aggregator_abi
 from ...constants import (
-    ETH_ASSET,
-    USDC_MAINNET,
     PRICE_FEED_USDC_ETH,
-    USDC_SEPOLIA,
-    USDT_MAINNET,
     PRICE_FEED_USDT_ETH,
-    USDS_MAINNET,
     PRICE_FEED_USDS_USD,
     PRICE_FEED_ETH_USD,
 )
@@ -27,12 +22,22 @@ if TYPE_CHECKING:
 class ChainlinkAdapter(BasePriceAdapter):
     """Adapter for querying Chainlink price feeds."""
 
+    eth_address: str
+    usdc_address: Optional[str]
+    usdt_address: Optional[str]
+    usds_address: Optional[str]
+
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
-        self.usdc_address = USDC_SEPOLIA if config.testnet else USDC_MAINNET
-        self.usdt_address = None if config.testnet else USDT_MAINNET
-        self.usds_address = None if config.testnet else USDS_MAINNET
+        assets = config.assets
+        eth_address = assets["ETH"]
+        if eth_address is None:
+            raise ValueError("ETH address is required for Chainlink adapter")
+        self.eth_address = eth_address
+        self.usdc_address = assets["USDC"]
+        self.usdt_address = assets["USDT"]
+        self.usds_address = assets["USDS"]
 
     @property
     def adapter_name(self) -> str:
@@ -62,7 +67,7 @@ class ChainlinkAdapter(BasePriceAdapter):
             - For assets without direct ETH price feeds, derives prices by
               combining USD-denominated feeds (e.g., USDS/USD ÷ ETH/USD).
         """
-        if prices_accumulator.base_asset != ETH_ASSET:
+        if prices_accumulator.base_asset != self.eth_address:
             raise ValueError("Chainlink adapter only supports ETH as base asset")
 
         direct_feed_assets = [
