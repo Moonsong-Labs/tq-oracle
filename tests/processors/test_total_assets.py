@@ -92,3 +92,26 @@ def test_calculate_total_assets_with_extra_prices():
     result = calculate_total_assets(aggregated, prices)
 
     assert result == (2 * 10**18) + (3 * 2 * 10**18)
+
+
+def test_calculate_total_assets_invalid_prices_raises():
+    aggregated = AggregatedAssets(
+        assets={
+            "0xA": 1,
+            "0xB": 1,
+            "0xC": 1,
+        }
+    )
+    prices = PriceData(
+        base_asset="0xA",
+        prices={
+            "0xA": 10**18,
+            "0xB": 0,
+            "0xC": -100,
+        },
+    )
+
+    with pytest.raises(
+        ValueError, match=r"Invalid prices for assets: 0xB: 0, 0xC: -100"
+    ):
+        calculate_total_assets(aggregated, prices)

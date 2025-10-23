@@ -10,8 +10,6 @@ from hyperliquid.info import Info
 from ...constants import (
     HL_MAINNET_API_URL,
     HL_TESTNET_API_URL,
-    USDC_MAINNET,
-    USDC_SEPOLIA,
     HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
 from ...logger import get_logger
@@ -33,6 +31,8 @@ class HyperliquidAdapter(BaseAssetAdapter):
     Raises ValueError on empty/invalid history or stale portfolio values.
     """
 
+    usdc_address: str
+
     def __init__(self, config: OracleSettings, chain: str = "hyperliquid"):
         """Initialize the Hyperliquid adapter.
 
@@ -41,6 +41,11 @@ class HyperliquidAdapter(BaseAssetAdapter):
             chain: Which chain to operate on (defaults to "hyperliquid")
         """
         super().__init__(config, chain=chain)
+        assets = config.assets
+        usdc_address = assets["USDC"]
+        if usdc_address is None:
+            raise ValueError("USDC address is required for Hyperliquid adapter")
+        self.usdc_address = usdc_address
         self.testnet = config.testnet
 
     @property
@@ -150,14 +155,13 @@ class HyperliquidAdapter(BaseAssetAdapter):
             )
 
             amount_native = int(latest_value * 1e18)
-            usdc_address = USDC_SEPOLIA if self.testnet else USDC_MAINNET
 
-            logger.debug("Using USDC address: %s", usdc_address)
+            logger.debug("Using USDC address: %s", self.usdc_address)
             logger.debug("Native amount: %d", amount_native)
 
             return [
                 AssetData(
-                    asset_address=usdc_address,
+                    asset_address=self.usdc_address,
                     amount=amount_native,
                 )
             ]

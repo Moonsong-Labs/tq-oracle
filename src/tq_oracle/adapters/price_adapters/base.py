@@ -57,3 +57,28 @@ class BasePriceAdapter(ABC):
     ) -> PriceData:
         """Fetch prices for the given asset addresses."""
         ...
+
+    def validate_prices(self, price_data: PriceData) -> None:
+        """Validate prices and raise an exception if any prices are non-positive.
+        Called after fetching prices to ensure all prices are positive.
+
+        Args:
+            price_data: The accumulated price data from all price adapters
+
+        Returns:
+            None
+        """
+
+        invalid_prices = [
+            (asset_address, price)
+            for asset_address, price in price_data.prices.items()
+            if price <= 0
+        ]
+
+        if invalid_prices:
+            invalid_details = ", ".join(
+                f"{addr}: {price}" for addr, price in invalid_prices
+            )
+            raise ValueError(
+                f"Found {len(invalid_prices)} asset(s) with non-positive prices: {invalid_details}"
+            )

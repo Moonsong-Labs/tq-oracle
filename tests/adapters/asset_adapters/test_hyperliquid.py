@@ -8,10 +8,9 @@ from tq_oracle.settings import OracleSettings
 from tq_oracle.constants import (
     HL_MAINNET_API_URL,
     HL_TESTNET_API_URL,
-    USDC_MAINNET,
-    USDC_SEPOLIA,
     HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
+from tq_oracle.settings import Network
 
 
 @pytest.fixture
@@ -20,6 +19,7 @@ def mainnet_config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://mainnet.rpc",
+        network=Network.MAINNET,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
@@ -37,6 +37,7 @@ def testnet_config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://testnet.rpc",
+        network=Network.SEPOLIA,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
@@ -48,8 +49,22 @@ def testnet_config():
     )
 
 
+@pytest.fixture
+def mainnet_usdc_address(mainnet_config):
+    address = mainnet_config.assets["USDC"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def testnet_usdc_address(testnet_config):
+    address = testnet_config.assets["USDC"]
+    assert address is not None
+    return address
+
+
 @pytest.mark.asyncio
-async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
+async def test_mainnet_uses_correct_api_and_usdc(mainnet_config, mainnet_usdc_address):
     """Mainnet config should use mainnet API URL and USDC address."""
     adapter = HyperliquidAdapter(mainnet_config)
 
@@ -67,11 +82,11 @@ async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
             base_url=HL_MAINNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == USDC_MAINNET
+        assert assets[0].asset_address == mainnet_usdc_address
 
 
 @pytest.mark.asyncio
-async def test_testnet_uses_correct_api_and_usdc(testnet_config):
+async def test_testnet_uses_correct_api_and_usdc(testnet_config, testnet_usdc_address):
     """Testnet config should use testnet API URL and USDC address."""
     adapter = HyperliquidAdapter(testnet_config)
 
@@ -89,7 +104,7 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
             base_url=HL_TESTNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == USDC_SEPOLIA
+        assert assets[0].asset_address == testnet_usdc_address
 
 
 @pytest.mark.asyncio

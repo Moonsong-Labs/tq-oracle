@@ -18,6 +18,16 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
+from enum import Enum
+
+from .constants import NetworkAssets
+
+
+class Network(str, Enum):
+    MAINNET = "mainnet"
+    SEPOLIA = "sepolia"
+    BASE = "base"
+
 
 class OracleSettings(BaseSettings):
     """Single source of truth for configuration. Values may come from:
@@ -36,6 +46,7 @@ class OracleSettings(BaseSettings):
     vault_address: str | None = None
     oracle_helper_address: str | None = None
     l1_rpc: str | None = None
+    network: Network = Network.MAINNET
 
     # --- hyperliquid ---
     hl_subvault_address: str | None = None
@@ -210,3 +221,23 @@ class OracleSettings(BaseSettings):
                 self.vault_address, self.l1_rpc
             )
         return self._oracle_address
+
+    @property
+    def assets(self) -> NetworkAssets:
+        """Get the assets for the configured network.
+
+        Returns:
+            NetworkAssets for the configured network
+        """
+        from .constants import ETH_MAINNET_ASSETS, SEPOLIA_ASSETS, BASE_ASSETS
+
+        network_assets_map = {
+            Network.MAINNET: ETH_MAINNET_ASSETS,
+            Network.SEPOLIA: SEPOLIA_ASSETS,
+            Network.BASE: BASE_ASSETS,
+        }
+
+        if self.network not in network_assets_map:
+            raise ValueError(f"Unknown network: {self.network}")
+
+        return network_assets_map[self.network]

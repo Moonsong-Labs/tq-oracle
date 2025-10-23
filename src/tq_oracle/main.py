@@ -20,6 +20,7 @@ from .constants import (
 )
 from .logger import setup_logging
 from .settings import OracleSettings
+from .settings import Network
 from .state import AppState
 
 app = typer.Typer(
@@ -52,6 +53,14 @@ def main(
             help="Path to a TOML config file (can include [tq_oracle] table).",
         ),
     ] = None,
+    network: Annotated[
+        Network,
+        typer.Option(
+            "--network",
+            "-n",
+            help="Network to use (mainnet, sepolia, or base).",
+        ),
+    ] = Network.MAINNET,
     testnet: Annotated[
         bool,
         typer.Option(
