@@ -92,4 +92,5 @@ def test_as_safe_dict_preserves_all_fields():
         "chainlink_price_failure_tolerance_percentage",
         "log_level",
         "subvault_adapters",
+        "network",
     }

@@ -4,6 +4,7 @@ from tq_oracle.constants import ETH_ASSET
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.chainlink import ChainlinkAdapter
 from tq_oracle.config import OracleCLIConfig
+from tq_oracle.config import Network
 
 
 @pytest.fixture
@@ -12,6 +13,7 @@ def config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",
+        network=Network.MAINNET,
         safe_address=None,
         l1_subvault_address=None,
         hl_rpc=None,
@@ -180,6 +182,7 @@ async def test_fetch_prices_usds_not_supported_on_testnet():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://sepolia.drpc.org",
+        network=Network.SEPOLIA,
         safe_address=None,
         l1_subvault_address=None,
         hl_rpc=None,

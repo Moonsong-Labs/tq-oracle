@@ -102,12 +102,12 @@ def test_calculate_price_deviation_percentage_zero_actual_price_raises_error(val
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usdc_integration(config):
+async def test_validate_prices_usdc_integration(config, eth_address, usdc_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=eth_address(config), prices={})
-    price_data = await cow_swap_adapter.fetch_prices([usdc_address(config)], price_data)
+    price_data = PriceData(base_asset=eth_address, prices={})
+    price_data = await cow_swap_adapter.fetch_prices([usdc_address], price_data)
 
     result = await validator.validate_prices(price_data)
 
@@ -117,12 +117,12 @@ async def test_validate_prices_usdc_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usdt_integration(config):
+async def test_validate_prices_usdt_integration(config, usdt_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=usdt_address(config), prices={})
-    price_data = await cow_swap_adapter.fetch_prices([usdt_address(config)], price_data)
+    price_data = PriceData(base_asset=usdt_address, prices={})
+    price_data = await cow_swap_adapter.fetch_prices([usdt_address], price_data)
 
     result = await validator.validate_prices(price_data)
 
@@ -132,12 +132,12 @@ async def test_validate_prices_usdt_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usds_integration(config):
+async def test_validate_prices_usds_integration(config, usds_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=usds_address(config), prices={})
-    price_data = await cow_swap_adapter.fetch_prices([usds_address(config)], price_data)
+    price_data = PriceData(base_asset=usds_address, prices={})
+    price_data = await cow_swap_adapter.fetch_prices([usds_address], price_data)
 
     result = await validator.validate_prices(price_data)
 
@@ -147,13 +147,15 @@ async def test_validate_prices_usds_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_all_stablecoins_integration(config):
+async def test_validate_prices_all_stablecoins_integration(
+    config, usdc_address, usdt_address, usds_address
+):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=usdc_address(config), prices={})
+    price_data = PriceData(base_asset=usdc_address, prices={})
     price_data = await cow_swap_adapter.fetch_prices(
-        [usdc_address(config), usdt_address(config), usds_address(config)], price_data
+        [usdc_address, usdt_address, usds_address], price_data
     )
 
     result = await validator.validate_prices(price_data)
@@ -164,13 +166,15 @@ async def test_validate_prices_all_stablecoins_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_fails_on_excessive_deviation(config):
+async def test_validate_prices_fails_on_excessive_deviation(
+    config, eth_address, usdc_address
+):
     validator = ChainlinkValidator(config)
 
     price_data = PriceData(
-        base_asset=eth_address(config),
+        base_asset=eth_address,
         prices={
-            usdc_address(config): 1000000000000000,
+            usdc_address: 1000000000000000,
         },
     )
 
@@ -178,12 +182,12 @@ async def test_validate_prices_fails_on_excessive_deviation(config):
 
     assert not result.passed
     assert "failure threshold" in result.message.lower()
-    assert usdc_address(config) in result.message
+    assert usdc_address in result.message
 
 
 @pytest.mark.asyncio
-async def test_validate_prices_passes_with_empty_prices(validator):
-    price_data = PriceData(base_asset=eth_address(config), prices={})
+async def test_validate_prices_passes_with_empty_prices(validator, eth_address):
+    price_data = PriceData(base_asset=eth_address, prices={})
 
     result = await validator.validate_prices(price_data)
 

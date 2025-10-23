@@ -50,14 +50,21 @@ def testnet_config():
 
 
 @pytest.fixture
-def usdc_address(config):
-    address = config.assets["USDC"]
+def mainnet_usdc_address(mainnet_config):
+    address = mainnet_config.assets["USDC"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def testnet_usdc_address(testnet_config):
+    address = testnet_config.assets["USDC"]
     assert address is not None
     return address
 
 
 @pytest.mark.asyncio
-async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
+async def test_mainnet_uses_correct_api_and_usdc(mainnet_config, mainnet_usdc_address):
     """Mainnet config should use mainnet API URL and USDC address."""
     adapter = HyperliquidAdapter(mainnet_config)
 
@@ -75,11 +82,11 @@ async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
             base_url=HL_MAINNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == usdc_address(mainnet_config)
+        assert assets[0].asset_address == mainnet_usdc_address
 
 
 @pytest.mark.asyncio
-async def test_testnet_uses_correct_api_and_usdc(testnet_config):
+async def test_testnet_uses_correct_api_and_usdc(testnet_config, testnet_usdc_address):
     """Testnet config should use testnet API URL and USDC address."""
     adapter = HyperliquidAdapter(testnet_config)
 
@@ -97,7 +104,7 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
             base_url=HL_TESTNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == usdc_address(testnet_config)
+        assert assets[0].asset_address == testnet_usdc_address
 
 
 @pytest.mark.asyncio

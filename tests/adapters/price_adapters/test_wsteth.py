@@ -52,12 +52,14 @@ async def test_adapter_name(config):
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(config):
+async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(
+    config, eth_address
+):
     adapter = WstETHAdapter(config)
     unsupported_address = "0xUnsupported"
 
     result = await adapter.fetch_prices(
-        [unsupported_address], PriceData(base_asset=eth_address(config), prices={})
+        [unsupported_address], PriceData(base_asset=eth_address, prices={})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 0
@@ -76,12 +78,14 @@ async def test_fetch_prices_raises_on_unsupported_base_asset(config):
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(config):
+async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(
+    config, eth_address
+):
     adapter = WstETHAdapter(config)
     unsupported_address = "0xUnsupported"
     result = await adapter.fetch_prices(
         [unsupported_address],
-        PriceData(base_asset=eth_address(config), prices={"0x111": 1}),
+        PriceData(base_asset=eth_address, prices={"0x111": 1}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
@@ -89,63 +93,65 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(config)
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_eth_returns_one(config):
+async def test_fetch_prices_eth_returns_one(config, eth_address):
     adapter = WstETHAdapter(config)
     result = await adapter.fetch_prices(
-        [eth_address(config)], PriceData(base_asset=eth_address(config), prices={})
+        [eth_address], PriceData(base_asset=eth_address, prices={})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
-    assert result.prices[eth_address(config)] == 1
+    assert result.prices[eth_address] == 1
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_weth_returns_one_to_one(config):
+async def test_fetch_prices_weth_returns_one_to_one(config, eth_address, weth_address):
     adapter = WstETHAdapter(config)
     result = await adapter.fetch_prices(
-        [weth_address(config)], PriceData(base_asset=eth_address(config), prices={})
+        [weth_address], PriceData(base_asset=eth_address, prices={})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
-    assert result.prices[weth_address(config)] == 10**18
+    assert result.prices[weth_address] == 10**18
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_all_three_assets(config):
+async def test_fetch_prices_all_three_assets(config, eth_address, weth_address):
     adapter = WstETHAdapter(config)
     result = await adapter.fetch_prices(
-        [eth_address(config), weth_address(config)],
-        PriceData(base_asset=eth_address(config), prices={}),
+        [eth_address, weth_address],
+        PriceData(base_asset=eth_address, prices={}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
-    assert result.prices[eth_address(config)] == 1
-    assert result.prices[weth_address(config)] == 10**18
+    assert result.prices[eth_address] == 1
+    assert result.prices[weth_address] == 10**18
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_preserves_existing_prices(config):
+async def test_fetch_prices_preserves_existing_prices(
+    config, eth_address, weth_address
+):
     adapter = WstETHAdapter(config)
     result = await adapter.fetch_prices(
-        [weth_address(config)],
-        PriceData(base_asset=eth_address(config), prices={"0x111": 123}),
+        [weth_address],
+        PriceData(base_asset=eth_address, prices={"0x111": 123}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
     assert result.prices["0x111"] == 123
-    assert result.prices[weth_address(config)] == 10**18
+    assert result.prices[weth_address] == 10**18
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_wsteth_integration(config):
+async def test_fetch_prices_wsteth_integration(config, eth_address, wsteth_address):
     adapter = WstETHAdapter(config)
     result = await adapter.fetch_prices(
-        [wsteth_address(config)], PriceData(base_asset=eth_address(config), prices={})
+        [wsteth_address], PriceData(base_asset=eth_address, prices={})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
-    price = result.prices[wsteth_address(config)]
+    price = result.prices[wsteth_address]
     assert isinstance(price, int)
     assert price > 10**18
     assert price < 2 * 10**18
@@ -153,18 +159,20 @@ async def test_fetch_prices_wsteth_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_all_assets_integration(config):
+async def test_fetch_prices_all_assets_integration(
+    config, eth_address, weth_address, wsteth_address
+):
     adapter = WstETHAdapter(config)
     result = await adapter.fetch_prices(
-        [eth_address(config), weth_address(config), wsteth_address(config)],
-        PriceData(base_asset=eth_address(config), prices={"0x111": 456}),
+        [eth_address, weth_address, wsteth_address],
+        PriceData(base_asset=eth_address, prices={"0x111": 456}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 4
     assert result.prices["0x111"] == 456
-    assert result.prices[eth_address(config)] == 1
-    assert result.prices[weth_address(config)] == 10**18
-    wsteth_price = result.prices[wsteth_address(config)]
+    assert result.prices[eth_address] == 1
+    assert result.prices[weth_address] == 10**18
+    wsteth_price = result.prices[wsteth_address]
     assert isinstance(wsteth_price, int)
     assert wsteth_price > 10**18
     assert wsteth_price < 2 * 10**18
