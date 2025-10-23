@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from enum import Enum
 from typing import Optional
 
 from eth_typing import URI
 from web3 import Web3
+
+from .constants import NetworkAssets
+
+
+class Network(str, Enum):
+    MAINNET = "mainnet"
+    SEPOLIA = "sepolia"
+    BASE = "base"
 
 
 @dataclass
@@ -25,6 +34,7 @@ class OracleCLIConfig:
     l1_rpc: Optional[str] = None
     l1_subvault_address: Optional[str] = None
     safe_address: Optional[str] = None
+    network: Network = Network.MAINNET
     hl_rpc: Optional[str] = None
     hl_subvault_address: Optional[str] = None
     testnet: bool = False
@@ -95,6 +105,26 @@ class OracleCLIConfig:
         if self.l1_rpc is None:
             raise ValueError("l1_rpc must be configured")
         return self.l1_rpc
+
+    @property
+    def assets(self) -> NetworkAssets:
+        """Get the assets for the configured network.
+
+        Returns:
+            NetworkAssets for the configured network
+        """
+        from .constants import ETH_MAINNET_ASSETS, SEPOLIA_ASSETS, BASE_ASSETS
+
+        network_assets_map = {
+            Network.MAINNET: ETH_MAINNET_ASSETS,
+            Network.SEPOLIA: SEPOLIA_ASSETS,
+            Network.BASE: BASE_ASSETS,
+        }
+
+        if self.network not in network_assets_map:
+            raise ValueError(f"Unknown network: {self.network}")
+
+        return network_assets_map[self.network]
 
     def get_subvault_config(self, subvault_address: str) -> SubvaultAdapterConfig:
         """Get adapter configuration for a specific subvault.

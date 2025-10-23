@@ -8,6 +8,7 @@ import typer
 
 from tq_oracle.constants import HL_PROD_EVM_RPC, HL_TEST_EVM_RPC
 
+from .config import Network
 from .config_loader import build_config
 from .constants import (
     DEFAULT_MAINNET_RPC_URL,
@@ -89,6 +90,14 @@ def report(
             help="Hyperliquid subvault address to query (optional, defaults to vault address).",
         ),
     ] = None,
+    network: Annotated[
+        Network,
+        typer.Option(
+            "--network",
+            "-n",
+            help="Network to use (mainnet, sepolia, or base).",
+        ),
+    ] = Network.MAINNET,
     testnet: Annotated[
         bool,
         typer.Option(
@@ -184,6 +193,7 @@ def report(
     # Boolean and numeric args are always added. merge_config_sources handles
     # the precedence smartly: if a CLI arg matches its default value and a
     # non-default value exists in TOML/ENV, the TOML/ENV value wins.
+    cli_args["network"] = network
     cli_args["testnet"] = testnet
     cli_args["dry_run"] = dry_run
     cli_args["ignore_empty_vault"] = ignore_empty_vault
