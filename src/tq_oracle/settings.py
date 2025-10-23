@@ -99,7 +99,6 @@ class OracleSettings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Custom config-file source with explicit precedence: CLI > ENV > FILE."""
-        # Get config path from environment variable
         env_cfg = os.environ.get("TQ_ORACLE_CONFIG")
         cfg_path = Path(env_cfg) if env_cfg else None
 
@@ -111,7 +110,6 @@ class OracleSettings(BaseSettings):
             def get_field_value(
                 self, field: Any, field_name: str
             ) -> tuple[Any, str, bool]:
-                # Not used in our implementation
                 return None, "", False
 
             def __call__(self) -> dict[str, Any]:

@@ -74,7 +74,6 @@ def main(
     ] = False,
 ):
     """Initialize application state once and pass it to subcommands via ctx.obj."""
-    # Set config path in environment if provided
     import os
 
     if config:
@@ -85,7 +84,6 @@ def main(
         dry_run=dry_run,
     )
 
-    # Apply defaults for RPC and oracle helper if not set
     if settings.l1_rpc is None:
         settings.l1_rpc = (
             DEFAULT_SEPOLIA_RPC_URL if settings.testnet else DEFAULT_MAINNET_RPC_URL
@@ -120,11 +118,9 @@ def report(
     state: AppState = ctx.obj
     s = state.settings
 
-    # Override vault_address if provided via CLI
     if vault_address:
         s.vault_address = vault_address
 
-    # Validate required fields
     if not s.vault_address:
         raise typer.BadParameter("vault_address must be configured")
     if not s.l1_rpc:

@@ -124,18 +124,15 @@ async def collect_assets(state: AppState) -> AggregatedAssets:
                 f"{', '.join(invalid_subvaults)}"
             )
 
-    # Collect asset fetching tasks
     log.info("Setting up asset adapters...")
     asset_fetch_tasks = []
 
-    # Helper to get subvault config
     def get_subvault_config(subvault_address: str) -> dict[str, Any]:
         """Get adapter configuration for a specific subvault."""
         normalized_address = subvault_address.lower()
         for config in s.subvault_adapters:
             if config["subvault_address"].lower() == normalized_address:
                 return config
-        # Return default config
         return {
             "subvault_address": subvault_address,
             "chain": "l1",
@@ -192,19 +189,16 @@ async def collect_assets(state: AppState) -> AggregatedAssets:
         )
     ]
 
-    # Fetch assets from all adapters in parallel
     log.info(
         "Fetching assets: %d adapter tasks + %d additional per-subvault tasks...",
         len(asset_fetch_tasks),
         len(adapter_tasks),
     )
 
-    # Execute default adapters
     default_results = await asyncio.gather(
         *[task for _, task in asset_fetch_tasks], return_exceptions=True
     )
 
-    # Execute per-subvault adapters
     per_subvault_results = await asyncio.gather(
         *[
             adapter.fetch_assets(subvault_addr)

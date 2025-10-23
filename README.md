@@ -65,11 +65,11 @@ pre_check_timeout = 12.0
 Then run with minimal arguments:
 
 ```bash
-# Config file is automatically detected
-uv run tq-oracle
+# `tq-oracle.toml` Config file is automatically detected 
+uv run tq-oracle report
 
 # Or specify config file explicitly
-uv run tq-oracle --config ./my-config.toml
+uv run tq-oracle report --config ./my-config.toml
 ```
 
 See `tq-oracle.toml.example` for a complete configuration template with all available options.
