@@ -117,11 +117,11 @@ async def test_validate_prices_usdc_integration(config, eth_address, usdc_addres
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usdt_integration(config, usdt_address):
+async def test_validate_prices_usdt_integration(config, eth_address, usdt_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=usdt_address, prices={})
+    price_data = PriceData(base_asset=eth_address, prices={})
     price_data = await cow_swap_adapter.fetch_prices([usdt_address], price_data)
 
     result = await validator.validate_prices(price_data)
@@ -132,11 +132,11 @@ async def test_validate_prices_usdt_integration(config, usdt_address):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usds_integration(config, usds_address):
+async def test_validate_prices_usds_integration(config, eth_address, usds_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=usds_address, prices={})
+    price_data = PriceData(base_asset=eth_address, prices={})
     price_data = await cow_swap_adapter.fetch_prices([usds_address], price_data)
 
     result = await validator.validate_prices(price_data)
@@ -148,12 +148,12 @@ async def test_validate_prices_usds_integration(config, usds_address):
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_validate_prices_all_stablecoins_integration(
-    config, usdc_address, usdt_address, usds_address
+    config, eth_address, usdc_address, usdt_address, usds_address
 ):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=usdc_address, prices={})
+    price_data = PriceData(base_asset=eth_address, prices={})
     price_data = await cow_swap_adapter.fetch_prices(
         [usdc_address, usdt_address, usds_address], price_data
     )

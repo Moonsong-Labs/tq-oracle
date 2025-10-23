@@ -31,6 +31,27 @@ def eth_address(config):
     return address
 
 
+@pytest.fixture
+def usdc_address(config):
+    address = config.assets["USDC"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def usdt_address(config):
+    address = config.assets["USDT"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def usds_address(config):
+    address = config.assets["USDS"]
+    assert address is not None
+    return address
+
+
 @pytest.mark.asyncio
 async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(
     config, eth_address
@@ -73,9 +94,10 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_usdc_integration_with_previous_prices(config, eth_address):
+async def test_fetch_prices_usdc_integration_with_previous_prices(
+    config, eth_address, usdc_address
+):
     adapter = CowSwapAdapter(config)
-    usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
     result = await adapter.fetch_prices(
         [usdc_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
     )
@@ -89,9 +111,10 @@ async def test_fetch_prices_usdc_integration_with_previous_prices(config, eth_ad
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_usdt_integration_with_previous_prices(config, eth_address):
+async def test_fetch_prices_usdt_integration_with_previous_prices(
+    config, eth_address, usdt_address
+):
     adapter = CowSwapAdapter(config)
-    usdt_address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
     result = await adapter.fetch_prices(
         [usdt_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
     )
@@ -105,10 +128,10 @@ async def test_fetch_prices_usdt_integration_with_previous_prices(config, eth_ad
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_usdc_and_usdt_integration(config, eth_address):
+async def test_fetch_prices_usdc_and_usdt_integration(
+    config, eth_address, usdc_address, usdt_address
+):
     adapter = CowSwapAdapter(config)
-    usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-    usdt_address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
     result = await adapter.fetch_prices(
         [usdc_address, usdt_address], PriceData(base_asset=eth_address, prices={})
     )
@@ -123,7 +146,7 @@ async def test_fetch_prices_usdc_and_usdt_integration(config, eth_address):
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_usdt_not_supported_on_testnet(config, eth_address):
+async def test_fetch_prices_usdt_not_supported_on_testnet(eth_address, usdt_address):
     testnet_config = OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
@@ -139,7 +162,6 @@ async def test_fetch_prices_usdt_not_supported_on_testnet(config, eth_address):
         safe_txn_srvc_api_key=None,
     )
     adapter = CowSwapAdapter(testnet_config)
-    usdt_address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
     result = await adapter.fetch_prices(
         [usdt_address], PriceData(base_asset=eth_address, prices={})
     )
@@ -149,9 +171,10 @@ async def test_fetch_prices_usdt_not_supported_on_testnet(config, eth_address):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_usds_integration_with_previous_prices(config, eth_address):
+async def test_fetch_prices_usds_integration_with_previous_prices(
+    config, eth_address, usds_address
+):
     adapter = CowSwapAdapter(config)
-    usds_address = "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
     result = await adapter.fetch_prices(
         [usds_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
     )
@@ -165,11 +188,10 @@ async def test_fetch_prices_usds_integration_with_previous_prices(config, eth_ad
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_all_stablecoins_integration(config, eth_address):
+async def test_fetch_prices_all_stablecoins_integration(
+    config, eth_address, usdc_address, usdt_address, usds_address
+):
     adapter = CowSwapAdapter(config)
-    usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-    usdt_address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
-    usds_address = "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
     result = await adapter.fetch_prices(
         [usdc_address, usdt_address, usds_address],
         PriceData(base_asset=eth_address, prices={}),
@@ -188,7 +210,7 @@ async def test_fetch_prices_all_stablecoins_integration(config, eth_address):
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_usds_not_supported_on_testnet(eth_address):
+async def test_fetch_prices_usds_not_supported_on_testnet(eth_address, usds_address):
     testnet_config = OracleCLIConfig(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
@@ -204,7 +226,6 @@ async def test_fetch_prices_usds_not_supported_on_testnet(eth_address):
         safe_txn_srvc_api_key=None,
     )
     adapter = CowSwapAdapter(testnet_config)
-    usds_address = "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
     result = await adapter.fetch_prices(
         [usds_address], PriceData(base_asset=eth_address, prices={})
     )
