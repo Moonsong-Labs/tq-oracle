@@ -7,7 +7,7 @@ import backoff
 import requests
 
 from ...constants import TOKEN_DECIMALS
-from ...config import Network
+from ...settings import Network
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:

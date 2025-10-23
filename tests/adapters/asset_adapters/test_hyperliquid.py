@@ -10,7 +10,7 @@ from tq_oracle.constants import (
     HL_TESTNET_API_URL,
     HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
-from tq_oracle.config import Network
+from tq_oracle.settings import Network
 
 
 @pytest.fixture
