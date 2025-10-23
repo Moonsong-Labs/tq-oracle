@@ -248,54 +248,16 @@ uv run python scripts/check_cctp_inflight.py \
 
 ### Asset Adapters
 
-Asset adapters fetch asset holdings from specific protocols (e.g., Hyperliquid, Aave, Uniswap).
+Asset adapters fetch asset holdings from specific protocols (e.g., Hyperliquid, Aave, Lido).
 
-1. **Create adapter file** in `src/tq_oracle/adapters/asset_adapters/`:
+Quick overview:
 
-```python
-from __future__ import annotations
+1. **Create adapter file** in `src/tq_oracle/adapters/asset_adapters/` implementing `BaseAssetAdapter`
+2. **Register adapter** in `src/tq_oracle/adapters/asset_adapters/__init__.py`'s `ADAPTER_REGISTRY`
+3. **Write integration tests** in `tests/adapters/asset_adapters/`
+4. **Add asset addresses** to `src/tq_oracle/constants.py` if needed
 
-from typing import TYPE_CHECKING
-
-from .base import AssetData, BaseAssetAdapter
-
-if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
-
-class MyProtocolAdapter(BaseAssetAdapter):
-    """Adapter for querying MyProtocol assets."""
-
-    def __init__(self, config: OracleCLIConfig):
-        super().__init__(config)
-        # Initialize any protocol-specific clients/connections
-
-    @property
-    def adapter_name(self) -> str:
-        return "my_protocol"
-
-    async def fetch_assets(self, vault_address: str) -> list[AssetData]:
-        """Fetch asset data from MyProtocol for the given vault."""
-        # Implement your protocol-specific logic here
-        return [
-            AssetData(asset_address="0x...", amount=1000000),
-        ]
-```
-
-2. **Register adapter** in `src/tq_oracle/adapters/asset_adapters/__init__.py`:
-
-```python
-from .my_protocol import MyProtocolAdapter
-
-ADAPTER_REGISTRY: dict[str, type[BaseAssetAdapter]] = {
-    "idle_balances": IdleBalancesAdapter,
-    "hyperliquid": HyperliquidAdapter,
-    "my_protocol": MyProtocolAdapter,  # Add your adapter here
-}
-
-ASSET_ADAPTERS: list[type[BaseAssetAdapter]] = list(ADAPTER_REGISTRY.values())
-```
-
-The adapter name in the registry (e.g., `"my_protocol"`) is used in the `[[subvault_adapters]]` configuration's `additional_adapters` field.
+The adapter name in the registry is used in the `[[subvault_adapters]]` configuration's `additional_adapters` field.
 
 ### Price Adapters
 
