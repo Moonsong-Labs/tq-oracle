@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from web3 import Web3
 
@@ -14,11 +14,18 @@ if TYPE_CHECKING:
 class WstETHAdapter(BasePriceAdapter):
     """Adapter for pricing ETH, WETH, and wstETH."""
 
+    eth_address: str
+    weth_address: Optional[str]
+    wsteth_address: Optional[str]
+
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
         assets = config.assets
-        self.eth_address = assets["ETH"]
+        eth_address = assets["ETH"]
+        if eth_address is None:
+            raise ValueError("ETH address is required for WstETH adapter")
+        self.eth_address = eth_address
         self.weth_address = assets["WETH"]
         self.wsteth_address = assets["WSTETH"]
 
@@ -46,13 +53,10 @@ class WstETHAdapter(BasePriceAdapter):
             - WETH is 1:1 with ETH (10**18).
             - wstETH price is derived from the wstETH contract's getStETHByWstETH function.
         """
-        if (
-            self.eth_address is not None
-            and prices_accumulator.base_asset != self.eth_address
-        ):
+        if prices_accumulator.base_asset != self.eth_address:
             raise ValueError("WstETH adapter only supports ETH as base asset")
 
-        has_eth = self.eth_address is not None and self.eth_address in asset_addresses
+        has_eth = self.eth_address in asset_addresses
         has_weth = (
             self.weth_address is not None and self.weth_address in asset_addresses
         )
@@ -61,7 +65,6 @@ class WstETHAdapter(BasePriceAdapter):
         )
 
         if has_eth:
-            assert self.eth_address is not None
             prices_accumulator.prices[self.eth_address] = 1
 
         if has_weth:
