@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass
@@ -11,31 +10,6 @@ class PriceData:
 
     base_asset: str
     prices: dict[str, int]  # asset_address -> price_wei (18 decimals)
-
-
-class PriceAdapter(Protocol):
-    """Protocol defining the interface for price adapters."""
-
-    @property
-    def adapter_name(self) -> str:
-        """Return the name of this adapter."""
-        ...
-
-    async def fetch_prices(
-        self, asset_addresses: list[str], prices_accumulator: PriceData
-    ) -> PriceData:
-        """Fetch prices for the given asset addresses.
-
-        Args:
-            asset_addresses: List of asset contract addresses to get prices for
-            prices_accumulator: Existing price accumulator to update. Must
-                have base_asset set to ETH (wei). All prices are 18-decimal values
-                representing wei per 1 unit of the asset.
-
-        Returns:
-            The same accumulator with the adapter's prices merged in.
-        """
-        ...
 
 
 class BasePriceAdapter(ABC):
