@@ -52,10 +52,10 @@ USDC_HL_TESTNET = "0x2B3370eE501B4a559b57D449569354196457D8Ab"
 TOKEN_DECIMALS: dict[str, int] = {
     addr: decimals
     for addr, decimals in [
-        (ETH_MAINNET_ASSETS["USDC"], 6),
-        (SEPOLIA_ASSETS["USDC"], 6),
-        (ETH_MAINNET_ASSETS["USDT"], 6),
-        (ETH_MAINNET_ASSETS["USDS"], 18),
+        (ETH_MAINNET_ASSETS.get("USDC"), 6),
+        (SEPOLIA_ASSETS.get("USDC"), 6),
+        (ETH_MAINNET_ASSETS.get("USDT"), 6),
+        (ETH_MAINNET_ASSETS.get("USDS"), 18),
     ]
     if addr is not None
 }
