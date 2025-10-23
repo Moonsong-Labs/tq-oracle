@@ -362,12 +362,12 @@ from typing import TYPE_CHECKING
 from .base import BasePriceValidator, PriceValidationResult
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 class MyValidator(BasePriceValidator):
     """Validator to cross-check prices against a reference oracle."""
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         # Initialize validator-specific connections
 

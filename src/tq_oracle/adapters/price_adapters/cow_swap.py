@@ -88,13 +88,11 @@ class CowSwapAdapter(BasePriceAdapter):
         if prices_accumulator.base_asset != self.eth_address:
             raise ValueError("CowSwap adapter only supports ETH as base asset")
 
-        supported_assets = {
-            self.usdc_address,
-            self.usdt_address,
-            self.usds_address,
-        }
-
-        supported_assets = [asset for asset in supported_assets if asset is not None]
+        supported_assets = [
+            addr
+            for addr in [self.usdc_address, self.usdt_address, self.usds_address]
+            if addr is not None
+        ]
 
         for asset_address in asset_addresses:
             if asset_address not in supported_assets:

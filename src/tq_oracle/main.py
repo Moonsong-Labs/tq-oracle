@@ -13,6 +13,8 @@ import typer
 from .constants import (
     DEFAULT_MAINNET_RPC_URL,
     DEFAULT_SEPOLIA_RPC_URL,
+    HL_PROD_EVM_RPC,
+    HL_TEST_EVM_RPC,
     MAINNET_ORACLE_HELPER,
     SEPOLIA_ORACLE_HELPER,
 )
@@ -43,7 +45,7 @@ def _redacted_dump(settings: OracleSettings) -> dict:
 @app.callback()
 def main(
     ctx: typer.Context,
-    config: Annotated[
+    config_path: Annotated[
         Path | None,
         typer.Option(
             "--config",
@@ -91,8 +93,8 @@ def main(
     """Initialize application state once and pass it to subcommands via ctx.obj."""
     import os
 
-    if config:
-        os.environ["TQ_ORACLE_CONFIG"] = str(config)
+    if config_path:
+        os.environ["TQ_ORACLE_CONFIG"] = str(config_path)
 
     settings = OracleSettings(
         network=network,
@@ -101,11 +103,13 @@ def main(
         dry_run=dry_run,
     )
 
+    used_default_l1_rpc = False
     if settings.l1_rpc is None:
         if settings.network == Network.SEPOLIA:
             settings.l1_rpc = DEFAULT_SEPOLIA_RPC_URL
         else:
             settings.l1_rpc = DEFAULT_MAINNET_RPC_URL
+        used_default_l1_rpc = True
 
     if settings.oracle_helper_address is None:
         if settings.network == Network.SEPOLIA:
@@ -113,7 +117,20 @@ def main(
         else:
             settings.oracle_helper_address = MAINNET_ORACLE_HELPER
 
-    settings.using_default_rpc = config is None or settings.hl_rpc is None
+    default_hl_rpc = (
+        HL_TEST_EVM_RPC if settings.hyperliquid_env == "testnet" else HL_PROD_EVM_RPC
+    )
+
+    used_default_hl_rpc = False
+    if settings.hl_rpc is None:
+        settings.hl_rpc = default_hl_rpc
+        used_default_hl_rpc = True
+    else:
+        fields_set = getattr(settings, "model_fields_set", set())
+        if "hl_rpc" not in fields_set and settings.hl_rpc == default_hl_rpc:
+            used_default_hl_rpc = True
+
+    settings.using_default_rpc = used_default_l1_rpc or used_default_hl_rpc
 
     setup_logging(settings.log_level)
     logger = _build_logger()
