@@ -1,5 +1,18 @@
 """Blockchain contract address constants."""
 
+from typing import TypedDict
+
+
+class NetworkAddresses(TypedDict):
+    USDC_ADDRESS: str
+    USDT_ADDRESS: str
+    USDS_ADDRESS: str
+    ETH_ADDRESS: str
+    WETH_ADDRESS: str
+    WSTETH_ADDRESS: str
+    ORACLE_HELPER: str
+
+
 PRICE_FEED_USDC_ETH = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
 PRICE_FEED_USDT_ETH = "0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46"
 PRICE_FEED_USDS_USD = "0xfF30586cD0F29eD462364C7e81375FC0C71219b1"
