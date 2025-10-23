@@ -21,13 +21,13 @@ from ...units import scale_to_18
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 
 class ChainlinkAdapter(BasePriceAdapter):
     """Adapter for querying Chainlink price feeds."""
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
         self.usdc_address = USDC_SEPOLIA if config.testnet else USDC_MAINNET

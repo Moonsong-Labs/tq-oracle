@@ -1,11 +1,10 @@
 import json
-from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import requests
 
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 from tq_oracle.report.generator import OracleReport
 from tq_oracle.report.publisher import (
     build_transaction,
@@ -26,9 +25,9 @@ def sample_report() -> OracleReport:
 
 
 @pytest.fixture
-def broadcast_config() -> OracleCLIConfig:
-    """Provides a sample OracleCLIConfig configured for broadcast mode."""
-    return OracleCLIConfig(
+def broadcast_config() -> OracleSettings:
+    """Provides a sample OracleSettings configured for broadcast mode."""
+    return OracleSettings(
         vault_address="0x1234567890123456789012345678901234567890",
         oracle_helper_address="0x3234567890123456789012345678901234567890",
         l1_rpc="http://localhost:8545",
@@ -67,7 +66,7 @@ async def test_publish_to_stdout_prints_correct_json(
 async def test_build_transaction_creates_valid_tx_dict(
     mock_get_oracle: MagicMock,
     mock_encode_submit_reports: MagicMock,
-    broadcast_config: OracleCLIConfig,
+    broadcast_config: OracleSettings,
     sample_report: OracleReport,
 ):
     """
@@ -110,7 +109,7 @@ async def test_send_to_safe_happy_path(
     MockAccount: MagicMock,
     mock_to_thread: MagicMock,
     MockSafeTx: MagicMock,
-    broadcast_config: OracleCLIConfig,
+    broadcast_config: OracleSettings,
 ):
     """
     Verify the happy path for send_to_safe, ensuring all dependencies
@@ -149,7 +148,11 @@ async def test_send_to_safe_happy_path(
 
     result_url = await send_to_safe(broadcast_config, transaction)
 
-    MockAccount.from_key.assert_called_once_with(broadcast_config.private_key)
+    # We now unwrap the SecretStr before passing to Account
+    assert broadcast_config.private_key is not None
+    MockAccount.from_key.assert_called_once_with(
+        broadcast_config.private_key.get_secret_value()
+    )
 
     get_call = mock_to_thread.call_args_list[0]
     assert get_call.args[0].__name__ == "get"
@@ -164,7 +167,11 @@ async def test_send_to_safe_happy_path(
     # chain_id is derived from the RPC, so we check it's passed through
     assert "chain_id" in kwargs
 
-    mock_safe_tx_instance.sign.assert_called_once_with(broadcast_config.private_key)
+    # We now unwrap the SecretStr before passing to sign
+    assert broadcast_config.private_key is not None
+    mock_safe_tx_instance.sign.assert_called_once_with(
+        broadcast_config.private_key.get_secret_value()
+    )
     mock_to_thread.assert_any_call(
         mock_tx_service_instance.post_transaction, mock_safe_tx_instance
     )
@@ -176,15 +183,15 @@ async def test_send_to_safe_happy_path(
 
 @pytest.mark.asyncio
 async def test_send_to_safe_raises_error_if_config_missing(
-    broadcast_config: OracleCLIConfig,
+    broadcast_config: OracleSettings,
 ):
     """
     Verify that send_to_safe raises ValueError if essential config
     (safe_address, private_key) is missing.
     """
     transaction = {}
-    config_no_safe = replace(broadcast_config, safe_address=None)
-    config_no_key = replace(broadcast_config, private_key=None)
+    config_no_safe = broadcast_config.model_copy(update={"safe_address": None})
+    config_no_key = broadcast_config.model_copy(update={"private_key": None})
 
     with pytest.raises(ValueError, match="safe_address required for Broadcast mode"):
         await send_to_safe(config_no_safe, transaction)
@@ -199,7 +206,7 @@ async def test_send_to_safe_raises_error_if_config_missing(
 async def test_send_to_safe_handles_http_error_on_nonce_fetch(
     mock_to_thread: MagicMock,
     MockAccount: MagicMock,
-    broadcast_config: OracleCLIConfig,
+    broadcast_config: OracleSettings,
 ):
     """
     Verify that an HTTP error during the nonce fetch is propagated correctly.
@@ -224,7 +231,7 @@ async def test_send_to_safe_handles_http_error_on_nonce_fetch(
 async def test_publish_report_routes_to_stdout_on_dry_run(
     mock_send_to_safe: AsyncMock,
     mock_publish_to_stdout: AsyncMock,
-    broadcast_config: OracleCLIConfig,
+    broadcast_config: OracleSettings,
     sample_report: OracleReport,
 ):
     """
@@ -244,7 +251,7 @@ async def test_publish_report_routes_to_stdout_on_dry_run(
 async def test_publish_report_routes_to_broadcast_flow(
     mock_build_transaction: AsyncMock,
     mock_send_to_safe: AsyncMock,
-    broadcast_config: OracleCLIConfig,
+    broadcast_config: OracleSettings,
     sample_report: OracleReport,
     caplog,
 ):
@@ -273,7 +280,7 @@ async def test_publish_report_routes_to_broadcast_flow(
 async def test_publish_report_handles_broadcast_error_and_exits(
     mock_build_transaction: AsyncMock,
     mock_send_to_safe: AsyncMock,
-    broadcast_config: OracleCLIConfig,
+    broadcast_config: OracleSettings,
     sample_report: OracleReport,
     caplog,
 ):
@@ -297,7 +304,7 @@ async def test_publish_report_handles_broadcast_error_and_exits(
 
 @pytest.mark.asyncio
 async def test_publish_report_raises_for_unsupported_direct_mode(
-    broadcast_config: OracleCLIConfig, sample_report: OracleReport
+    broadcast_config: OracleSettings, sample_report: OracleReport
 ):
     """
     Verify that publish_report raises ValueError if not in

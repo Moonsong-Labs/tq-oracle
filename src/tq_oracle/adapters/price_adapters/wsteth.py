@@ -9,13 +9,13 @@ from ...constants import ETH_ASSET, WETH_MAINNET, WSTETH_MAINNET
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 
 class WstETHAdapter(BasePriceAdapter):
     """Adapter for pricing ETH, WETH, and wstETH."""
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self.l1_rpc = config.l1_rpc
         self.weth_address = WETH_MAINNET

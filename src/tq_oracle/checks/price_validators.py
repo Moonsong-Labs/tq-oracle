@@ -8,7 +8,7 @@ from ..adapters.price_validators import PRICE_VALIDATORS
 
 if TYPE_CHECKING:
     from ..adapters.price_adapters.base import PriceData
-    from ..config import OracleCLIConfig
+    from ..settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class PriceValidationError(Exception):
 
 
 async def run_price_validations(
-    config: OracleCLIConfig,
+    config: OracleSettings,
     price_data: PriceData,
 ) -> None:
     """Run all price validators after price fetching.

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
-from ...config import OracleCLIConfig
+from ...settings import OracleSettings
 
 
 class AdapterChain(Enum):
@@ -50,7 +50,7 @@ class AssetAdapter(Protocol):
 class BaseAssetAdapter(ABC):
     """Abstract base class for asset adapters."""
 
-    def __init__(self, config: OracleCLIConfig, chain: str = "l1"):
+    def __init__(self, config: OracleSettings, chain: str = "l1"):
         """Initialize the adapter with configuration.
 
         Args:

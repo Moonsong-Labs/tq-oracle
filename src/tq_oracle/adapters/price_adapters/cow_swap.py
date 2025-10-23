@@ -17,13 +17,13 @@ from ...constants import (
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 
 class CowSwapAdapter(BasePriceAdapter):
     """Adapter for querying CoW Protocol native prices."""
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         network = "sepolia" if config.testnet else "mainnet"
         self.api_base_url = f"https://api.cow.fi/{network}/api/v1"

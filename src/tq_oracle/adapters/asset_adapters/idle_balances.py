@@ -24,7 +24,7 @@ from ...abi import (
 from .base import AssetData, BaseAssetAdapter, AdapterChain
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 logger = get_logger(__name__)
 
@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 class IdleBalancesAdapter(BaseAssetAdapter):
     """Adapter for querying Idle Balances assets from L1 or Hyperliquid chain."""
 
-    def __init__(self, config: OracleCLIConfig, chain: str = "l1"):
+    def __init__(self, config: OracleSettings, chain: str = "l1"):
         """Initialize the adapter.
 
         Args:

@@ -1,252 +1,154 @@
+"""CLI entrypoint for the TQ Oracle."""
+
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
-from typing import Annotated, Any, Optional
+import json
+import logging
+from pathlib import Path
+from typing import Annotated
 
 import typer
 
-from tq_oracle.constants import HL_PROD_EVM_RPC, HL_TEST_EVM_RPC
-
-from .config_loader import build_config
 from .constants import (
     DEFAULT_MAINNET_RPC_URL,
     DEFAULT_SEPOLIA_RPC_URL,
+    HL_PROD_EVM_RPC,
+    HL_TEST_EVM_RPC,
     MAINNET_ORACLE_HELPER,
     SEPOLIA_ORACLE_HELPER,
 )
 from .logger import setup_logging
-from .orchestrator import execute_oracle_flow
-
-setup_logging()
+from .settings import OracleSettings
+from .state import AppState
 
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     pretty_exceptions_short=True,
     pretty_exceptions_show_locals=False,
-    help="Collect TVL data from vault protocols using modular adapters.",
+    help="TVL reporting and Safe submission tool.",
 )
 
 
-@app.command("report")
-def report(
-    vault_address: Annotated[
-        Optional[str],
-        typer.Argument(
-            help="Vault contract address to query (optional; must be provided via CLI argument, environment variable, or config file).",
-        ),
-    ] = None,
+def _build_logger() -> logging.Logger:
+    """Build a logger instance."""
+    return logging.getLogger("tq_oracle")
+
+
+def _redacted_dump(settings: OracleSettings) -> dict:
+    """Return settings as dict with secrets redacted."""
+    return settings.as_safe_dict()
+
+
+@app.callback()
+def main(
+    ctx: typer.Context,
     config: Annotated[
-        Optional[str],
+        Path | None,
         typer.Option(
             "--config",
             "-c",
-            help="Path to TOML configuration file (default: ./tq-oracle.toml or ~/.config/tq-oracle/config.toml).",
-        ),
-    ] = None,
-    oracle_helper_address: Annotated[
-        Optional[str],
-        typer.Option(
-            "--oracle-helper-address",
-            "-h",
-            help="OracleHelper contract address to query (defaults to mainnet/testnet based on --testnet flag).",
-        ),
-    ] = None,
-    l1_rpc: Annotated[
-        Optional[str],
-        typer.Option(
-            "--l1-rpc",
-            help="Ethereum L1 RPC endpoint (defaults to mainnet/testnet based on --testnet flag).",
-        ),
-    ] = None,
-    safe_address: Annotated[
-        Optional[str],
-        typer.Option(
-            "--safe-address",
-            "-s",
-            help="Gnosis Safe address for multi-sig submission (optional).",
-        ),
-    ] = None,
-    hl_rpc: Annotated[
-        Optional[str],
-        typer.Option(
-            "--hl-rpc",
-            help="hyperliquid RPC endpoint (optional).",
-        ),
-    ] = None,
-    l1_subvault_address: Annotated[
-        Optional[str],
-        typer.Option(
-            "--l1-subvault-address",
-            help="L1 subvault address for CCTP bridge monitoring (optional).",
-        ),
-    ] = None,
-    hl_subvault_address: Annotated[
-        Optional[str],
-        typer.Option(
-            "--hl-subvault-address",
-            help="Hyperliquid subvault address to query (optional, defaults to vault address).",
+            help="Path to a TOML config file (can include [tq_oracle] table).",
         ),
     ] = None,
     testnet: Annotated[
         bool,
         typer.Option(
-            "--testnet/--no-testnet",
-            help="Use testnet instead of mainnet.",
+            "--testnet/--no-testnet", help="Use testnet; overrides env/config."
         ),
     ] = False,
     dry_run: Annotated[
         bool,
         typer.Option(
             "--dry-run/--no-dry-run",
-            help="Preview actions without sending a transaction.",
+            help="Do not post onchain; overrides env/config.",
         ),
     ] = True,
-    private_key: Annotated[
-        Optional[str],
-        typer.Option(
-            "--private-key",
-            help="Private key for signing transactions",
-        ),
-    ] = None,
-    safe_txn_srvc_api_key: Annotated[
-        Optional[str],
-        typer.Option(
-            "--safe-key",
-            help="API key for the Safe Transaction Service (optional, but recommended).",
-        ),
-    ] = None,
-    ignore_empty_vault: Annotated[
+    show_config: Annotated[
         bool,
         typer.Option(
-            "--ignore-empty-vault/--no-ignore-empty-vault",
-            help="Suppress errors when vault has no assets or OracleHelper doesn't recognize assets (useful for testing pre-deployment).",
+            "--show-config",
+            help="Print effective config (with secrets redacted) and exit.",
         ),
     ] = False,
-    ignore_timeout_check: Annotated[
-        bool,
-        typer.Option(
-            "--ignore-timeout-check/--no-ignore-timeout-check",
-            help="Warn but don't block when timeout hasn't elapsed since last report (allows forced submission).",
-        ),
-    ] = False,
-    ignore_active_proposal_check: Annotated[
-        bool,
-        typer.Option(
-            "--ignore-active-proposal-check/--no-ignore-active-proposal-check",
-            help="Warn but don't block when there are active submitReports() proposals in the Safe (allows duplicate submission).",
-        ),
-    ] = False,
-    pre_check_retries: Annotated[
-        int,
-        typer.Option(
-            "--pre-check-retries",
-            help="Number of times to retry pre-checks if they fail (default: 3).",
-        ),
-    ] = 3,
-    pre_check_timeout: Annotated[
-        float,
-        typer.Option(
-            "--pre-check-timeout",
-            help="Timeout in seconds between pre-check retries (default: 12.0).",
-        ),
-    ] = 12.0,
-    chainlink_price_warning_tolerance_percentage: Annotated[
-        float,
-        typer.Option(
-            "--chainlink-warning-tolerance",
-            help="Chainlink price deviation percentage to trigger warning (default: 0.5).",
-        ),
-    ] = 0.5,
-    chainlink_price_failure_tolerance_percentage: Annotated[
-        float,
-        typer.Option(
-            "--chainlink-failure-tolerance",
-            help="Chainlink price deviation percentage to fail validation (default: 1.0).",
-        ),
-    ] = 1.0,
-) -> None:
-    """Collect TVL data and submit via Safe (optional)."""
-    optional_args = {
-        "vault_address": vault_address,
-        "oracle_helper_address": oracle_helper_address,
-        "l1_rpc": l1_rpc,
-        "safe_address": safe_address,
-        "hl_rpc": hl_rpc,
-        "l1_subvault_address": l1_subvault_address,
-        "hl_subvault_address": hl_subvault_address,
-        "private_key": private_key,
-        "safe_txn_srvc_api_key": safe_txn_srvc_api_key,
-    }
-    cli_args: dict[str, Any] = {k: v for k, v in optional_args.items() if v is not None}
+):
+    """Initialize application state once and pass it to subcommands via ctx.obj."""
+    # Set config path in environment if provided
+    import os
 
-    # Boolean and numeric args are always added. merge_config_sources handles
-    # the precedence smartly: if a CLI arg matches its default value and a
-    # non-default value exists in TOML/ENV, the TOML/ENV value wins.
-    cli_args["testnet"] = testnet
-    cli_args["dry_run"] = dry_run
-    cli_args["ignore_empty_vault"] = ignore_empty_vault
-    cli_args["ignore_timeout_check"] = ignore_timeout_check
-    cli_args["ignore_active_proposal_check"] = ignore_active_proposal_check
-    cli_args["pre_check_retries"] = pre_check_retries
-    cli_args["pre_check_timeout"] = pre_check_timeout
-    cli_args["chainlink_price_warning_tolerance_percentage"] = (
-        chainlink_price_warning_tolerance_percentage
-    )
-    cli_args["chainlink_price_failure_tolerance_percentage"] = (
-        chainlink_price_failure_tolerance_percentage
+    if config:
+        os.environ["TQ_ORACLE_CONFIG"] = str(config)
+
+    settings = OracleSettings(
+        testnet=testnet,
+        dry_run=dry_run,
     )
 
-    try:
-        cfg = build_config(config_file_path=config, **cli_args)
-    except FileNotFoundError as e:
-        raise typer.BadParameter(str(e), param_hint=["--config"])
-    except ValueError as e:
-        raise typer.BadParameter(str(e))
-
-    updates: dict[str, Any] = {}
-    if cfg.l1_rpc is None:
-        updates["l1_rpc"] = (
-            DEFAULT_SEPOLIA_RPC_URL if cfg.testnet else DEFAULT_MAINNET_RPC_URL
+    # Apply defaults for RPC and oracle helper if not set
+    if settings.l1_rpc is None:
+        settings.l1_rpc = (
+            DEFAULT_SEPOLIA_RPC_URL if settings.testnet else DEFAULT_MAINNET_RPC_URL
         )
-    if cfg.oracle_helper_address is None:
-        updates["oracle_helper_address"] = (
-            SEPOLIA_ORACLE_HELPER if cfg.testnet else MAINNET_ORACLE_HELPER
+    if settings.oracle_helper_address is None:
+        settings.oracle_helper_address = (
+            SEPOLIA_ORACLE_HELPER if settings.testnet else MAINNET_ORACLE_HELPER
         )
-    if cfg.hl_rpc is None:
-        updates["hl_rpc"] = HL_PROD_EVM_RPC if not cfg.testnet else HL_TEST_EVM_RPC
+    if settings.hl_rpc is None:
+        settings.hl_rpc = HL_PROD_EVM_RPC if not settings.testnet else HL_TEST_EVM_RPC
 
-    using_default_rpc = l1_rpc is None or hl_rpc is None
-    updates["using_default_rpc"] = using_default_rpc
+    settings.using_default_rpc = config is None or settings.hl_rpc is None
 
-    if updates:
-        cfg = replace(cfg, **updates)
+    setup_logging(settings.log_level)
+    logger = _build_logger()
 
-    setup_logging(cfg.log_level)
+    ctx.obj = AppState(settings=settings, logger=logger)
 
-    if not cfg.vault_address:
+    if show_config:
+        typer.echo(json.dumps(_redacted_dump(settings), indent=2))
+        raise typer.Exit(code=0)
+
+
+@app.command()
+def report(
+    ctx: typer.Context,
+    vault_address: Annotated[
+        str | None, typer.Argument(help="Vault address to report.")
+    ] = None,
+):
+    """Build a TVL report and (optionally) submit to Safe."""
+    state: AppState = ctx.obj
+    s = state.settings
+
+    # Override vault_address if provided via CLI
+    if vault_address:
+        s.vault_address = vault_address
+
+    # Validate required fields
+    if not s.vault_address:
         raise typer.BadParameter("vault_address must be configured")
-    if not cfg.l1_rpc:
+    if not s.l1_rpc:
         raise typer.BadParameter("l1_rpc must be configured")
-    if not cfg.oracle_helper_address:
+    if not s.oracle_helper_address:
         raise typer.BadParameter("oracle_helper_address must be configured")
-    if not cfg.hl_rpc:
+    if not s.hl_rpc:
         raise typer.BadParameter("hl_rpc must be configured")
 
-    if not cfg.dry_run and not cfg.safe_address and not cfg.private_key:
+    if not s.dry_run and not s.safe_address and not s.private_key:
         raise typer.BadParameter(
-            "Either --safe-address OR --private-key required when running with --no-dry-run.",
-            param_hint=["--safe-address", "--private-key"],
+            "Either safe_address OR private_key required when running with --no-dry-run.",
+            param_hint=["TQ_ORACLE_SAFE_ADDRESS", "TQ_ORACLE_PRIVATE_KEY"],
         )
 
-    if cfg.safe_address and not cfg.dry_run and not cfg.private_key:
+    if s.safe_address and not s.dry_run and not s.private_key:
         raise typer.BadParameter(
-            "--private-key required when using --safe-address with --no-dry-run.",
-            param_hint=["--private-key"],
+            "private_key required when using safe_address with --no-dry-run.",
+            param_hint=["TQ_ORACLE_PRIVATE_KEY"],
         )
 
-    asyncio.run(execute_oracle_flow(cfg))
+    from .pipeline.run import run_report
+
+    asyncio.run(run_report(state, s.vault_address_required))
 
 
 def run() -> None:
