@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from web3 import Web3
 
@@ -15,8 +15,6 @@ class WstETHAdapter(BasePriceAdapter):
     """Adapter for pricing ETH, WETH, and wstETH."""
 
     eth_address: str
-    weth_address: Optional[str]
-    wsteth_address: Optional[str]
 
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import backoff
 import requests
@@ -18,9 +18,6 @@ class CowSwapAdapter(BasePriceAdapter):
     """Adapter for querying CoW Protocol native prices."""
 
     eth_address: str
-    usdc_address: Optional[str]
-    usdt_address: Optional[str]
-    usds_address: Optional[str]
 
     NETWORK_API_URLS: dict[Network, str] = {
         Network.MAINNET: "https://api.cow.fi/mainnet/api/v1",

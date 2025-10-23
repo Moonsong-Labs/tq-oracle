@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from web3 import Web3
 
@@ -23,9 +23,6 @@ class ChainlinkAdapter(BasePriceAdapter):
     """Adapter for querying Chainlink price feeds."""
 
     eth_address: str
-    usdc_address: Optional[str]
-    usdt_address: Optional[str]
-    usds_address: Optional[str]
 
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
