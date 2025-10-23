@@ -1,19 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import backoff
 import requests
 
-from ...constants import (
-    ETH_ASSET,
-    TOKEN_DECIMALS,
-    USDC_MAINNET,
-    USDC_SEPOLIA,
-    USDT_MAINNET,
-    USDS_MAINNET,
-)
+from ...constants import TOKEN_DECIMALS
+from ...config import Network
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
@@ -23,13 +17,28 @@ if TYPE_CHECKING:
 class CowSwapAdapter(BasePriceAdapter):
     """Adapter for querying CoW Protocol native prices."""
 
+    eth_address: str
+    usdc_address: Optional[str]
+    usdt_address: Optional[str]
+    usds_address: Optional[str]
+
+    NETWORK_API_URLS: dict[Network, str] = {
+        Network.MAINNET: "https://api.cow.fi/mainnet/api/v1",
+        Network.SEPOLIA: "https://api.cow.fi/sepolia/api/v1",
+        Network.BASE: "https://api.cow.fi/base/api/v1",
+    }
+
     def __init__(self, config: OracleCLIConfig):
         super().__init__(config)
-        network = "sepolia" if config.testnet else "mainnet"
-        self.api_base_url = f"https://api.cow.fi/{network}/api/v1"
-        self.usdc_address = USDC_SEPOLIA if config.testnet else USDC_MAINNET
-        self.usdt_address = None if config.testnet else USDT_MAINNET
-        self.usds_address = None if config.testnet else USDS_MAINNET
+        self.api_base_url = self.NETWORK_API_URLS[config.network]
+        assets = config.assets
+        eth_address = assets["ETH"]
+        if eth_address is None:
+            raise ValueError("ETH address is required for CowSwap adapter")
+        self.eth_address = eth_address
+        self.usdc_address = assets["USDC"]
+        self.usdt_address = assets["USDT"]
+        self.usds_address = assets["USDS"]
 
     @property
     def adapter_name(self) -> str:
@@ -79,10 +88,16 @@ class CowSwapAdapter(BasePriceAdapter):
             - Supports USDC, USDT, and USDS.
             - CoW API returns price per 1 whole token in ETH.
         """
-        if prices_accumulator.base_asset != ETH_ASSET:
+        if prices_accumulator.base_asset != self.eth_address:
             raise ValueError("CowSwap adapter only supports ETH as base asset")
 
-        supported_assets = {self.usdc_address, self.usdt_address, self.usds_address}
+        supported_assets = {
+            self.usdc_address,
+            self.usdt_address,
+            self.usds_address,
+        }
+
+        supported_assets = [asset for asset in supported_assets if asset is not None]
 
         for asset_address in asset_addresses:
             if asset_address not in supported_assets:
