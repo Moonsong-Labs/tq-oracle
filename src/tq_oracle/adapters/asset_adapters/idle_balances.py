@@ -21,7 +21,7 @@ from ...abi import (
     get_oracle_address_from_vault,
     load_erc20_abi,
 )
-from .base import AssetData, BaseAssetAdapter
+from .base import AssetData, BaseAssetAdapter, AdapterChain
 
 if TYPE_CHECKING:
     from ...config import OracleCLIConfig
@@ -30,14 +30,24 @@ logger = get_logger(__name__)
 
 
 class IdleBalancesAdapter(BaseAssetAdapter):
-    """Adapter for querying Idle Balances assets."""
+    """Adapter for querying Idle Balances assets from L1 or Hyperliquid chain."""
 
-    def __init__(self, config: OracleCLIConfig):
-        super().__init__(config)
-        self.w3_mainnet = Web3(Web3.HTTPProvider(config.l1_rpc))
-        self.w3_hl: Web3 | None = None
-        if config.hl_rpc:
-            self.w3_hl = Web3(Web3.HTTPProvider(config.hl_rpc))
+    def __init__(self, config: OracleCLIConfig, chain: str = "l1"):
+        """Initialize the adapter.
+
+        Args:
+            config: Oracle configuration
+            chain: Which chain to query - "l1" or "hyperliquid"
+        """
+        super().__init__(config, chain=chain)
+
+        if chain == "hyperliquid":
+            if not config.hl_rpc:
+                raise ValueError("hl_rpc must be configured to use hyperliquid chain")
+            self.w3 = Web3(Web3.HTTPProvider(config.hl_rpc))
+        else:
+            self.w3 = Web3(Web3.HTTPProvider(config.l1_rpc))
+
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
         self._rpc_jitter = getattr(self.config, "rpc_jitter", 0.10)  # seconds
@@ -59,54 +69,93 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     def adapter_name(self) -> str:
         return "idle_balances"
 
+    @property
+    def chain(self) -> AdapterChain:
+        return (
+            AdapterChain.HYPERLIQUID
+            if self._chain == "hyperliquid"
+            else AdapterChain.L1
+        )
+
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
-        """Fetch asset data from Idle Balances for the given vault.
+        """Fetch idle balances for the given subvault on the configured chain.
 
         Args:
-            subvault_address: The subvault contract address to query (used as fallback if config doesn't specify hl_subvault_address)
+            subvault_address: The specific subvault contract address to query
 
         Returns:
             List of AssetData objects containing asset addresses and balances
         """
-        subvault_addresses, supported_assets = await asyncio.gather(
-            self._fetch_subvault_addresses(),
-            self._fetch_supported_assets(),
-        )
+        if self._chain == "hyperliquid":
+            logger.debug(
+                "Fetching HL USDC idle balance for subvault %s",
+                subvault_address,
+            )
+            usdc_address = USDC_HL_TESTNET if self.config.testnet else USDC_HL_MAINNET
+            usdc_asset = await self._fetch_asset_balance(
+                self.w3, subvault_address, usdc_address
+            )
+            usdc_asset.asset_address = (
+                USDC_SEPOLIA if self.config.testnet else USDC_MAINNET
+            )
+            return [usdc_asset]
+
+        supported_assets = await self._fetch_supported_assets()
 
         logger.debug(
-            "Fetching balances for %d subvaults x %d assets = %d total calls",
-            len(subvault_addresses),
+            "Fetching L1 balances for subvault %s across %d assets",
+            subvault_address,
             len(supported_assets),
-            len(subvault_addresses) * len(supported_assets),
         )
 
         asset_tasks = [
-            self._fetch_asset_balance(self.w3_mainnet, subvault_addr, asset_addr)
-            for subvault_addr in subvault_addresses
+            self._fetch_asset_balance(self.w3, subvault_address, asset_addr)
             for asset_addr in supported_assets
         ]
 
         assets = list(await asyncio.gather(*asset_tasks))
 
-        # Fetch USDC balance from HL subvault if configured
-        if self.w3_hl:
-            usdc_address = USDC_HL_TESTNET if self.config.testnet else USDC_HL_MAINNET
-            hl_subvault_address = self.config.hl_subvault_address or subvault_address
-            usdc_asset = await self._fetch_asset_balance(
-                self.w3_hl, hl_subvault_address, usdc_address
-            )
-            # Overwrite USDC HL address with mainnet address
-            usdc_asset.asset_address = (
-                USDC_SEPOLIA if self.config.testnet else USDC_MAINNET
-            )
-            assets.append(usdc_asset)
-        else:
-            logger.warning(
-                "Hyperliquid RPC not configured, skipping HL USDC balance fetch"
-            )
-
-        logger.debug("Fetched %d asset balances", len(assets))
+        logger.debug("Fetched %d L1 asset balances for subvault", len(assets))
         return assets
+
+    async def fetch_all_assets(self) -> list[AssetData]:
+        """Fetch idle balances for ALL subvaults on the configured chain.
+
+        This method discovers all subvaults and fetches idle balances for each.
+        Use this for the default idle_balances collection on L1.
+
+        Returns:
+            List of AssetData objects from all subvaults
+        """
+        subvault_addresses = await self._fetch_subvault_addresses()
+        logger.info(
+            "Fetching %s idle balances for %d subvaults",
+            self._chain,
+            len(subvault_addresses),
+        )
+
+        asset_results = await asyncio.gather(
+            *[self.fetch_assets(addr) for addr in subvault_addresses],
+            return_exceptions=True,
+        )
+
+        all_assets: list[AssetData] = []
+        for subvault_addr, result in zip(subvault_addresses, asset_results):
+            if isinstance(result, Exception):
+                logger.error(
+                    "Failed to fetch idle balances for subvault %s: %s",
+                    subvault_addr,
+                    result,
+                )
+            elif isinstance(result, list):
+                all_assets.extend(result)
+
+        logger.info(
+            "Fetched %d total idle balance entries from %d subvaults",
+            len(all_assets),
+            len(subvault_addresses),
+        )
+        return all_assets
 
     async def _fetch_contract_list(
         self,
@@ -128,10 +177,10 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         Returns:
             List of addresses fetched from the contract
         """
-        checksum_address = self.w3_mainnet.to_checksum_address(contract_address)
+        checksum_address = self.w3.to_checksum_address(contract_address)
         logger.debug("Fetching %ss from contract: %s", item_type, checksum_address)
 
-        contract = self.w3_mainnet.eth.contract(address=checksum_address, abi=abi)
+        contract = self.w3.eth.contract(address=checksum_address, abi=abi)
         count = await self._rpc(getattr(contract.functions, count_function)().call)
         logger.debug("Found %d %ss", count, item_type)
 
@@ -151,7 +200,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Get the subvault addresses for the given vault."""
         vault_abi = load_vault_abi()
         return await self._fetch_contract_list(
-            contract_address=self.config.vault_address,
+            contract_address=self.config.vault_address_required,
             abi=vault_abi,
             count_function="subvaults",
             item_function="subvaultAt",
@@ -162,7 +211,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Get the supported assets for the given vault."""
         oracle_abi = load_oracle_abi()
         oracle_address = get_oracle_address_from_vault(
-            self.config.vault_address, self.config.l1_rpc
+            self.config.vault_address_required, self.config.l1_rpc_required
         )
         return await self._fetch_contract_list(
             contract_address=oracle_address,

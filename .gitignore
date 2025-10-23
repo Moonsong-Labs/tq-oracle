@@ -27,3 +27,7 @@ CLAUDE.md
 .kluster
 
 .env
+
+test.toml
+config.toml
+tq-oracle.toml

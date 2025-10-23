@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, Optional
+from dataclasses import replace
+from typing import Annotated, Any, Optional
 
 import typer
 
 from tq_oracle.constants import HL_PROD_EVM_RPC, HL_TEST_EVM_RPC
 
-from .config import OracleCLIConfig
+from .config_loader import build_config
 from .constants import (
     DEFAULT_MAINNET_RPC_URL,
     DEFAULT_SEPOLIA_RPC_URL,
@@ -31,11 +32,19 @@ app = typer.Typer(
 @app.command("report")
 def report(
     vault_address: Annotated[
-        str,
+        Optional[str],
         typer.Argument(
-            help="Vault contract address to query.",
+            help="Vault contract address to query (optional; must be provided via CLI argument, environment variable, or config file).",
         ),
-    ],
+    ] = None,
+    config: Annotated[
+        Optional[str],
+        typer.Option(
+            "--config",
+            "-c",
+            help="Path to TOML configuration file (default: ./tq-oracle.toml or ~/.config/tq-oracle/config.toml).",
+        ),
+    ] = None,
     oracle_helper_address: Annotated[
         Optional[str],
         typer.Option(
@@ -48,7 +57,6 @@ def report(
         Optional[str],
         typer.Option(
             "--l1-rpc",
-            envvar="L1_RPC",
             help="Ethereum L1 RPC endpoint (defaults to mainnet/testnet based on --testnet flag).",
         ),
     ] = None,
@@ -64,7 +72,6 @@ def report(
         Optional[str],
         typer.Option(
             "--hl-rpc",
-            envvar="HL_EVM_RPC",
             help="hyperliquid RPC endpoint (optional).",
         ),
     ] = None,
@@ -72,7 +79,6 @@ def report(
         Optional[str],
         typer.Option(
             "--l1-subvault-address",
-            envvar="L1_SUBVAULT_ADDRESS",
             help="L1 subvault address for CCTP bridge monitoring (optional).",
         ),
     ] = None,
@@ -80,7 +86,6 @@ def report(
         Optional[str],
         typer.Option(
             "--hl-subvault-address",
-            envvar="HL_SUBVAULT_ADDRESS",
             help="Hyperliquid subvault address to query (optional, defaults to vault address).",
         ),
     ] = None,
@@ -102,7 +107,6 @@ def report(
         Optional[str],
         typer.Option(
             "--private-key",
-            envvar="PRIVATE_KEY",
             help="Private key for signing transactions",
         ),
     ] = None,
@@ -110,7 +114,6 @@ def report(
         Optional[str],
         typer.Option(
             "--safe-key",
-            envvar="SAFE_TRANSACTION_SERVICE_API_KEY",
             help="API key for the Safe Transaction Service (optional, but recommended).",
         ),
     ] = None,
@@ -165,54 +168,85 @@ def report(
     ] = 1.0,
 ) -> None:
     """Collect TVL data and submit via Safe (optional)."""
-    if not dry_run and not safe_address and not private_key:
+    optional_args = {
+        "vault_address": vault_address,
+        "oracle_helper_address": oracle_helper_address,
+        "l1_rpc": l1_rpc,
+        "safe_address": safe_address,
+        "hl_rpc": hl_rpc,
+        "l1_subvault_address": l1_subvault_address,
+        "hl_subvault_address": hl_subvault_address,
+        "private_key": private_key,
+        "safe_txn_srvc_api_key": safe_txn_srvc_api_key,
+    }
+    cli_args: dict[str, Any] = {k: v for k, v in optional_args.items() if v is not None}
+
+    # Boolean and numeric args are always added. merge_config_sources handles
+    # the precedence smartly: if a CLI arg matches its default value and a
+    # non-default value exists in TOML/ENV, the TOML/ENV value wins.
+    cli_args["testnet"] = testnet
+    cli_args["dry_run"] = dry_run
+    cli_args["ignore_empty_vault"] = ignore_empty_vault
+    cli_args["ignore_timeout_check"] = ignore_timeout_check
+    cli_args["ignore_active_proposal_check"] = ignore_active_proposal_check
+    cli_args["pre_check_retries"] = pre_check_retries
+    cli_args["pre_check_timeout"] = pre_check_timeout
+    cli_args["chainlink_price_warning_tolerance_percentage"] = (
+        chainlink_price_warning_tolerance_percentage
+    )
+    cli_args["chainlink_price_failure_tolerance_percentage"] = (
+        chainlink_price_failure_tolerance_percentage
+    )
+
+    try:
+        cfg = build_config(config_file_path=config, **cli_args)
+    except FileNotFoundError as e:
+        raise typer.BadParameter(str(e), param_hint=["--config"])
+    except ValueError as e:
+        raise typer.BadParameter(str(e))
+
+    updates: dict[str, Any] = {}
+    if cfg.l1_rpc is None:
+        updates["l1_rpc"] = (
+            DEFAULT_SEPOLIA_RPC_URL if cfg.testnet else DEFAULT_MAINNET_RPC_URL
+        )
+    if cfg.oracle_helper_address is None:
+        updates["oracle_helper_address"] = (
+            SEPOLIA_ORACLE_HELPER if cfg.testnet else MAINNET_ORACLE_HELPER
+        )
+    if cfg.hl_rpc is None:
+        updates["hl_rpc"] = HL_PROD_EVM_RPC if not cfg.testnet else HL_TEST_EVM_RPC
+
+    using_default_rpc = l1_rpc is None or hl_rpc is None
+    updates["using_default_rpc"] = using_default_rpc
+
+    if updates:
+        cfg = replace(cfg, **updates)
+
+    setup_logging(cfg.log_level)
+
+    if not cfg.vault_address:
+        raise typer.BadParameter("vault_address must be configured")
+    if not cfg.l1_rpc:
+        raise typer.BadParameter("l1_rpc must be configured")
+    if not cfg.oracle_helper_address:
+        raise typer.BadParameter("oracle_helper_address must be configured")
+    if not cfg.hl_rpc:
+        raise typer.BadParameter("hl_rpc must be configured")
+
+    if not cfg.dry_run and not cfg.safe_address and not cfg.private_key:
         raise typer.BadParameter(
             "Either --safe-address OR --private-key required when running with --no-dry-run.",
             param_hint=["--safe-address", "--private-key"],
         )
 
-    if safe_address and not dry_run and not private_key:
+    if cfg.safe_address and not cfg.dry_run and not cfg.private_key:
         raise typer.BadParameter(
             "--private-key required when using --safe-address with --no-dry-run.",
             param_hint=["--private-key"],
         )
 
-    using_default_rpc = l1_rpc is None or hl_rpc is None
-
-    if l1_rpc is None:
-        l1_rpc = DEFAULT_SEPOLIA_RPC_URL if testnet else DEFAULT_MAINNET_RPC_URL
-
-    if oracle_helper_address is None:
-        oracle_helper_address = (
-            SEPOLIA_ORACLE_HELPER if testnet else MAINNET_ORACLE_HELPER
-        )
-
-    if hl_rpc is None:
-        hl_rpc = HL_PROD_EVM_RPC if not testnet else HL_TEST_EVM_RPC
-
-    config = OracleCLIConfig(
-        vault_address=vault_address,
-        oracle_helper_address=oracle_helper_address,
-        l1_rpc=l1_rpc,
-        l1_subvault_address=l1_subvault_address,
-        safe_address=safe_address,
-        hl_rpc=hl_rpc,
-        hl_subvault_address=hl_subvault_address,
-        using_default_rpc=using_default_rpc,
-        testnet=testnet,
-        dry_run=dry_run,
-        private_key=private_key,
-        safe_txn_srvc_api_key=safe_txn_srvc_api_key,
-        ignore_empty_vault=ignore_empty_vault,
-        ignore_timeout_check=ignore_timeout_check,
-        ignore_active_proposal_check=ignore_active_proposal_check,
-        pre_check_retries=pre_check_retries,
-        pre_check_timeout=pre_check_timeout,
-        chainlink_price_warning_tolerance_percentage=chainlink_price_warning_tolerance_percentage,
-        chainlink_price_failure_tolerance_percentage=chainlink_price_failure_tolerance_percentage,
-    )
-
-    asyncio.run(execute_oracle_flow(config))
+    asyncio.run(execute_oracle_flow(cfg))
 
 
 def run() -> None:

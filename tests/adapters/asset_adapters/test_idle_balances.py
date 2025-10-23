@@ -70,7 +70,7 @@ async def test_fetch_asset_balance_integration(config):
 
     usdc_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
     usdc_asset = await adapter._fetch_asset_balance(
-        adapter.w3_mainnet, subvault_address, usdc_address
+        adapter.w3, subvault_address, usdc_address
     )
     assert isinstance(usdc_asset, AssetData)
     assert usdc_asset.asset_address == usdc_address
@@ -79,7 +79,7 @@ async def test_fetch_asset_balance_integration(config):
 
     weth_address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
     weth_asset = await adapter._fetch_asset_balance(
-        adapter.w3_mainnet, subvault_address, weth_address
+        adapter.w3, subvault_address, weth_address
     )
     assert isinstance(weth_asset, AssetData)
     assert weth_asset.asset_address == weth_address
@@ -88,7 +88,7 @@ async def test_fetch_asset_balance_integration(config):
 
     usdt_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
     usdt_asset = await adapter._fetch_asset_balance(
-        adapter.w3_mainnet, subvault_address, usdt_address
+        adapter.w3, subvault_address, usdt_address
     )
     assert isinstance(usdt_asset, AssetData)
     assert usdt_asset.asset_address == usdt_address
@@ -104,7 +104,7 @@ async def test_fetch_eth_balance_integration(config):
     subvault_address = "0x90c983DC732e65DB6177638f0125914787b8Cb78"
 
     eth_asset = await adapter._fetch_asset_balance(
-        adapter.w3_mainnet, subvault_address, ETH_ASSET
+        adapter.w3, subvault_address, ETH_ASSET
     )
     assert isinstance(eth_asset, AssetData)
     assert eth_asset.asset_address == ETH_ASSET
@@ -132,13 +132,13 @@ def hl_config():
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_fetch_asset_balance_hyperevm_integration(hl_config):
-    adapter = IdleBalancesAdapter(hl_config)
+    adapter = IdleBalancesAdapter(hl_config, chain="hyperliquid")
 
     hl_subvault_address = "0x90c983DC732e65DB6177638f0125914787b8Cb78"
 
-    assert adapter.w3_hl is not None
+    assert adapter.w3 is not None
     usdc_hl_asset = await adapter._fetch_asset_balance(
-        adapter.w3_hl, hl_subvault_address, USDC_HL_MAINNET
+        adapter.w3, hl_subvault_address, USDC_HL_MAINNET
     )
     assert isinstance(usdc_hl_asset, AssetData)
     assert usdc_hl_asset.asset_address == USDC_HL_MAINNET
@@ -151,7 +151,7 @@ async def test_fetch_asset_balance_hyperevm_integration(hl_config):
 async def test_fetch_assets_integration(hl_config):
     adapter = IdleBalancesAdapter(hl_config)
 
-    assets = await adapter.fetch_assets("unused_param")
+    assets = await adapter.fetch_all_assets()
 
     expected_asset_addresses = {
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
@@ -162,7 +162,7 @@ async def test_fetch_assets_integration(hl_config):
         "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
     }
 
-    assert len(assets) == 25
+    assert len(assets) == 24
 
     for asset in assets:
         assert isinstance(asset, AssetData)
@@ -176,7 +176,7 @@ async def test_fetch_assets_integration(hl_config):
 async def test_fetch_assets_without_hl_integration(config):
     adapter = IdleBalancesAdapter(config)
 
-    assets = await adapter.fetch_assets("unused_param")
+    assets = await adapter.fetch_all_assets()
 
     expected_asset_addresses = {
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",

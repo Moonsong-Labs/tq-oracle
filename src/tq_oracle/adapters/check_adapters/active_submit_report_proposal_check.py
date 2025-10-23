@@ -101,7 +101,7 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
             List of active submitReport() proposals
         """
         network = EthereumNetwork(config.chain_id)
-        ethereum_client = EthereumClient(URI(config.l1_rpc))
+        ethereum_client = EthereumClient(URI(config.l1_rpc_required))
         tx_service = TransactionServiceApi(
             network, ethereum_client, api_key=config.safe_txn_srvc_api_key
         )

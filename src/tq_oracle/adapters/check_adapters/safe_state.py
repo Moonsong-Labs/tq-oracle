@@ -40,17 +40,18 @@ class SafeStateAdapter(BaseCheckAdapter):
             )
 
         try:
-            if await self._check_already_published(config, config.vault_address):
+            vault_address = config.vault_address_required
+            if await self._check_already_published(config, vault_address):
                 return CheckResult(
                     passed=False,
-                    message=f"Report already published for vault {config.vault_address}",
+                    message=f"Report already published for vault {vault_address}",
                     retry_recommended=False,
                 )
 
-            if await self._check_pending_vote(config, config.vault_address):
+            if await self._check_pending_vote(config, vault_address):
                 return CheckResult(
                     passed=False,
-                    message=f"Report already pending vote for vault {config.vault_address}",
+                    message=f"Report already pending vote for vault {vault_address}",
                     retry_recommended=False,
                 )
 

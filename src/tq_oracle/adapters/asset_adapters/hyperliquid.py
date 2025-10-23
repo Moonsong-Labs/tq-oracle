@@ -15,7 +15,7 @@ from ...constants import (
     HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
 from ...logger import get_logger
-from .base import AssetData, BaseAssetAdapter
+from .base import AssetData, BaseAssetAdapter, AdapterChain
 
 if TYPE_CHECKING:
     from ...config import OracleCLIConfig
@@ -33,13 +33,23 @@ class HyperliquidAdapter(BaseAssetAdapter):
     Raises ValueError on empty/invalid history or stale portfolio values.
     """
 
-    def __init__(self, config: OracleCLIConfig):
-        super().__init__(config)
+    def __init__(self, config: OracleCLIConfig, chain: str = "hyperliquid"):
+        """Initialize the Hyperliquid adapter.
+
+        Args:
+            config: Oracle configuration
+            chain: Which chain to operate on (defaults to "hyperliquid")
+        """
+        super().__init__(config, chain=chain)
         self.testnet = config.testnet
 
     @property
     def adapter_name(self) -> str:
         return "hyperliquid"
+
+    @property
+    def chain(self) -> AdapterChain:
+        return AdapterChain.HYPERLIQUID
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch current portfolio value (NAV) for the given subvault.

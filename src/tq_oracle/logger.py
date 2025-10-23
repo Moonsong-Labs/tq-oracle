@@ -39,16 +39,19 @@ class ColoredFormatter(logging.Formatter):
         return result
 
 
-def setup_logging() -> None:
+def setup_logging(log_level: str | None = None) -> None:
     """Configure logging for the application.
 
-    Reads LOG_LEVEL environment variable (defaults to INFO).
+    Args:
+        log_level: Log level to use (DEBUG, INFO, WARNING, ERROR, CRITICAL, TRACE).
+                   If None, reads from LOG_LEVEL environment variable (defaults to INFO).
+
     Sets up a simple console handler with formatted output and colors.
 
     When LOG_LEVEL is DEBUG, web3 and urllib3 loggers are set to WARNING
     to reduce noise. Use LOG_LEVEL=TRACE to see all web3/urllib3 logs.
     """
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_level = (log_level or os.getenv("LOG_LEVEL", "INFO")).upper()
     level = getattr(logging, log_level, logging.INFO)
 
     handler = logging.StreamHandler(sys.stdout)
