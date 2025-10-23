@@ -6,6 +6,8 @@ A command-line application for collecting Total Value Locked (TVL) data from vau
 
 TQ Oracle performs read smart contract READ calls through a registry of protocol adapters to aggregate TVL data for specified vaults. Each adapter is responsible for querying specific contracts and returning standardized asset price data.
 
+For detailed system architecture and integration with Mellow Finance flexible-vaults, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Running without installing
 
 You can run this CLI without any git cloning, directly with `uv`
@@ -40,67 +42,21 @@ TQ Oracle supports three ways to configure the application, with the following p
 
 ### Basic Command
 
-```bash
-uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
-```
+Run the CLI with a vault address and dry-run flag to preview reports without submission.
 
 ### Using a Configuration File (Recommended)
 
-Create a `tq-oracle.toml` file in your project directory or `~/.config/tq-oracle/config.toml`:
-
-```toml
-vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
-testnet = false
-
-l1_rpc = "https://ethereum-rpc.publicnode.com"
-hl_rpc = "https://api.hyperliquid.xyz/evm"
-
-dry_run = true
-
-ignore_empty_vault = false
-pre_check_retries = 3
-pre_check_timeout = 12.0
-```
-
-Then run with minimal arguments:
-
-```bash
-# `tq-oracle.toml` Config file is automatically detected
-uv run tq-oracle report
-
-# Or specify config file explicitly
-uv run tq-oracle report --config ./my-config.toml
-```
-
-See `tq-oracle.toml.example` for a complete configuration template with all available options.
+- Create `tq-oracle.toml` in project directory or `~/.config/tq-oracle/config.toml`
+- Configure vault address, network, RPC endpoints, and operational settings
+- Run with minimal CLI arguments - config file is auto-detected
+- See `tq-oracle.toml.example` for complete configuration template
 
 ### With Environment Variables
 
-Create a `.env` file:
-
-```env
-L1_RPC=https://sepolia.drpc.org
-HL_SUBVAULT_ADDRESS=0xYourHyperliquidSubvaultAddress
-PRIVATE_KEY=0xYourPrivateKey
-```
-
-Then run:
-
-```bash
-uv run tq-oracle <VAULT_ADDRESS> [OPTIONS]
-```
-
-> [!IMPORTANT]  
-> Always use environment variables or CLI flags for secrets (private keys, API keys). Never store them in TOML configuration files.
-
-#### Example
-
-```bash
-uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
-  --dry-run \
-  --ignore-empty-vault \
-  --hl-subvault-address 0xb764428a29EAEbe8e2301F5924746F818b331F5A
-```
+- Create `.env` file for environment-specific settings
+- Set RPC endpoints, subvault addresses, and other non-secret configuration
+- **Important**: Always use environment variables or CLI flags for secrets (private keys, API keys) - never store them in TOML files
+- Run with vault address and any additional CLI options
 
 ### Configuration Options
 
@@ -141,70 +97,34 @@ All configuration options can be set via CLI arguments, environment variables, o
 
 ### Advanced Configuration: Subvault Adapters
 
-TQ Oracle supports configuring multiple asset adapters per subvault address, allowing you to compose TVL from various sources (e.g., idle balances on L1 + portfolio on Hyperliquid).
+TQ Oracle supports configuring multiple asset adapters per subvault address, allowing you to compose TVL from various sources.
 
-**Configuration Structure:**
+**Configuration via TOML:**
 
-```toml
-[[subvault_adapters]]
-subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
-chain = "hyperliquid"                          # Chain: "l1" or "hyperliquid"
-additional_adapters = ["hyperliquid", "idle_balances"]  # Asset adapters to run
-skip_idle_balances = false                     # Skip default L1 idle_balances check
-skip_subvault_existence_check = false          # Skip vault contract validation
-```
+- Specify target subvault address
+- Define which chain the subvault operates on (L1 or Hyperliquid)
+- List additional adapters to run for this subvault
+- Option to skip default idle balances check
+- Option to skip subvault existence validation
 
 **Available Asset Adapters:**
+
 - `idle_balances` - Checks for idle USDC balances not yet deployed
 - `hyperliquid` - Fetches portfolio value from Hyperliquid
 
-**Example: Hyperliquid subvault with portfolio + idle USDC check**
+See `tq-oracle.toml.example` for complete configuration examples.
 
-```toml
-[[subvault_adapters]]
-subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
-chain = "hyperliquid"
-additional_adapters = ["hyperliquid", "idle_balances"]
-skip_idle_balances = false
-skip_subvault_existence_check = false
-```
+### Usage Examples
 
-See `tq-oracle-example.toml` for more configuration examples.
-
-### Examples
-
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > Until Mellow has deployments of the vaults available for testing, you may need to use `--ignore-empty-vault` flag to overcome empty-asset errors.
 
-**Dry-run on mainnet:**
+**Common Usage Patterns:**
 
-```bash
-uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 --dry-run
-```
-
-**Dry-run with custom Hyperliquid subvault:**
-
-```bash
-uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
-  --hl-subvault-address 0xYourHyperliquidAddress
-```
-
-**Execute on testnet with Safe:**
-
-```bash
-uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
-  --safe-address 0xabc... \
-  --testnet \
-  --no-dry-run \
-  --private-key 0x...
-```
-
-**Testing empty vault (pre-deployment):**
-
-```bash
-uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
-  --ignore-empty-vault
-```
+- **Dry-run on mainnet**: Preview report generation without submitting to chain
+- **Custom subvault**: Specify Hyperliquid subvault address for cross-chain asset tracking
+- **Testnet execution**: Run against testnet with Safe multi-sig for testing
+- **Pre-deployment testing**: Test with empty vaults using ignore flags
 
 ## Architecture
 
@@ -235,116 +155,31 @@ These checks prevent race conditions and ensure accurate TVL snapshots by detect
 
 ### Testing CCTP Bridge Detection
 
-A standalone test script is available to verify CCTP bridge in-flight detection:
-
-```bash
-# Test on mainnet
-uv run python scripts/check_cctp_inflight.py \
-  0xL1SubvaultAddress \
-  0xHLSubvaultAddress
-```
+A standalone test script is available in `scripts/check_cctp_inflight.py` to verify CCTP bridge in-flight detection with L1 and Hyperliquid subvault addresses.
 
 ## Adding New Adapters
 
 ### Asset Adapters
 
-Asset adapters fetch asset holdings from specific protocols (e.g., Hyperliquid, Aave, Uniswap).
+Asset adapters fetch asset holdings from specific protocols (e.g., Hyperliquid, Aave, Lido).
 
-1. **Create adapter file** in `src/tq_oracle/adapters/asset_adapters/`:
+Quick overview:
 
-```python
-from __future__ import annotations
+1. **Create adapter file** in `src/tq_oracle/adapters/asset_adapters/` implementing `BaseAssetAdapter`
+2. **Register adapter** in `src/tq_oracle/adapters/asset_adapters/__init__.py`'s `ADAPTER_REGISTRY`
+3. **Write integration tests** in `tests/adapters/asset_adapters/`
+4. **Add asset addresses** to `src/tq_oracle/constants.py` if needed
 
-from typing import TYPE_CHECKING
-
-from .base import AssetData, BaseAssetAdapter
-
-if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
-
-class MyProtocolAdapter(BaseAssetAdapter):
-    """Adapter for querying MyProtocol assets."""
-
-    def __init__(self, config: OracleCLIConfig):
-        super().__init__(config)
-        # Initialize any protocol-specific clients/connections
-
-    @property
-    def adapter_name(self) -> str:
-        return "my_protocol"
-
-    async def fetch_assets(self, vault_address: str) -> list[AssetData]:
-        """Fetch asset data from MyProtocol for the given vault."""
-        # Implement your protocol-specific logic here
-        return [
-            AssetData(asset_address="0x...", amount=1000000),
-        ]
-```
-
-2. **Register adapter** in `src/tq_oracle/adapters/asset_adapters/__init__.py`:
-
-```python
-from .my_protocol import MyProtocolAdapter
-
-ADAPTER_REGISTRY: dict[str, type[BaseAssetAdapter]] = {
-    "idle_balances": IdleBalancesAdapter,
-    "hyperliquid": HyperliquidAdapter,
-    "my_protocol": MyProtocolAdapter,  # Add your adapter here
-}
-
-ASSET_ADAPTERS: list[type[BaseAssetAdapter]] = list(ADAPTER_REGISTRY.values())
-```
-
-The adapter name in the registry (e.g., `"my_protocol"`) is used in the `[[subvault_adapters]]` configuration's `additional_adapters` field.
+The adapter name in the registry is used in the `[[subvault_adapters]]` configuration's `additional_adapters` field.
 
 ### Price Adapters
 
 Price adapters fetch USD prices for assets from price oracles (e.g., Chainlink, Pyth).
 
-1. **Create adapter file** in `src/tq_oracle/adapters/price_adapters/`:
-
-```python
-# src/tq_oracle/adapters/price_adapters/my_oracle.py
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from .base import BasePriceAdapter, PriceData
-
-if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
-
-class MyOracleAdapter(BasePriceAdapter):
-    """Adapter for querying MyOracle price feeds."""
-
-    def __init__(self, config: OracleCLIConfig):
-        super().__init__(config)
-        # Initialize oracle connections
-
-    @property
-    def adapter_name(self) -> str:
-        return "my_oracle"
-
-    async def fetch_prices(self, asset_addresses: list[str]) -> list[PriceData]:
-        """Fetch USD prices for the given asset addresses."""
-        # Implement price fetching logic
-        return [
-            PriceData(asset_address=addr, price_usd=1000000000000000000)
-            for addr in asset_addresses
-        ]
-```
-
-2. **Register adapter** in `src/tq_oracle/adapters/price_adapters/__init__.py`:
-
-```python
-from .my_oracle import MyOracleAdapter
-
-PRICE_ADAPTERS = [
-    CowSwapAdapter,
-    WstETHAdapter,
-    MyOracleAdapter,  # Add your adapter here
-]
-```
+1. **Create adapter file** in `src/tq_oracle/adapters/price_adapters/` implementing `BasePriceAdapter`
+2. **Register adapter** in `src/tq_oracle/adapters/price_adapters/__init__.py`'s `PRICE_ADAPTERS` list
+3. **Implement async `fetch_prices()` method** to query oracle and return price data
+4. **Write unit tests** in `tests/adapters/price_adapters/`
 
 > **Note:** `ChainlinkAdapter` is exported for use in price validators but not used directly in the main pricing pipeline.
 
@@ -352,92 +187,22 @@ PRICE_ADAPTERS = [
 
 Price validators cross-check prices from the main price adapters against reference sources to detect anomalies or manipulation. They run after price fetching and can issue warnings or halt execution if prices deviate beyond configured thresholds.
 
-1. **Create validator file** in `src/tq_oracle/adapters/price_validators/`:
+1. **Create validator file** in `src/tq_oracle/adapters/price_validators/` implementing `BasePriceValidator`
+2. **Register validator** in `src/tq_oracle/adapters/price_validators/__init__.py`'s `PRICE_VALIDATORS` list
+3. **Implement async `validate_prices()` method** to cross-check prices and return validation results
+4. **Configure tolerance thresholds** in settings for warning and failure levels
+5. **Write unit tests** in `tests/adapters/price_validators/`
 
-```python
-# src/tq_oracle/adapters/price_validators/my_validator.py
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from .base import BasePriceValidator, PriceValidationResult
-
-if TYPE_CHECKING:
-    from ...settings import OracleSettings
-
-class MyValidator(BasePriceValidator):
-    """Validator to cross-check prices against a reference oracle."""
-
-    def __init__(self, config: OracleSettings):
-        super().__init__(config)
-        # Initialize validator-specific connections
-
-    @property
-    def validator_name(self) -> str:
-        return "my_validator"
-
-    async def validate_prices(
-        self,
-        prices: dict[str, int]
-    ) -> list[PriceValidationResult]:
-        """Validate prices against reference oracle.
-
-        Args:
-            prices: Dict mapping asset addresses to prices (in wei, 18 decimals)
-
-        Returns:
-            List of validation results (warnings or failures)
-        """
-        # Implement validation logic
-        results = []
-        for asset_address, price in prices.items():
-            reference_price = await self.fetch_reference_price(asset_address)
-            deviation = abs(price - reference_price) / reference_price
-
-            if deviation > 0.01:  # 1% deviation
-                results.append(
-                    PriceValidationResult(
-                        asset_address=asset_address,
-                        severity="warning",
-                        message=f"Price deviation: {deviation:.2%}"
-                    )
-                )
-
-        return results
-```
-
-2. **Register validator** in `src/tq_oracle/adapters/price_validators/__init__.py`:
-
-```python
-from .my_validator import MyValidator
-
-PRICE_VALIDATORS = [
-    ChainlinkValidator,
-    MyValidator,  # Add your validator here
-]
-```
-
-**Configuration:**
-
-Price validators respect tolerance thresholds configured in `settings.py`:
+Validators respect tolerance thresholds configured in `settings.py`:
 - `chainlink_price_warning_tolerance_percentage` (default: 0.5%) - Issues warnings
 - `chainlink_price_failure_tolerance_percentage` (default: 1.0%) - Halts execution
 
 ## Development
 
-```bash
-# Install dev dependencies
-uv sync --all-extras
-
-# Run tests
-pytest
-
-# Lint code
-ruff check src/
-
-# Format code
-ruff format src/
-```
+- **Install dependencies**: Use `uv sync --all-extras` for development dependencies
+- **Run tests**: Execute test suite with pytest
+- **Lint code**: Check code quality with ruff
+- **Format code**: Apply consistent formatting with ruff format
 
 ---
 
