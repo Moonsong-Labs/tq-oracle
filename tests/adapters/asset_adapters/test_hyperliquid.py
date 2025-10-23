@@ -8,10 +8,9 @@ from tq_oracle.config import OracleCLIConfig
 from tq_oracle.constants import (
     HL_MAINNET_API_URL,
     HL_TESTNET_API_URL,
-    USDC_MAINNET,
-    USDC_SEPOLIA,
     HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
+from tq_oracle.config import Network
 
 
 @pytest.fixture
@@ -20,6 +19,7 @@ def mainnet_config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://mainnet.rpc",
+        network=Network.MAINNET,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
@@ -37,6 +37,7 @@ def testnet_config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://testnet.rpc",
+        network=Network.SEPOLIA,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
@@ -46,6 +47,13 @@ def testnet_config():
         private_key=None,
         safe_txn_srvc_api_key=None,
     )
+
+
+@pytest.fixture
+def usdc_address(config):
+    address = config.assets["USDC"]
+    assert address is not None
+    return address
 
 
 @pytest.mark.asyncio
@@ -67,7 +75,7 @@ async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
             base_url=HL_MAINNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == USDC_MAINNET
+        assert assets[0].asset_address == usdc_address(mainnet_config)
 
 
 @pytest.mark.asyncio
@@ -89,7 +97,7 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
             base_url=HL_TESTNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == USDC_SEPOLIA
+        assert assets[0].asset_address == usdc_address(testnet_config)
 
 
 @pytest.mark.asyncio
