@@ -4,10 +4,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Protocol
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 
 @dataclass
 class PriceData:
@@ -62,7 +58,7 @@ class BasePriceAdapter(ABC):
         """Fetch prices for the given asset addresses."""
         ...
 
-    async def validate_prices(self, price_data: PriceData) -> None:
+    def validate_prices(self, price_data: PriceData) -> None:
         """Validate prices and raise an exception if any prices are non-positive.
         Called after fetching prices to ensure all prices are positive.
 

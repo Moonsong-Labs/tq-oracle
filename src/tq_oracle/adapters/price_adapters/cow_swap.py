@@ -97,6 +97,6 @@ class CowSwapAdapter(BasePriceAdapter):
             price_wei_normalized = price_wei // (10 ** (18 - token_decimals))
             prices_accumulator.prices[asset_address] = price_wei_normalized
 
-        await self.validate_prices(prices_accumulator)
+        self.validate_prices(prices_accumulator)
 
         return prices_accumulator

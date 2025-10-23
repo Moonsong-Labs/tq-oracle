@@ -117,6 +117,6 @@ class ChainlinkAdapter(BasePriceAdapter):
             usds_eth_price = (usds_usd_scaled * 10**18) // eth_usd_scaled
             prices_accumulator.prices[self.usds_address] = usds_eth_price
 
-        await self.validate_prices(prices_accumulator)
+        self.validate_prices(prices_accumulator)
 
         return prices_accumulator
