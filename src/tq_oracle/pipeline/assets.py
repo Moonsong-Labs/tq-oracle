@@ -64,32 +64,33 @@ def _process_adapter_results(
         log: Logger instance
     """
     for task_info, result in zip(tasks_info, results):
-        match result:
-            case Exception() as e:
-                if len(task_info) == 2:  # (name, _)
-                    name = task_info[0]
-                    log.error("Adapter '%s' failed: %s", name, e)
-                elif len(task_info) == 3:  # (subvault_addr, adapter, name)
-                    subvault_addr, _, name = task_info
-                    log.error(
-                        "Adapter '%s' failed for subvault %s: %s",
-                        name,
-                        subvault_addr,
-                        e,
-                    )
-            case list() as assets:
-                if len(task_info) == 2:  # (name, _)
-                    name = task_info[0]
-                    log.debug("Adapter '%s' returned %d assets", name, len(assets))
-                elif len(task_info) == 3:  # (subvault_addr, adapter, name)
-                    subvault_addr, _, name = task_info
-                    log.debug(
-                        "Adapter '%s' for subvault %s returned %d assets",
-                        name,
-                        subvault_addr,
-                        len(assets),
-                    )
-                asset_data.append(assets)
+        if isinstance(result, BaseException):
+            e = result
+            if len(task_info) == 2:  # (name, _)
+                name = task_info[0]
+                log.error("Adapter '%s' failed: %s", name, e)
+            elif len(task_info) == 3:  # (subvault_addr, adapter, name)
+                subvault_addr, _, name = task_info
+                log.error(
+                    "Adapter '%s' failed for subvault %s: %s",
+                    name,
+                    subvault_addr,
+                    e,
+                )
+        elif isinstance(result, list):
+            assets = result
+            if len(task_info) == 2:  # (name, _)
+                name = task_info[0]
+                log.debug("Adapter '%s' returned %d assets", name, len(assets))
+            elif len(task_info) == 3:  # (subvault_addr, adapter, name)
+                subvault_addr, _, name = task_info
+                log.debug(
+                    "Adapter '%s' for subvault %s returned %d assets",
+                    name,
+                    subvault_addr,
+                    len(assets),
+                )
+            asset_data.append(assets)
 
 
 async def collect_assets(state: AppState) -> AggregatedAssets:
