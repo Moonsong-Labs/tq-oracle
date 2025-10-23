@@ -13,8 +13,6 @@ import typer
 from .constants import (
     DEFAULT_MAINNET_RPC_URL,
     DEFAULT_SEPOLIA_RPC_URL,
-    HL_PROD_EVM_RPC,
-    HL_TEST_EVM_RPC,
     MAINNET_ORACLE_HELPER,
     SEPOLIA_ORACLE_HELPER,
 )
@@ -61,12 +59,20 @@ def main(
             help="Network to use (mainnet, sepolia, or base).",
         ),
     ] = Network.MAINNET,
-    testnet: Annotated[
-        bool,
+    hyperliquid_env: Annotated[
+        str,
         typer.Option(
-            "--testnet/--no-testnet", help="Use testnet; overrides env/config."
+            "--hyperliquid-env",
+            help="Hyperliquid environment (mainnet or testnet); overrides env/config.",
         ),
-    ] = False,
+    ] = "mainnet",
+    cctp_env: Annotated[
+        str,
+        typer.Option(
+            "--cctp-env",
+            help="CCTP environment (mainnet or testnet); overrides env/config.",
+        ),
+    ] = "mainnet",
     dry_run: Annotated[
         bool,
         typer.Option(
@@ -89,20 +95,23 @@ def main(
         os.environ["TQ_ORACLE_CONFIG"] = str(config)
 
     settings = OracleSettings(
-        testnet=testnet,
+        network=network,
+        hyperliquid_env=hyperliquid_env,  # type: ignore
+        cctp_env=cctp_env,  # type: ignore
         dry_run=dry_run,
     )
 
     if settings.l1_rpc is None:
-        settings.l1_rpc = (
-            DEFAULT_SEPOLIA_RPC_URL if settings.testnet else DEFAULT_MAINNET_RPC_URL
-        )
+        if settings.network == Network.SEPOLIA:
+            settings.l1_rpc = DEFAULT_SEPOLIA_RPC_URL
+        else:
+            settings.l1_rpc = DEFAULT_MAINNET_RPC_URL
+
     if settings.oracle_helper_address is None:
-        settings.oracle_helper_address = (
-            SEPOLIA_ORACLE_HELPER if settings.testnet else MAINNET_ORACLE_HELPER
-        )
-    if settings.hl_rpc is None:
-        settings.hl_rpc = HL_PROD_EVM_RPC if not settings.testnet else HL_TEST_EVM_RPC
+        if settings.network == Network.SEPOLIA:
+            settings.oracle_helper_address = SEPOLIA_ORACLE_HELPER
+        else:
+            settings.oracle_helper_address = MAINNET_ORACLE_HELPER
 
     settings.using_default_rpc = config is None or settings.hl_rpc is None
 

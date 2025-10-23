@@ -7,10 +7,6 @@ from web3 import Web3
 import backoff
 import random
 from web3.exceptions import ProviderConnectionError
-from ...constants import (
-    USDC_HL_MAINNET,
-    USDC_HL_TESTNET,
-)
 from ...logger import get_logger
 from ...abi import (
     load_vault_abi,
@@ -101,7 +97,9 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 "Fetching HL USDC idle balance for subvault %s",
                 subvault_address,
             )
-            usdc_address = USDC_HL_TESTNET if self.config.testnet else USDC_HL_MAINNET
+            if self.config.hyperliquid_usdc_address is None:
+                raise ValueError("hyperliquid_usdc_address must be set in config")
+            usdc_address = self.config.hyperliquid_usdc_address
             usdc_asset = await self._fetch_asset_balance(
                 self.w3, subvault_address, usdc_address
             )

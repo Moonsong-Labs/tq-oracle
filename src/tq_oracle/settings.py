@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 try:
     import tomllib  # py311+
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -29,6 +29,10 @@ class Network(str, Enum):
     BASE = "base"
 
 
+HyperliquidEnv = Literal["mainnet", "testnet"]
+CCTPEnv = Literal["mainnet", "testnet"]
+
+
 class OracleSettings(BaseSettings):
     """Single source of truth for configuration. Values may come from:
     - CLI (init kwargs)
@@ -39,8 +43,11 @@ class OracleSettings(BaseSettings):
     """
 
     # --- global toggles ---
-    testnet: bool = False
     dry_run: bool = True
+
+    # --- environment selection ---
+    hyperliquid_env: HyperliquidEnv = "mainnet"
+    cctp_env: CCTPEnv = "mainnet"
 
     # --- core addresses / endpoints ---
     vault_address: str | None = None
@@ -52,6 +59,11 @@ class OracleSettings(BaseSettings):
     hl_subvault_address: str | None = None
     hl_rpc: str | None = None
     l1_subvault_address: str | None = None
+
+    # --- computed/derived values (set by validator) ---
+    hyperliquid_api_url: str | None = None
+    hyperliquid_usdc_address: str | None = None
+    cctp_token_messenger_address: str | None = None
 
     # --- safe / signing ---
     safe_address: str | None = None
@@ -99,6 +111,54 @@ class OracleSettings(BaseSettings):
         if v is None or isinstance(v, SecretStr):
             return v
         return SecretStr(v)
+
+    @model_validator(mode="after")
+    def set_derived_values(self) -> "OracleSettings":
+        """Compute environment-specific values based on configuration.
+
+        This centralizes all environment selection logic in one place,
+        removing the need for if/else checks throughout the codebase.
+        """
+        from .constants import (
+            HL_MAINNET_API_URL,
+            HL_TESTNET_API_URL,
+            HL_PROD_EVM_RPC,
+            HL_TEST_EVM_RPC,
+            USDC_HL_MAINNET,
+            USDC_HL_TESTNET,
+            TOKEN_MESSENGER_V2_PROD,
+            TOKEN_MESSENGER_V2_TEST,
+        )
+
+        if self.hyperliquid_api_url is None:
+            self.hyperliquid_api_url = (
+                HL_TESTNET_API_URL
+                if self.hyperliquid_env == "testnet"
+                else HL_MAINNET_API_URL
+            )
+
+        if self.hl_rpc is None:
+            self.hl_rpc = (
+                HL_TEST_EVM_RPC
+                if self.hyperliquid_env == "testnet"
+                else HL_PROD_EVM_RPC
+            )
+
+        if self.hyperliquid_usdc_address is None:
+            self.hyperliquid_usdc_address = (
+                USDC_HL_TESTNET
+                if self.hyperliquid_env == "testnet"
+                else USDC_HL_MAINNET
+            )
+
+        if self.cctp_token_messenger_address is None:
+            self.cctp_token_messenger_address = (
+                TOKEN_MESSENGER_V2_TEST
+                if self.cctp_env == "testnet"
+                else TOKEN_MESSENGER_V2_PROD
+            )
+
+        return self
 
     @classmethod
     def settings_customise_sources(

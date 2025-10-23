@@ -7,11 +7,7 @@ from typing import TYPE_CHECKING, Optional, Any
 
 from hyperliquid.info import Info
 
-from ...constants import (
-    HL_MAINNET_API_URL,
-    HL_TESTNET_API_URL,
-    HL_MAX_PORTFOLIO_STALENESS_SECONDS,
-)
+from ...constants import HL_MAX_PORTFOLIO_STALENESS_SECONDS
 from ...logger import get_logger
 from .base import AssetData, BaseAssetAdapter, AdapterChain
 
@@ -32,6 +28,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
     """
 
     usdc_address: str
+    api_url: str
 
     def __init__(self, config: OracleSettings, chain: str = "hyperliquid"):
         """Initialize the Hyperliquid adapter.
@@ -46,7 +43,10 @@ class HyperliquidAdapter(BaseAssetAdapter):
         if usdc_address is None:
             raise ValueError("USDC address is required for Hyperliquid adapter")
         self.usdc_address = usdc_address
-        self.testnet = config.testnet
+
+        if config.hyperliquid_api_url is None:
+            raise ValueError("hyperliquid_api_url must be set in config")
+        self.api_url = config.hyperliquid_api_url
 
     @property
     def adapter_name(self) -> str:
@@ -78,15 +78,14 @@ class HyperliquidAdapter(BaseAssetAdapter):
         # Use config's hl_subvault_address if set, otherwise fall back to passed address
         address_to_query = self.config.hl_subvault_address or subvault_address
 
-        base_url = HL_TESTNET_API_URL if self.testnet else HL_MAINNET_API_URL
         logger.info(
-            "Fetching Hyperliquid assets for %s (testnet=%s)",
+            "Fetching Hyperliquid assets for %s (env=%s)",
             address_to_query,
-            self.testnet,
+            self.config.hyperliquid_env,
         )
-        logger.debug("Using API URL: %s", base_url)
+        logger.debug("Using API URL: %s", self.api_url)
 
-        info = await asyncio.to_thread(Info, base_url=base_url, skip_ws=True)
+        info = await asyncio.to_thread(Info, base_url=self.api_url, skip_ws=True)
 
         try:
             logger.debug("Calling portfolio API to fetch latest NAV data...")

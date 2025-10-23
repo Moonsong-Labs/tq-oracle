@@ -20,8 +20,6 @@ from tq_oracle.constants import (
     HL_BLOCK_TIME,
     L1_BLOCK_TIME,
     RPC_RATE_LIMIT_DELAY,
-    TOKEN_MESSENGER_V2_PROD,
-    TOKEN_MESSENGER_V2_TEST,
 )
 
 if TYPE_CHECKING:
@@ -43,15 +41,9 @@ class TransactionIdentity(NamedTuple):
 class CCTPBridgeAdapter(BaseCheckAdapter):
     """Detects in-flight CCTP bridging transactions between L1 and Hyperliquid."""
 
-    MESSENGER_ADDRESSES = {
-        "testnet": TOKEN_MESSENGER_V2_TEST,
-        "mainnet": TOKEN_MESSENGER_V2_PROD,
-    }
-
     def __init__(self, config: OracleSettings):
         super().__init__(config)
         self._config = config
-        self.testnet = config.testnet
 
     @property
     def name(self) -> str:
@@ -138,9 +130,9 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
             logger.debug(f"Connecting to HL RPC: {self._config.hl_rpc}")
             hl_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.hl_rpc))
 
-            messenger_addr = self.MESSENGER_ADDRESSES[
-                "testnet" if self._config.testnet else "mainnet"
-            ]
+            if self._config.cctp_token_messenger_address is None:
+                raise ValueError("cctp_token_messenger_address must be set in config")
+            messenger_addr = self._config.cctp_token_messenger_address
 
             abi_dir = Path(tq_oracle.__file__).parent / "abis"
             messenger_abi = load_abi(abi_dir / "TokenMessengerV2.json")

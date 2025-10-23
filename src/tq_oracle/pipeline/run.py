@@ -33,7 +33,12 @@ async def run_report(state: AppState, vault_address: str) -> None:
 
     log.info(
         "Starting report",
-        extra={"vault": vault_address, "testnet": s.testnet, "dry_run": s.dry_run},
+        extra={
+            "vault": vault_address,
+            "hyperliquid_env": s.hyperliquid_env,
+            "cctp_env": s.cctp_env,
+            "dry_run": s.dry_run,
+        },
     )
 
     await run_preflight(state, vault_address)
