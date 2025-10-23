@@ -1,5 +1,5 @@
 # TQ Oracle Configuration Example
-# This file demonstrates the additional adapters configuration
+# This file demonstrates a comprehensive configuration example, including basic settings, RPC endpoints, logging, adapters, rate limiting, and pre-checks.
 
 vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
 testnet = false

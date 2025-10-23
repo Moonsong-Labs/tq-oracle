@@ -103,7 +103,9 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             usdc_asset = await self._fetch_asset_balance(
                 self.w3, subvault_address, usdc_address
             )
-            usdc_asset.asset_address = self.usdc_address
+            usdc_asset = AssetData(
+                asset_address=self.usdc_address, amount=usdc_asset.amount
+            )
             return [usdc_asset]
 
         supported_assets = await self._fetch_supported_assets()

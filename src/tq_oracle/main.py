@@ -19,8 +19,7 @@ from .constants import (
     SEPOLIA_ORACLE_HELPER,
 )
 from .logger import setup_logging
-from .settings import OracleSettings
-from .settings import Network
+from .settings import CCTPEnv, HyperliquidEnv, Network, OracleSettings
 from .state import AppState
 
 app = typer.Typer(
@@ -62,14 +61,14 @@ def main(
         ),
     ] = Network.MAINNET,
     hyperliquid_env: Annotated[
-        str,
+        HyperliquidEnv,
         typer.Option(
             "--hyperliquid-env",
             help="Hyperliquid environment (mainnet or testnet); overrides env/config.",
         ),
     ] = "mainnet",
     cctp_env: Annotated[
-        str,
+        CCTPEnv,
         typer.Option(
             "--cctp-env",
             help="CCTP environment (mainnet or testnet); overrides env/config.",
@@ -98,8 +97,8 @@ def main(
 
     settings = OracleSettings(
         network=network,
-        hyperliquid_env=hyperliquid_env,  # type: ignore
-        cctp_env=cctp_env,  # type: ignore
+        hyperliquid_env=hyperliquid_env,
+        cctp_env=cctp_env,
         dry_run=dry_run,
     )
 

@@ -116,7 +116,8 @@ All configuration options can be set via CLI arguments, environment variables, o
 | `--l1-subvault-address` | `L1_SUBVAULT_ADDRESS` | `l1_subvault_address` | - | L1 subvault for CCTP monitoring |
 | `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | `hl_subvault_address` | Vault address | Hyperliquid subvault address |
 | `--safe-address` `-s` | - | `safe_address` | - | Gnosis Safe address for multi-sig |
-| `--testnet/--no-testnet` | - | `testnet` | `false` | Use testnet instead of mainnet |
+| `--hyperliquid-env` | `HYPERLIQUID_ENV` | `hyperliquid_env` | `"mainnet"` | Hyperliquid environment (`"mainnet"` or `"testnet"`) |
+| `--cctp-env` | `CCTP_ENV` | `cctp_env` | `"mainnet"` | CCTP environment (`"mainnet"` or `"testnet"`) |
 | `--dry-run/--no-dry-run` | - | `dry_run` | `true` | Preview without sending transaction |
 | `--private-key` | `PRIVATE_KEY` | ❌ *Never use TOML* | - | Private key for signing (required with Safe on --no-dry-run) |
 | `--safe-key` | `SAFE_TRANSACTION_SERVICE_API_KEY` | ❌ *Never use TOML* | - | API key for Safe Transaction Service |
