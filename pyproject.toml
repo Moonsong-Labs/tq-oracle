@@ -1,13 +1,15 @@
 [project]
 name = "tq-oracle"
 version = "0.1.0"
-description = "Add your description here"
+description = "Theoriq Oracle for Mellow flexible-vaults"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "backoff>=2.2.1",
     "dotenv>=0.9.9",
     "hyperliquid-python-sdk>=0.19.0",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
     "requests>=2.32.5",
     "safe-eth-py>=7.13.0",
     "typer>=0.19.2",
@@ -19,11 +21,17 @@ dev = [
     "pyrefly>=0.35.0",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
+    "pytest-env>=1.1.0",
     "ruff>=0.13.2",
 ]
 
 [tool.pyrefly]
 project-includes = ["src","tests", "scripts"]
+
+[tool.pytest.ini_options]
+env = [
+    "TQ_ORACLE_CONFIG=/nonexistent/path",
+]
 
 [project.scripts]
 tq-oracle = "tq_oracle.main:run"

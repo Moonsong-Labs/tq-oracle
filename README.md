@@ -65,11 +65,11 @@ pre_check_timeout = 12.0
 Then run with minimal arguments:
 
 ```bash
-# Config file is automatically detected
-uv run tq-oracle
+# `tq-oracle.toml` Config file is automatically detected
+uv run tq-oracle report
 
 # Or specify config file explicitly
-uv run tq-oracle --config ./my-config.toml
+uv run tq-oracle report --config ./my-config.toml
 ```
 
 See `tq-oracle.toml.example` for a complete configuration template with all available options.
@@ -125,6 +125,9 @@ All configuration options can be set via CLI arguments, environment variables, o
 | `--ignore-active-proposal-check` | - | `ignore_active_proposal_check` | `false` | Allow duplicate submissions |
 | `--pre-check-retries` | - | `pre_check_retries` | `3` | Number of pre-check retry attempts |
 | `--pre-check-timeout` | - | `pre_check_timeout` | `12.0` | Timeout between pre-check retries (seconds) |
+| - | - | `log_level` | `"INFO"` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| - | - | `chainlink_price_warning_tolerance_percentage` | `0.5` | Price deviation warning threshold (%) |
+| - | - | `chainlink_price_failure_tolerance_percentage` | `1.0` | Price deviation failure threshold (%) |
 
 #### TOML-Only Options (Not available via CLI)
 
@@ -134,6 +137,38 @@ All configuration options can be set via CLI arguments, environment variables, o
 | `rpc_max_concurrent_calls` | `5` | Maximum concurrent RPC connections |
 | `rpc_delay` | `0.15` | Delay between RPC calls (seconds) |
 | `rpc_jitter` | `0.10` | Random jitter for RPC delays (seconds) |
+
+### Advanced Configuration: Subvault Adapters
+
+TQ Oracle supports configuring multiple asset adapters per subvault address, allowing you to compose TVL from various sources (e.g., idle balances on L1 + portfolio on Hyperliquid).
+
+**Configuration Structure:**
+
+```toml
+[[subvault_adapters]]
+subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
+chain = "hyperliquid"                          # Chain: "l1" or "hyperliquid"
+additional_adapters = ["hyperliquid", "idle_balances"]  # Asset adapters to run
+skip_idle_balances = false                     # Skip default L1 idle_balances check
+skip_subvault_existence_check = false          # Skip vault contract validation
+```
+
+**Available Asset Adapters:**
+- `idle_balances` - Checks for idle USDC balances not yet deployed
+- `hyperliquid` - Fetches portfolio value from Hyperliquid
+
+**Example: Hyperliquid subvault with portfolio + idle USDC check**
+
+```toml
+[[subvault_adapters]]
+subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
+chain = "hyperliquid"
+additional_adapters = ["hyperliquid", "idle_balances"]
+skip_idle_balances = false
+skip_subvault_existence_check = false
+```
+
+See `tq-oracle-example.toml` for more configuration examples.
 
 ### Examples
 
@@ -175,10 +210,12 @@ uv run tq-oracle 0x277C6A642564A91ff78b008022D65683cEE5CCC5 \
 ```sh
 src/tq_oracle/
 ├── main.py                           # CLI entry point (Typer)
-├── config.py                         # Configuration dataclass
-├── orchestrator.py                   # Main control flow orchestration
-├── adapters/                         # Protocol adapters (asset/price/check)
-├── processors/                       # Data processing pipeline
+├── settings.py                       # Configuration management (pydantic-settings)
+├── state.py                          # Application state container
+├── pipeline/                         # Orchestration pipeline
+├── domain/                           # Core domain models
+├── adapters/                         # Protocol adapters
+├── processors/                       # Data processing utilities
 ├── report/                           # Report generation and publishing
 ├── safe/                             # Safe transaction building
 ├── checks/                           # Pre-flight validation orchestration
@@ -248,11 +285,16 @@ class MyProtocolAdapter(BaseAssetAdapter):
 ```python
 from .my_protocol import MyProtocolAdapter
 
-ASSET_ADAPTERS = [
-    HyperliquidAdapter,
-    MyProtocolAdapter,  # Add your adapter here
-]
+ADAPTER_REGISTRY: dict[str, type[BaseAssetAdapter]] = {
+    "idle_balances": IdleBalancesAdapter,
+    "hyperliquid": HyperliquidAdapter,
+    "my_protocol": MyProtocolAdapter,  # Add your adapter here
+}
+
+ASSET_ADAPTERS: list[type[BaseAssetAdapter]] = list(ADAPTER_REGISTRY.values())
 ```
+
+The adapter name in the registry (e.g., `"my_protocol"`) is used in the `[[subvault_adapters]]` configuration's `additional_adapters` field.
 
 ### Price Adapters
 
@@ -297,10 +339,88 @@ class MyOracleAdapter(BasePriceAdapter):
 from .my_oracle import MyOracleAdapter
 
 PRICE_ADAPTERS = [
-    ChainlinkAdapter,
+    CowSwapAdapter,
+    WstETHAdapter,
     MyOracleAdapter,  # Add your adapter here
 ]
 ```
+
+> **Note:** `ChainlinkAdapter` is exported for use in price validators but not used directly in the main pricing pipeline.
+
+### Price Validators
+
+Price validators cross-check prices from the main price adapters against reference sources to detect anomalies or manipulation. They run after price fetching and can issue warnings or halt execution if prices deviate beyond configured thresholds.
+
+1. **Create validator file** in `src/tq_oracle/adapters/price_validators/`:
+
+```python
+# src/tq_oracle/adapters/price_validators/my_validator.py
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from .base import BasePriceValidator, PriceValidationResult
+
+if TYPE_CHECKING:
+    from ...config import OracleCLIConfig
+
+class MyValidator(BasePriceValidator):
+    """Validator to cross-check prices against a reference oracle."""
+
+    def __init__(self, config: OracleCLIConfig):
+        super().__init__(config)
+        # Initialize validator-specific connections
+
+    @property
+    def validator_name(self) -> str:
+        return "my_validator"
+
+    async def validate_prices(
+        self,
+        prices: dict[str, int]
+    ) -> list[PriceValidationResult]:
+        """Validate prices against reference oracle.
+
+        Args:
+            prices: Dict mapping asset addresses to prices (in wei, 18 decimals)
+
+        Returns:
+            List of validation results (warnings or failures)
+        """
+        # Implement validation logic
+        results = []
+        for asset_address, price in prices.items():
+            reference_price = await self.fetch_reference_price(asset_address)
+            deviation = abs(price - reference_price) / reference_price
+
+            if deviation > 0.01:  # 1% deviation
+                results.append(
+                    PriceValidationResult(
+                        asset_address=asset_address,
+                        severity="warning",
+                        message=f"Price deviation: {deviation:.2%}"
+                    )
+                )
+
+        return results
+```
+
+2. **Register validator** in `src/tq_oracle/adapters/price_validators/__init__.py`:
+
+```python
+from .my_validator import MyValidator
+
+PRICE_VALIDATORS = [
+    ChainlinkValidator,
+    MyValidator,  # Add your validator here
+]
+```
+
+**Configuration:**
+
+Price validators respect tolerance thresholds configured in `settings.py`:
+- `chainlink_price_warning_tolerance_percentage` (default: 0.5%) - Issues warnings
+- `chainlink_price_failure_tolerance_percentage` (default: 1.0%) - Halts execution
 
 ## Development
 

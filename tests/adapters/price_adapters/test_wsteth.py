@@ -3,12 +3,12 @@ import pytest
 from tq_oracle.constants import ETH_ASSET, WETH_MAINNET, WSTETH_MAINNET
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.wsteth import WstETHAdapter
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 
 
 @pytest.fixture
 def config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",

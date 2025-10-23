@@ -7,7 +7,7 @@ from tq_oracle.processors.oracle_helper import (
     EncodedAssetPrices,
     derive_final_prices,
 )
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 
 
 def test_encode_asset_prices_sorts_by_address():
@@ -71,7 +71,7 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE": 0,
     }
 
-    config = OracleCLIConfig(
+    config = OracleSettings(
         vault_address=vault,
         oracle_helper_address=oracle_helper,
         l1_rpc=provider,

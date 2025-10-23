@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from eth_typing import URI
 from safe_eth.eth import EthereumClient, EthereumNetwork
@@ -14,7 +14,7 @@ from web3 import Web3
 from tq_oracle.adapters.check_adapters.base import BaseCheckAdapter, CheckResult
 
 if TYPE_CHECKING:
-    from tq_oracle.config import OracleCLIConfig
+    from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ SUBMIT_REPORTS_SELECTOR = "0x8f88cbfb"
 class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
     """Check if there are any active submitReport() proposals being voted on."""
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self._config = config
 
@@ -42,9 +42,7 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
         Returns:
             CheckResult indicating if there are active proposals
         """
-        config = cast("OracleCLIConfig", self.config)
-
-        if not config.safe_address:
+        if not self._config.safe_address:
             logger.info("No Safe address configured, skipping active proposal checks")
             return CheckResult(
                 passed=True,
@@ -53,7 +51,7 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
             )
 
         try:
-            active_proposals = await self._get_active_submit_report_proposals(config)
+            active_proposals = await self._get_active_submit_report_proposals()
 
             if active_proposals:
                 proposal_count = len(active_proposals)
@@ -88,25 +86,23 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
                 retry_recommended=False,
             )
 
-    async def _get_active_submit_report_proposals(
-        self,
-        config: OracleCLIConfig,
-    ) -> list[object]:
+    async def _get_active_submit_report_proposals(self) -> list[object]:
         """Get active submitReport() proposals from the Safe.
-
-        Args:
-            config: CLI configuration with Safe details
 
         Returns:
             List of active submitReport() proposals
         """
-        network = EthereumNetwork(config.chain_id)
-        ethereum_client = EthereumClient(URI(config.l1_rpc_required))
-        tx_service = TransactionServiceApi(
-            network, ethereum_client, api_key=config.safe_txn_srvc_api_key
-        )
+        network = EthereumNetwork(self._config.chain_id)
+        ethereum_client = EthereumClient(URI(self._config.l1_rpc_required))
 
-        safe_checksum = Web3.to_checksum_address(config.safe_address)
+        api_key = (
+            self._config.safe_txn_srvc_api_key.get_secret_value()
+            if self._config.safe_txn_srvc_api_key
+            else None
+        )
+        tx_service = TransactionServiceApi(network, ethereum_client, api_key=api_key)
+
+        safe_checksum = Web3.to_checksum_address(self._config.safe_address)
 
         pending_txs = await asyncio.to_thread(
             tx_service.get_transactions,

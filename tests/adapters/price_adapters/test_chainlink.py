@@ -3,12 +3,12 @@ import pytest
 from tq_oracle.constants import ETH_ASSET
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.chainlink import ChainlinkAdapter
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 
 
 @pytest.fixture
 def config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",
@@ -112,7 +112,7 @@ async def test_fetch_prices_usdc_and_usdt_integration(config):
 
 @pytest.mark.asyncio
 async def test_fetch_prices_usdt_not_supported_on_testnet():
-    testnet_config = OracleCLIConfig(
+    testnet_config = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://sepolia.drpc.org",
@@ -176,7 +176,7 @@ async def test_fetch_prices_all_stablecoins_integration(config):
 
 @pytest.mark.asyncio
 async def test_fetch_prices_usds_not_supported_on_testnet():
-    testnet_config = OracleCLIConfig(
+    testnet_config = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://sepolia.drpc.org",

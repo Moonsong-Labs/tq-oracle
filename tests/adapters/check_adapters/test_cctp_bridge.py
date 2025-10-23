@@ -8,7 +8,7 @@ from tq_oracle.adapters.check_adapters.cctp_bridge import (
     CCTPBridgeAdapter,
     TransactionIdentity,
 )
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 from tq_oracle.constants import (
     HL_BLOCK_TIME,
     L1_BLOCK_TIME,
@@ -42,8 +42,8 @@ def mock_w3():
 
 @pytest.fixture
 def config():
-    """Provides a default, valid OracleCLIConfig for tests."""
-    return OracleCLIConfig(
+    """Provides a default, valid OracleSettings for tests."""
+    return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
         l1_rpc="https://eth.example",

@@ -9,13 +9,13 @@ from tq_oracle.adapters.check_adapters.active_submit_report_proposal_check impor
     SUBMIT_REPORTS_SELECTOR,
     ActiveSubmitReportProposalCheck,
 )
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 
 
 @pytest.fixture
 def config():
-    """Provides a default, valid OracleCLIConfig for tests."""
-    return OracleCLIConfig(
+    """Provides a default, valid OracleSettings for tests."""
+    return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
         l1_rpc="https://eth.example",
