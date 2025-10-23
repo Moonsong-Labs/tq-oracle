@@ -8,11 +8,8 @@ import backoff
 import random
 from web3.exceptions import ProviderConnectionError
 from ...constants import (
-    ETH_ASSET,
     USDC_HL_MAINNET,
     USDC_HL_TESTNET,
-    USDC_MAINNET,
-    USDC_SEPOLIA,
 )
 from ...logger import get_logger
 from ...abi import (
@@ -32,6 +29,9 @@ logger = get_logger(__name__)
 class IdleBalancesAdapter(BaseAssetAdapter):
     """Adapter for querying Idle Balances assets from L1 or Hyperliquid chain."""
 
+    eth_address: str
+    usdc_address: str
+
     def __init__(self, config: OracleCLIConfig, chain: str = "l1"):
         """Initialize the adapter.
 
@@ -47,6 +47,16 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             self.w3 = Web3(Web3.HTTPProvider(config.hl_rpc))
         else:
             self.w3 = Web3(Web3.HTTPProvider(config.l1_rpc))
+
+        assets = config.assets
+        eth_address = assets["ETH"]
+        if eth_address is None:
+            raise ValueError("ETH address is required for IdleBalances adapter")
+        self.eth_address = eth_address
+        usdc_address = assets["USDC"]
+        if usdc_address is None:
+            raise ValueError("USDC address is required for IdleBalances adapter")
+        self.usdc_address = usdc_address
 
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
@@ -95,9 +105,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             usdc_asset = await self._fetch_asset_balance(
                 self.w3, subvault_address, usdc_address
             )
-            usdc_asset.asset_address = (
-                USDC_SEPOLIA if self.config.testnet else USDC_MAINNET
-            )
+            usdc_asset.asset_address = self.usdc_address
             return [usdc_asset]
 
         supported_assets = await self._fetch_supported_assets()
@@ -227,7 +235,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Fetch the balance of an asset for the given subvault."""
         checksum_subvault_address = w3.to_checksum_address(subvault_address)
 
-        if asset_address == ETH_ASSET:
+        if asset_address == self.eth_address:
             balance = await self._rpc(w3.eth.get_balance, checksum_subvault_address)
         else:
             erc20_abi = load_erc20_abi()
