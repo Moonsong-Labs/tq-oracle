@@ -2,7 +2,8 @@
 # This file demonstrates a comprehensive configuration example, including basic settings, RPC endpoints, logging, adapters, rate limiting, and pre-checks.
 
 vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
-testnet = false
+hyperliquid_env = "mainnet"  # Options: mainnet, testnet
+cctp_env = "mainnet"         # Options: mainnet, testnet
 
 l1_rpc = "https://ethereum-rpc.publicnode.com"
 hl_rpc = "https://api.hyperliquid.xyz/evm"
