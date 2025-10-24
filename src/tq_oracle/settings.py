@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -11,6 +12,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
+from dotenv import load_dotenv
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
@@ -18,9 +20,9 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-from enum import Enum
-
 from .constants import NetworkAssets
+
+load_dotenv()
 
 
 class Network(str, Enum):

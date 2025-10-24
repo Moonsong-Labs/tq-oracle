@@ -186,17 +186,17 @@ def report(
     if not s.hl_rpc:
         raise typer.BadParameter("hl_rpc must be configured")
 
-    if not s.dry_run and not s.safe_address and not s.private_key:
-        raise typer.BadParameter(
-            "Either safe_address OR private_key required when running with --no-dry-run.",
-            param_hint=["TQ_ORACLE_SAFE_ADDRESS", "TQ_ORACLE_PRIVATE_KEY"],
-        )
-
-    if s.safe_address and not s.dry_run and not s.private_key:
-        raise typer.BadParameter(
-            "private_key required when using safe_address with --no-dry-run.",
-            param_hint=["TQ_ORACLE_PRIVATE_KEY"],
-        )
+    if not s.dry_run:
+        if not s.safe_address:
+            raise typer.BadParameter(
+                "safe_address is required when running with --no-dry-run.",
+                param_hint=["--safe-address", "TQ_ORACLE_SAFE_ADDRESS"],
+            )
+        if not s.private_key:
+            raise typer.BadParameter(
+                "private_key is required when running with --no-dry-run.",
+                param_hint=["--private-key", "TQ_ORACLE_PRIVATE_KEY"],
+            )
 
     from .pipeline.run import run_report
 
