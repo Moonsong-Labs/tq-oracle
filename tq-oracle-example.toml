@@ -1,0 +1,64 @@
+# TQ Oracle Configuration Example
+# This file demonstrates a comprehensive configuration example, including basic settings, RPC endpoints, logging, adapters, rate limiting, and pre-checks.
+
+vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
+hyperliquid_env = "mainnet"  # Options: mainnet, testnet
+cctp_env = "mainnet"         # Options: mainnet, testnet
+
+l1_rpc = "https://ethereum-rpc.publicnode.com"
+hl_rpc = "https://api.hyperliquid.xyz/evm"
+
+dry_run = true
+log_level = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# Configure additional adapters per subvault
+# By default, idle_balances adapter runs on ALL subvaults on L1 chain
+
+# Example 1: Hyperliquid subvault with portfolio + idle USDC check
+[[subvault_adapters]]
+subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
+chain = "hyperliquid"  # This subvault is on Hyperliquid chain
+additional_adapters = ["hyperliquid", "idle_balances"]
+# hyperliquid adapter: Fetch HL portfolio value
+# idle_balances adapter: Check USDC not yet sent to hypercore (uses chain="hyperliquid")
+skip_idle_balances = false  # Still run default L1 idle_balances
+skip_subvault_existence_check = false  # Validate this subvault exists in the vault contract
+
+# Example 2: Another HL subvault, only portfolio (no idle USDC check)
+[[subvault_adapters]]
+subvault_address = "0x1234567890123456789012345678901234567890"
+chain = "hyperliquid"
+additional_adapters = ["hyperliquid"]
+skip_idle_balances = false
+skip_subvault_existence_check = false
+
+# Example 3: L1 subvault with skip_idle_balances
+[[subvault_adapters]]
+subvault_address = "0x9999999999999999999999999999999999999999"
+chain = "l1"  # Explicitly set to L1 (this is the default)
+additional_adapters = []
+skip_idle_balances = true  # Don't run L1 idle_balances for this subvault
+skip_subvault_existence_check = false
+
+# Example 4: Subvault that doesn't exist yet (skip validation)
+# Useful for pre-deployment testing or future subvaults
+[[subvault_adapters]]
+subvault_address = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+chain = "l1"
+additional_adapters = []
+skip_idle_balances = false
+skip_subvault_existence_check = true  # Skip validation - this subvault might not exist yet
+
+# Example 5: Subvault with only default L1 idle_balances (no config needed)
+# No [[subvault_adapters]] section needed - L1 idle_balances runs by default for all subvaults
+
+# RPC rate limiting (optional)
+max_calls = 3
+rpc_max_concurrent_calls = 5
+rpc_delay = 0.15
+rpc_jitter = 0.10
+
+# Pre-check configuration (optional)
+ignore_empty_vault = false
+pre_check_retries = 3
+pre_check_timeout = 12.0

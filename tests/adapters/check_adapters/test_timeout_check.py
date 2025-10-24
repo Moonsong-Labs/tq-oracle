@@ -8,20 +8,21 @@ from tq_oracle.adapters.check_adapters.timeout_check import (
     TimeoutCheckAdapter,
     format_time_remaining,
 )
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 
 
 @pytest.fixture
 def config():
-    """Provides a default, valid OracleCLIConfig for tests."""
-    return OracleCLIConfig(
+    """Provides a default, valid OracleSettings for tests."""
+    return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
         l1_rpc="https://eth.example",
         hl_rpc="https://hl.example",
         l1_subvault_address="0x1111111111111111111111111111111111111111",
         hl_subvault_address="0x2222222222222222222222222222222222222222",
-        testnet=False,
+        hyperliquid_env="mainnet",
+        cctp_env="mainnet",
         dry_run=True,
         private_key=None,
         safe_address=None,

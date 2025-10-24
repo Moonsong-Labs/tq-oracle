@@ -7,18 +7,12 @@ from typing import TYPE_CHECKING, Optional, Any
 
 from hyperliquid.info import Info
 
-from ...constants import (
-    HL_MAINNET_API_URL,
-    HL_TESTNET_API_URL,
-    USDC_MAINNET,
-    USDC_SEPOLIA,
-    HL_MAX_PORTFOLIO_STALENESS_SECONDS,
-)
+from ...constants import HL_MAX_PORTFOLIO_STALENESS_SECONDS
 from ...logger import get_logger
-from .base import AssetData, BaseAssetAdapter
+from .base import AssetData, BaseAssetAdapter, AdapterChain
 
 if TYPE_CHECKING:
-    from ...config import OracleCLIConfig
+    from ...settings import OracleSettings
 
 logger = get_logger(__name__)
 
@@ -33,13 +27,34 @@ class HyperliquidAdapter(BaseAssetAdapter):
     Raises ValueError on empty/invalid history or stale portfolio values.
     """
 
-    def __init__(self, config: OracleCLIConfig):
-        super().__init__(config)
-        self.testnet = config.testnet
+    usdc_address: str
+    api_url: str
+
+    def __init__(self, config: OracleSettings, chain: str = "hyperliquid"):
+        """Initialize the Hyperliquid adapter.
+
+        Args:
+            config: Oracle configuration
+            chain: Which chain to operate on (defaults to "hyperliquid")
+        """
+        super().__init__(config, chain=chain)
+        assets = config.assets
+        usdc_address = assets["USDC"]
+        if usdc_address is None:
+            raise ValueError("USDC address is required for Hyperliquid adapter")
+        self.usdc_address = usdc_address
+
+        if config.hyperliquid_api_url is None:
+            raise ValueError("hyperliquid_api_url must be set in config")
+        self.api_url = config.hyperliquid_api_url
 
     @property
     def adapter_name(self) -> str:
         return "hyperliquid"
+
+    @property
+    def chain(self) -> AdapterChain:
+        return AdapterChain.HYPERLIQUID
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch current portfolio value (NAV) for the given subvault.
@@ -63,15 +78,14 @@ class HyperliquidAdapter(BaseAssetAdapter):
         # Use config's hl_subvault_address if set, otherwise fall back to passed address
         address_to_query = self.config.hl_subvault_address or subvault_address
 
-        base_url = HL_TESTNET_API_URL if self.testnet else HL_MAINNET_API_URL
         logger.info(
-            "Fetching Hyperliquid assets for %s (testnet=%s)",
+            "Fetching Hyperliquid assets for %s (env=%s)",
             address_to_query,
-            self.testnet,
+            self.config.hyperliquid_env,
         )
-        logger.debug("Using API URL: %s", base_url)
+        logger.debug("Using API URL: %s", self.api_url)
 
-        info = await asyncio.to_thread(Info, base_url=base_url, skip_ws=True)
+        info = await asyncio.to_thread(Info, base_url=self.api_url, skip_ws=True)
 
         try:
             logger.debug("Calling portfolio API to fetch latest NAV data...")
@@ -140,14 +154,13 @@ class HyperliquidAdapter(BaseAssetAdapter):
             )
 
             amount_native = int(latest_value * 1e18)
-            usdc_address = USDC_SEPOLIA if self.testnet else USDC_MAINNET
 
-            logger.debug("Using USDC address: %s", usdc_address)
+            logger.debug("Using USDC address: %s", self.usdc_address)
             logger.debug("Native amount: %d", amount_native)
 
             return [
                 AssetData(
-                    asset_address=usdc_address,
+                    asset_address=self.usdc_address,
                     amount=amount_native,
                 )
             ]

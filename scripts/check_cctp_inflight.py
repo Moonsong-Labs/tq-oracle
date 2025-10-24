@@ -8,7 +8,7 @@ import sys
 from argparse import ArgumentParser
 
 from tq_oracle.adapters.check_adapters.cctp_bridge import CCTPBridgeAdapter
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 from tq_oracle.constants import (
     DEFAULT_MAINNET_RPC_URL,
     DEFAULT_SEPOLIA_RPC_URL,
@@ -45,7 +45,7 @@ async def test_cctp_bridge(
     if hl_rpc is None:
         hl_rpc = HL_TEST_EVM_RPC if testnet else HL_PROD_EVM_RPC
 
-    config = OracleCLIConfig(
+    config = OracleSettings(
         vault_address="",
         oracle_helper_address="",
         l1_rpc=l1_rpc,

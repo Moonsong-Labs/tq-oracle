@@ -3,21 +3,23 @@ import pytest
 from tq_oracle.adapters.price_validators.chainlink import ChainlinkValidator
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
 from tq_oracle.adapters.price_adapters.base import PriceData
-from tq_oracle.config import OracleCLIConfig
-from tq_oracle.constants import ETH_ASSET, USDC_MAINNET, USDT_MAINNET, USDS_MAINNET
+from tq_oracle.settings import OracleSettings
+from tq_oracle.settings import Network
 
 
 @pytest.fixture
 def config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://eth.drpc.org",
+        network=Network.MAINNET,
         safe_address=None,
         l1_subvault_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
-        testnet=False,
+        hyperliquid_env="mainnet",
+        cctp_env="mainnet",
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
@@ -29,6 +31,34 @@ def config():
 @pytest.fixture
 def validator(config):
     return ChainlinkValidator(config)
+
+
+@pytest.fixture
+def eth_address(config):
+    address = config.assets["ETH"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def usdc_address(config):
+    address = config.assets["USDC"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def usdt_address(config):
+    address = config.assets["USDT"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def usds_address(config):
+    address = config.assets["USDS"]
+    assert address is not None
+    return address
 
 
 def test_calculate_price_deviation_percentage_no_deviation(validator):
@@ -73,12 +103,12 @@ def test_calculate_price_deviation_percentage_zero_actual_price_raises_error(val
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usdc_integration(config):
+async def test_validate_prices_usdc_integration(config, eth_address, usdc_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=ETH_ASSET, prices={})
-    price_data = await cow_swap_adapter.fetch_prices([USDC_MAINNET], price_data)
+    price_data = PriceData(base_asset=eth_address, prices={})
+    price_data = await cow_swap_adapter.fetch_prices([usdc_address], price_data)
 
     result = await validator.validate_prices(price_data)
 
@@ -88,12 +118,12 @@ async def test_validate_prices_usdc_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usdt_integration(config):
+async def test_validate_prices_usdt_integration(config, eth_address, usdt_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=ETH_ASSET, prices={})
-    price_data = await cow_swap_adapter.fetch_prices([USDT_MAINNET], price_data)
+    price_data = PriceData(base_asset=eth_address, prices={})
+    price_data = await cow_swap_adapter.fetch_prices([usdt_address], price_data)
 
     result = await validator.validate_prices(price_data)
 
@@ -103,12 +133,12 @@ async def test_validate_prices_usdt_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_usds_integration(config):
+async def test_validate_prices_usds_integration(config, eth_address, usds_address):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=ETH_ASSET, prices={})
-    price_data = await cow_swap_adapter.fetch_prices([USDS_MAINNET], price_data)
+    price_data = PriceData(base_asset=eth_address, prices={})
+    price_data = await cow_swap_adapter.fetch_prices([usds_address], price_data)
 
     result = await validator.validate_prices(price_data)
 
@@ -118,13 +148,15 @@ async def test_validate_prices_usds_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_all_stablecoins_integration(config):
+async def test_validate_prices_all_stablecoins_integration(
+    config, eth_address, usdc_address, usdt_address, usds_address
+):
     validator = ChainlinkValidator(config)
     cow_swap_adapter = CowSwapAdapter(config)
 
-    price_data = PriceData(base_asset=ETH_ASSET, prices={})
+    price_data = PriceData(base_asset=eth_address, prices={})
     price_data = await cow_swap_adapter.fetch_prices(
-        [USDC_MAINNET, USDT_MAINNET, USDS_MAINNET], price_data
+        [usdc_address, usdt_address, usds_address], price_data
     )
 
     result = await validator.validate_prices(price_data)
@@ -135,13 +167,15 @@ async def test_validate_prices_all_stablecoins_integration(config):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_validate_prices_fails_on_excessive_deviation(config):
+async def test_validate_prices_fails_on_excessive_deviation(
+    config, eth_address, usdc_address
+):
     validator = ChainlinkValidator(config)
 
     price_data = PriceData(
-        base_asset=ETH_ASSET,
+        base_asset=eth_address,
         prices={
-            USDC_MAINNET: 1000000000000000,
+            usdc_address: 1000000000000000,
         },
     )
 
@@ -149,12 +183,12 @@ async def test_validate_prices_fails_on_excessive_deviation(config):
 
     assert not result.passed
     assert "failure threshold" in result.message.lower()
-    assert USDC_MAINNET in result.message
+    assert usdc_address in result.message
 
 
 @pytest.mark.asyncio
-async def test_validate_prices_passes_with_empty_prices(validator):
-    price_data = PriceData(base_asset=ETH_ASSET, prices={})
+async def test_validate_prices_passes_with_empty_prices(validator, eth_address):
+    price_data = PriceData(base_asset=eth_address, prices={})
 
     result = await validator.validate_prices(price_data)
 

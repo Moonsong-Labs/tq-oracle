@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from tq_oracle.adapters.check_adapters.base import BaseCheckAdapter, CheckResult
 
 if TYPE_CHECKING:
-    from tq_oracle.config import OracleCLIConfig
+    from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 
 
 class SafeStateAdapter(BaseCheckAdapter):
     """Validates Gnosis Safe state before publishing oracle data."""
+
+    def __init__(self, config: OracleSettings):
+        super().__init__(config)
+        self._config = config
 
     @property
     def name(self) -> str:
@@ -28,10 +32,8 @@ class SafeStateAdapter(BaseCheckAdapter):
         Returns:
             CheckResult indicating if Safe state allows publishing
         """
-        config = cast("OracleCLIConfig", self.config)
-
         # Skip checks if no Safe address configured
-        if not config.safe_address:
+        if not self._config.safe_address:
             logger.info("No Safe address configured, skipping Safe state checks")
             return CheckResult(
                 passed=True,
@@ -40,17 +42,18 @@ class SafeStateAdapter(BaseCheckAdapter):
             )
 
         try:
-            if await self._check_already_published(config, config.vault_address):
+            vault_address = self._config.vault_address_required
+            if await self._check_already_published(vault_address):
                 return CheckResult(
                     passed=False,
-                    message=f"Report already published for vault {config.vault_address}",
+                    message=f"Report already published for vault {vault_address}",
                     retry_recommended=False,
                 )
 
-            if await self._check_pending_vote(config, config.vault_address):
+            if await self._check_pending_vote(vault_address):
                 return CheckResult(
                     passed=False,
-                    message=f"Report already pending vote for vault {config.vault_address}",
+                    message=f"Report already pending vote for vault {vault_address}",
                     retry_recommended=False,
                 )
 
@@ -68,15 +71,10 @@ class SafeStateAdapter(BaseCheckAdapter):
                 retry_recommended=False,
             )
 
-    async def _check_already_published(
-        self,
-        config: OracleCLIConfig,
-        vault_address: str,
-    ) -> bool:
+    async def _check_already_published(self, vault_address: str) -> bool:
         """Check if a report has already been published for this vault.
 
         Args:
-            config: CLI configuration with RPC endpoints and Safe address
             vault_address: The vault contract address
 
         Returns:
@@ -88,15 +86,10 @@ class SafeStateAdapter(BaseCheckAdapter):
         # to check if a report has already been published for this vault
         return False
 
-    async def _check_pending_vote(
-        self,
-        config: OracleCLIConfig,
-        vault_address: str,
-    ) -> bool:
+    async def _check_pending_vote(self, vault_address: str) -> bool:
         """Check if a report is already pending vote for this vault.
 
         Args:
-            config: CLI configuration with RPC endpoints and Safe address
             vault_address: The vault contract address
 
         Returns:

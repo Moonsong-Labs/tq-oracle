@@ -8,7 +8,7 @@ from ..adapters.check_adapters import CHECK_ADAPTERS
 from ..adapters.check_adapters.base import CheckResult
 
 if TYPE_CHECKING:
-    from ..config import OracleCLIConfig
+    from ..settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class PreCheckError(Exception):
 
 
 async def run_pre_checks(
-    config: OracleCLIConfig,
+    config: OracleSettings,
     vault_address: str,
 ) -> None:
     """Run all pre-checks before proceeding with oracle flow.

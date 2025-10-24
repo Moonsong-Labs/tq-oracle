@@ -11,7 +11,7 @@ from tq_oracle.abi import load_oracle_abi
 from tq_oracle.adapters.check_adapters.base import BaseCheckAdapter, CheckResult
 
 if TYPE_CHECKING:
-    from tq_oracle.config import OracleCLIConfig
+    from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def format_time_remaining(seconds: int) -> str:
 class TimeoutCheckAdapter(BaseCheckAdapter):
     """Check if timeout period has elapsed since last oracle report."""
 
-    def __init__(self, config: OracleCLIConfig):
+    def __init__(self, config: OracleSettings):
         super().__init__(config)
         self._config = config
 

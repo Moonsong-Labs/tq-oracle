@@ -8,7 +8,7 @@ from tq_oracle.adapters.check_adapters.cctp_bridge import (
     CCTPBridgeAdapter,
     TransactionIdentity,
 )
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 from tq_oracle.constants import (
     HL_BLOCK_TIME,
     L1_BLOCK_TIME,
@@ -42,15 +42,16 @@ def mock_w3():
 
 @pytest.fixture
 def config():
-    """Provides a default, valid OracleCLIConfig for tests."""
-    return OracleCLIConfig(
+    """Provides a default, valid OracleSettings for tests."""
+    return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
         l1_rpc="https://eth.example",
         hl_rpc="https://hl.example",
         l1_subvault_address=DEPOSITOR_ADDRESS,
         hl_subvault_address=RECIPIENT_ADDRESS,
-        testnet=False,
+        hyperliquid_env="mainnet",
+        cctp_env="mainnet",
         dry_run=True,
         private_key=None,
         safe_address=None,
@@ -317,16 +318,28 @@ async def test_cleanup_providers_handles_no_disconnect_method():
 
 def test_messenger_addresses_mainnet(config):
     """Verifies correct CCTP messenger addresses for mainnet."""
-    config.testnet = False
-    adapter = CCTPBridgeAdapter(config)
-    assert adapter.MESSENGER_ADDRESSES["mainnet"] == TOKEN_MESSENGER_V2_PROD
+    config.cctp_env = "mainnet"
+    config = config.__class__.model_validate(config.model_dump())
+    assert config.cctp_token_messenger_address == TOKEN_MESSENGER_V2_PROD
 
 
-def test_messenger_addresses_testnet(config):
+def test_messenger_addresses_testnet():
     """Verifies correct CCTP messenger addresses for testnet."""
-    config.testnet = True
-    adapter = CCTPBridgeAdapter(config)
-    assert adapter.MESSENGER_ADDRESSES["testnet"] == TOKEN_MESSENGER_V2_TEST
+    # Create a new config with testnet environment
+    testnet_config = OracleSettings(
+        vault_address="0xVAULT",
+        oracle_helper_address="0xORACLE_HELPER",
+        l1_rpc="https://eth.example",
+        hl_rpc="https://hl.example",
+        l1_subvault_address=DEPOSITOR_ADDRESS,
+        hl_subvault_address=RECIPIENT_ADDRESS,
+        hyperliquid_env="testnet",
+        cctp_env="testnet",
+        dry_run=True,
+        private_key=None,
+        safe_address=None,
+    )
+    assert testnet_config.cctp_token_messenger_address == TOKEN_MESSENGER_V2_TEST
 
 
 @pytest.mark.asyncio

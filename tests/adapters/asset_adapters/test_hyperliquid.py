@@ -4,27 +4,28 @@ import pytest
 import time
 
 from tq_oracle.adapters.asset_adapters.hyperliquid import HyperliquidAdapter
-from tq_oracle.config import OracleCLIConfig
+from tq_oracle.settings import OracleSettings
 from tq_oracle.constants import (
     HL_MAINNET_API_URL,
     HL_TESTNET_API_URL,
-    USDC_MAINNET,
-    USDC_SEPOLIA,
     HL_MAX_PORTFOLIO_STALENESS_SECONDS,
 )
+from tq_oracle.settings import Network
 
 
 @pytest.fixture
 def mainnet_config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://mainnet.rpc",
+        network=Network.MAINNET,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
-        testnet=False,
+        hyperliquid_env="mainnet",
+        cctp_env="mainnet",
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
@@ -33,23 +34,39 @@ def mainnet_config():
 
 @pytest.fixture
 def testnet_config():
-    return OracleCLIConfig(
+    return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://testnet.rpc",
+        network=Network.SEPOLIA,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address=None,
-        testnet=True,
+        hyperliquid_env="testnet",
+        cctp_env="testnet",
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
     )
 
 
+@pytest.fixture
+def mainnet_usdc_address(mainnet_config):
+    address = mainnet_config.assets["USDC"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def testnet_usdc_address(testnet_config):
+    address = testnet_config.assets["USDC"]
+    assert address is not None
+    return address
+
+
 @pytest.mark.asyncio
-async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
+async def test_mainnet_uses_correct_api_and_usdc(mainnet_config, mainnet_usdc_address):
     """Mainnet config should use mainnet API URL and USDC address."""
     adapter = HyperliquidAdapter(mainnet_config)
 
@@ -67,11 +84,11 @@ async def test_mainnet_uses_correct_api_and_usdc(mainnet_config):
             base_url=HL_MAINNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == USDC_MAINNET
+        assert assets[0].asset_address == mainnet_usdc_address
 
 
 @pytest.mark.asyncio
-async def test_testnet_uses_correct_api_and_usdc(testnet_config):
+async def test_testnet_uses_correct_api_and_usdc(testnet_config, testnet_usdc_address):
     """Testnet config should use testnet API URL and USDC address."""
     adapter = HyperliquidAdapter(testnet_config)
 
@@ -89,7 +106,7 @@ async def test_testnet_uses_correct_api_and_usdc(testnet_config):
             base_url=HL_TESTNET_API_URL, skip_ws=True
         )
         assert len(assets) == 1
-        assert assets[0].asset_address == USDC_SEPOLIA
+        assert assets[0].asset_address == testnet_usdc_address
 
 
 @pytest.mark.asyncio
@@ -287,7 +304,7 @@ async def test_amount_precision_conversion(mainnet_config):
 @pytest.mark.asyncio
 async def test_hl_subvault_address_from_config_overrides_parameter(mainnet_config):
     """Config's hl_subvault_address should override the fetch_assets parameter."""
-    config_with_subvault = OracleCLIConfig(
+    config_with_subvault = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         l1_rpc="https://mainnet.rpc",
@@ -295,7 +312,8 @@ async def test_hl_subvault_address_from_config_overrides_parameter(mainnet_confi
         safe_address=None,
         hl_rpc=None,
         hl_subvault_address="0xConfigSubvault",
-        testnet=False,
+        hyperliquid_env="mainnet",
+        cctp_env="mainnet",
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,

@@ -12,7 +12,7 @@ from ..logger import get_logger
 from ..adapters.price_adapters.base import PriceData
 
 if TYPE_CHECKING:
-    from ..config import OracleCLIConfig
+    from ..settings import OracleSettings
 
 logger = get_logger(__name__)
 
@@ -32,7 +32,7 @@ class EncodedAssetPrices:
 
 
 async def derive_final_prices(
-    config: OracleCLIConfig,
+    config: OracleSettings,
     total_assets: int,
     price_data: PriceData,
 ) -> FinalPrices:
@@ -76,7 +76,7 @@ async def derive_final_prices(
             raise
 
 
-def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
+def get_oracle_helper_contract(config: OracleSettings) -> Contract:
     w3 = Web3(Web3.HTTPProvider(config.l1_rpc))
     abi = load_oracle_helper_abi()
     checksum_address = Web3.to_checksum_address(config.oracle_helper_address)
@@ -86,10 +86,11 @@ def get_oracle_helper_contract(config: OracleCLIConfig) -> Contract:
 def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
     """Encode asset prices for OracleHelper contract.
 
-    Always sets the base asset to price 0.
+    Python's default string sort is case-sensitive and doesn't match Solidity's behavior.
     """
+    # Always sets the base asset to price 0
     if prices.base_asset in prices.prices:
         prices.prices[prices.base_asset] = 0
-
-    asset_prices = sorted(prices.prices.items(), key=lambda item: item[0])
+    # Sorts addresses numerically (as integers) to match Solidity's address comparison
+    asset_prices = sorted(prices.prices.items(), key=lambda item: int(item[0], 16))
     return EncodedAssetPrices(asset_prices=asset_prices)
