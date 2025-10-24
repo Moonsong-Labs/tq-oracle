@@ -82,6 +82,10 @@ Multi-stage pricing system with validation:
 1. **Price Fetching**: Queries multiple price sources sequentially
    - `CowSwapAdapter`: Primary DEX aggregator price source
    - `WstETHAdapter`: Specialized adapter for wrapped staked ETH
+     - **⚠️ Pricing Assumption**: Assumes 1:1 peg between stETH and ETH
+     - Calculates wstETH price by querying the stETH/wstETH exchange rate from the wstETH contract
+     - Does NOT fetch or validate the market price of stETH/ETH
+     - During stETH depeg events, wstETH will be mispriced relative to market value
    - `ChainlinkAdapter`: Not used in main pipeline, only for validation
 
 2. **Price Validation** (`checks/price_validators.py`):

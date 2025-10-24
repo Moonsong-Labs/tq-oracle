@@ -17,7 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 class WstETHAdapter(BasePriceAdapter):
-    """Adapter for pricing ETH, WETH, and wstETH."""
+    """Adapter for pricing ETH, WETH, and wstETH.
+
+    WARNING: This adapter assumes a 1:1 peg between stETH and ETH when pricing wstETH.
+    The wstETH price is calculated by querying the wstETH contract's stETH/wstETH exchange
+    rate and treating that value as equivalent to ETH. During stETH depeg events (e.g.,
+    market stress, liquidity issues), this will result in inaccurate TVL reporting.
+
+    The adapter does NOT validate the stETH/ETH market price. Operators should monitor
+    stETH/ETH price deviation and be aware that reported wstETH values may not reflect
+    true market pricing during depeg scenarios.
+    """
 
     eth_address: str
 
