@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from web3 import Web3
 
 from ...abi import load_wsteth_abi
+from ...constants import DEFAULT_MAINNET_RPC_URL, ETH_MAINNET_ASSETS
+from ...settings import Network
 from .base import BasePriceAdapter, PriceData
 
 if TYPE_CHECKING:
     from ...settings import OracleSettings
+
+logger = logging.getLogger(__name__)
 
 
 class WstETHAdapter(BasePriceAdapter):
@@ -18,7 +23,19 @@ class WstETHAdapter(BasePriceAdapter):
 
     def __init__(self, config: OracleSettings):
         super().__init__(config)
-        self.l1_rpc = config.l1_rpc
+
+        if config.network == Network.MAINNET:
+            self.mainnet_rpc = config.l1_rpc
+        else:
+            # On L2s (Base, Sepolia, etc), use eth_mainnet_rpc or fall back to default
+            self.mainnet_rpc = config.eth_mainnet_rpc or DEFAULT_MAINNET_RPC_URL
+            if not config.eth_mainnet_rpc:
+                logger.warning(
+                    f"eth_mainnet_rpc not configured for {config.network.value}. "
+                    f"Using default public RPC ({DEFAULT_MAINNET_RPC_URL}) for wstETH pricing. "
+                    f"For production deployments, configure eth_mainnet_rpc in your settings."
+                )
+
         assets = config.assets
         eth_address = assets["ETH"]
         if eth_address is None:
@@ -54,12 +71,16 @@ class WstETHAdapter(BasePriceAdapter):
         if prices_accumulator.base_asset != self.eth_address:
             raise ValueError("WstETH adapter only supports ETH as base asset")
 
-        has_eth = self.eth_address in asset_addresses
+        asset_addresses_lower = [addr.lower() for addr in asset_addresses]
+
+        has_eth = self.eth_address.lower() in asset_addresses_lower
         has_weth = (
-            self.weth_address is not None and self.weth_address in asset_addresses
+            self.weth_address is not None
+            and self.weth_address.lower() in asset_addresses_lower
         )
         has_wsteth = (
-            self.wsteth_address is not None and self.wsteth_address in asset_addresses
+            self.wsteth_address is not None
+            and self.wsteth_address.lower() in asset_addresses_lower
         )
 
         if has_eth:
@@ -71,15 +92,23 @@ class WstETHAdapter(BasePriceAdapter):
 
         if has_wsteth:
             assert self.wsteth_address is not None
-            w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
+            wsteth_addr_actual = next(
+                addr
+                for addr in asset_addresses
+                if addr.lower() == self.wsteth_address.lower()
+            )
+
+            w3 = Web3(Web3.HTTPProvider(self.mainnet_rpc))
             wsteth_abi = load_wsteth_abi()
+            mainnet_wsteth = ETH_MAINNET_ASSETS["WSTETH"]
+            assert mainnet_wsteth is not None
             wsteth_contract = w3.eth.contract(
-                address=w3.to_checksum_address(self.wsteth_address),
+                address=w3.to_checksum_address(mainnet_wsteth),
                 abi=wsteth_abi,
             )
 
             wsteth_price = wsteth_contract.functions.getStETHByWstETH(10**18).call()
-            prices_accumulator.prices[self.wsteth_address] = int(wsteth_price)
+            prices_accumulator.prices[wsteth_addr_actual] = int(wsteth_price)
 
         self.validate_prices(prices_accumulator)
 

@@ -28,17 +28,17 @@ SEPOLIA_ASSETS: NetworkAssets = {
     "USDT": None,
     "USDS": None,
     "ETH": ETH_ASSET,
-    "WETH": None,
+    "WETH": "0xf531B8F309Be94191af87605CfBf600D71C2cFe0",
     "WSTETH": None,
 }
 
 BASE_ASSETS: NetworkAssets = {
-    "USDC": None,
-    "USDT": None,
-    "USDS": None,
+    "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "USDT": "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+    "USDS": "0x820c137fa70c8691f0e44dc420a5e53c168921dc",
     "ETH": ETH_ASSET,
-    "WETH": None,
-    "WSTETH": None,
+    "WETH": "0x4200000000000000000000000000000000000006",
+    "WSTETH": "0xc1cba3fcea344f92d9239c08c0568f6f2f0ee452",
 }
 
 PRICE_FEED_USDC_ETH = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
@@ -68,7 +68,7 @@ HL_TEST_EVM_RPC = "https://rpc.hyperliquid-testnet.xyz/evm"
 
 DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
 DEFAULT_SEPOLIA_RPC_URL = "https://sepolia.drpc.org"
-DEFAULT_BASE_RPC_URL = "https://base.llamarpc.com"
+DEFAULT_BASE_RPC_URL = "https://mainnet.base.org"
 
 MAINNET_ORACLE_HELPER = "0x000000005F543c38d5ea6D0bF10A50974Eb55E35"
 SEPOLIA_ORACLE_HELPER = "0x65464fe20562C22B2802B4094d3E042E18b5dfC2"

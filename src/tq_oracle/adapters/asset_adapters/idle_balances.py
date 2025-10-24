@@ -45,6 +45,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             self.w3 = Web3(Web3.HTTPProvider(config.l1_rpc))
 
         assets = config.assets
+        logger.debug(f"Assets available: {assets}")
         eth_address = assets["ETH"]
         if eth_address is None:
             raise ValueError("ETH address is required for IdleBalances adapter")

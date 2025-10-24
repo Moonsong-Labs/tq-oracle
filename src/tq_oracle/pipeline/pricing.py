@@ -52,6 +52,8 @@ async def price_assets(
         raise
 
     log.info("Calculating total assets in base asset...")
+    log.debug(f"Assets found: {aggregated}")
+    log.debug(f"Price data: {price_data}")
     total_assets = calculate_total_assets(aggregated, price_data)
     log.debug("Total assets in base asset: %d", total_assets)
 
