@@ -112,7 +112,7 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 - `idle_balances` - Checks for idle USDC balances not yet deployed
 - `hyperliquid` - Fetches portfolio value from Hyperliquid
 
-See `tq-oracle.toml.example` for complete configuration examples.
+See `tq-oracle-example.toml` for complete configuration examples.
 
 ### Usage Examples
 
