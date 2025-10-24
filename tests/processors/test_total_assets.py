@@ -146,9 +146,7 @@ def test_calculate_total_assets_invalid_prices_raises():
         ),
     ],
 )
-def test_calculate_total_assets_scenarios(
-    test_name, assets, prices, expected_total
-):
+def test_calculate_total_assets_scenarios(test_name, assets, prices, expected_total):
     """
     Tests various valid scenarios including single assets and zero amounts.
     - A single asset should be calculated correctly.
