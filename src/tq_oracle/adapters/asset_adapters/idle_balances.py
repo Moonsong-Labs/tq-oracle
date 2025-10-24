@@ -103,6 +103,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             usdc_asset = await self._fetch_asset_balance(
                 self.w3, subvault_address, usdc_address
             )
+            # For reporting purposes, we translate the Hyperliquid USDC address to the canonical L1 USDC address.
+            # This ensures consistency in asset reporting across chains.
             usdc_asset = AssetData(
                 asset_address=self.usdc_address, amount=usdc_asset.amount
             )
