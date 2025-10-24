@@ -17,7 +17,7 @@ def config():
     return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
-        l1_rpc="https://eth.example",
+        vault_rpc="https://eth.example",
         hl_rpc="https://hl.example",
         l1_subvault_address="0x1111111111111111111111111111111111111111",
         hl_subvault_address="0x2222222222222222222222222222222222222222",

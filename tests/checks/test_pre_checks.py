@@ -13,7 +13,7 @@ def config():
     return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
-        l1_rpc="https://eth.example",
+        vault_rpc="https://eth.example",
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,

@@ -74,7 +74,7 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
     config = OracleSettings(
         vault_address=vault,
         oracle_helper_address=oracle_helper,
-        l1_rpc=provider,
+        vault_rpc=provider,
         l1_subvault_address=None,
         safe_address=None,
         safe_txn_srvc_api_key=None,

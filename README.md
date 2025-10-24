@@ -67,7 +67,7 @@ All configuration options can be set via CLI arguments, environment variables, o
 | `VAULT_ADDRESS` | - | `vault_address` | *required* | Vault contract address (positional argument) |
 | `--config` `-c` | - | - | Auto-detect | Path to TOML configuration file |
 | `--oracle-helper-address` `-h` | - | `oracle_helper_address` | Auto (mainnet/testnet) | OracleHelper contract address |
-| `--l1-rpc` | `L1_RPC` | `l1_rpc` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
+| `--vault-rpc` | `VAULT_RPC` | `vault_rpc` | Auto (mainnet/sepolia/base) | Vault network RPC endpoint |
 | `--hl-rpc` | `HL_EVM_RPC` | `hl_rpc` | Auto (mainnet/testnet) | Hyperliquid RPC endpoint |
 | `--l1-subvault-address` | `L1_SUBVAULT_ADDRESS` | `l1_subvault_address` | - | L1 subvault for CCTP monitoring |
 | `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | `hl_subvault_address` | Vault address | Hyperliquid subvault address |

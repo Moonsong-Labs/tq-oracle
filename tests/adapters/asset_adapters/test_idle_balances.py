@@ -11,7 +11,7 @@ def config():
     return OracleSettings(
         vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://eth.drpc.org",
+        vault_rpc="https://eth.drpc.org",
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
@@ -118,7 +118,7 @@ def hl_config():
     return OracleSettings(
         vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://eth.drpc.org",
+        vault_rpc="https://eth.drpc.org",
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=HL_PROD_EVM_RPC,

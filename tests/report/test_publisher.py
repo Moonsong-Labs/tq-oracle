@@ -30,7 +30,7 @@ def broadcast_config() -> OracleSettings:
     return OracleSettings(
         vault_address="0x1234567890123456789012345678901234567890",
         oracle_helper_address="0x3234567890123456789012345678901234567890",
-        l1_rpc="http://localhost:8545",
+        vault_rpc="http://localhost:8545",
         l1_subvault_address=None,
         safe_address="0x3234567890123456789012345678901234567890",
         hl_rpc=None,

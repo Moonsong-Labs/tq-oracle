@@ -98,7 +98,7 @@ async def send_to_safe(
     logger.info("Proposing transaction as: %s", account.address)
 
     network = EthereumNetwork(config.chain_id)
-    ethereum_client = EthereumClient(URI(config.l1_rpc_required))
+    ethereum_client = EthereumClient(URI(config.vault_rpc_required))
 
     api_key = (
         config.safe_txn_srvc_api_key.get_secret_value()

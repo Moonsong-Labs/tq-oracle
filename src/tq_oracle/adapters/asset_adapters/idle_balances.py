@@ -28,12 +28,12 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     eth_address: str
     usdc_address: str
 
-    def __init__(self, config: OracleSettings, chain: str = "l1"):
+    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
         """Initialize the adapter.
 
         Args:
             config: Oracle configuration
-            chain: Which chain to query - "l1" or "hyperliquid"
+            chain: Which chain to query - "vault_chain" or "hyperliquid"
         """
         super().__init__(config, chain=chain)
 
@@ -42,7 +42,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 raise ValueError("hl_rpc must be configured to use hyperliquid chain")
             self.w3 = Web3(Web3.HTTPProvider(config.hl_rpc))
         else:
-            self.w3 = Web3(Web3.HTTPProvider(config.l1_rpc))
+            self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
 
         assets = config.assets
         logger.debug(f"Assets available: {assets}")
@@ -81,7 +81,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         return (
             AdapterChain.HYPERLIQUID
             if self._chain == "hyperliquid"
-            else AdapterChain.L1
+            else AdapterChain.VAULT_CHAIN
         )
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
@@ -222,7 +222,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """Get the supported assets for the given vault."""
         oracle_abi = load_oracle_abi()
         oracle_address = get_oracle_address_from_vault(
-            self.config.vault_address_required, self.config.l1_rpc_required
+            self.config.vault_address_required, self.config.vault_rpc_required
         )
         return await self._fetch_contract_list(
             contract_address=oracle_address,

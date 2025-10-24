@@ -30,7 +30,7 @@ async def _fetch_subvault_addresses(state: AppState) -> list[str]:
     s = state.settings
     log = state.logger
 
-    w3 = Web3(Web3.HTTPProvider(s.l1_rpc_required))
+    w3 = Web3(Web3.HTTPProvider(s.vault_rpc_required))
     vault_abi = load_vault_abi()
     vault_address = w3.to_checksum_address(s.vault_address_required)
     contract = w3.eth.contract(address=vault_address, abi=vault_abi)
@@ -136,23 +136,23 @@ async def collect_assets(state: AppState) -> AggregatedAssets:
                 return config
         return {
             "subvault_address": subvault_address,
-            "chain": "l1",
+            "chain": "vault_chain",
             "additional_adapters": [],
             "skip_idle_balances": False,
         }
 
-    # 1. Add default L1 idle_balances (runs against ALL subvaults unless globally skipped)
+    # 1. Add default vault_chain idle_balances (runs against ALL subvaults unless globally skipped)
     should_run_default_idle_balances = any(
         not get_subvault_config(addr).get("skip_idle_balances", False)
         for addr in subvault_addresses
     )
 
     if should_run_default_idle_balances:
-        idle_l1_adapter = IdleBalancesAdapter(s, chain="l1")
+        idle_vault_adapter = IdleBalancesAdapter(s, chain="vault_chain")
         asset_fetch_tasks.append(
-            ("idle_balances_l1", idle_l1_adapter.fetch_all_assets())
+            ("idle_balances_vault_chain", idle_vault_adapter.fetch_all_assets())
         )
-        log.debug("Added default L1 idle_balances adapter (all subvaults)")
+        log.debug("Added default vault_chain idle_balances adapter (all subvaults)")
 
     # 2. Add additional adapters per subvault
     def create_adapter_task(
@@ -161,13 +161,13 @@ async def collect_assets(state: AppState) -> AggregatedAssets:
         """Create an adapter instance for the given subvault and adapter name."""
         sv_config = get_subvault_config(subvault_addr)
         adapter_class = get_adapter_class(adapter_name)
-        adapter = adapter_class(s, chain=sv_config.get("chain", "l1"))
+        adapter = adapter_class(s, chain=sv_config.get("chain", "vault_chain"))
 
         log.debug(
             "Subvault %s → additional adapter: %s (chain: %s)",
             subvault_addr,
             adapter_name,
-            sv_config.get("chain", "l1"),
+            sv_config.get("chain", "vault_chain"),
         )
         return (subvault_addr, adapter, adapter_name)
 

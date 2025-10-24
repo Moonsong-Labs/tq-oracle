@@ -25,7 +25,7 @@ class WstETHAdapter(BasePriceAdapter):
         super().__init__(config)
 
         if config.network == Network.MAINNET:
-            self.mainnet_rpc = config.l1_rpc
+            self.mainnet_rpc = config.vault_rpc
         else:
             # On L2s (Base, Sepolia, etc), use eth_mainnet_rpc or fall back to default
             self.mainnet_rpc = config.eth_mainnet_rpc or DEFAULT_MAINNET_RPC_URL

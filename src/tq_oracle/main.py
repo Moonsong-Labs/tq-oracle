@@ -128,10 +128,10 @@ def initialize_context(
 
     settings = OracleSettings(**init_kwargs)
 
-    used_default_l1_rpc = False
-    if settings.l1_rpc is None:
-        settings.l1_rpc = NETWORK_RPC_DEFAULTS[settings.network]
-        used_default_l1_rpc = True
+    used_default_vault_rpc = False
+    if settings.vault_rpc is None:
+        settings.vault_rpc = NETWORK_RPC_DEFAULTS[settings.network]
+        used_default_vault_rpc = True
 
     if settings.oracle_helper_address is None:
         settings.oracle_helper_address = NETWORK_ORACLE_HELPER_DEFAULTS[
@@ -151,7 +151,7 @@ def initialize_context(
         if "hl_rpc" not in fields_set and settings.hl_rpc == default_hl_rpc:
             used_default_hl_rpc = True
 
-    settings.using_default_rpc = used_default_l1_rpc or used_default_hl_rpc
+    settings.using_default_rpc = used_default_vault_rpc or used_default_hl_rpc
 
     setup_logging(settings.log_level)
     logger = _build_logger()
@@ -179,8 +179,8 @@ def report(
 
     if not s.vault_address:
         raise typer.BadParameter("vault_address must be configured")
-    if not s.l1_rpc:
-        raise typer.BadParameter("l1_rpc must be configured")
+    if not s.vault_rpc:
+        raise typer.BadParameter("vault_rpc must be configured")
     if not s.oracle_helper_address:
         raise typer.BadParameter("oracle_helper_address must be configured")
     if not s.hl_rpc:

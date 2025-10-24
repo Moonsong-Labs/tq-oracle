@@ -198,7 +198,7 @@ TQ Oracle uses a three-tier configuration system with precedence:
 
 - `vault_address`: Target vault to report on
 - `oracle_helper_address`: OracleHelper contract for price normalization
-- `l1_rpc` / `hl_rpc`: RPC endpoints for different chains
+- `vault_rpc` / `hl_rpc`: RPC endpoints for different chains (vault network and Hyperliquid)
 - `safe_address`: Gnosis Safe for multi-sig submission
 - `private_key`: Signer key for proposing Safe transactions
 - `subvault_adapters`: Per-subvault adapter configuration

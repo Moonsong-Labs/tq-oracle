@@ -9,7 +9,7 @@ from ...settings import OracleSettings
 class AdapterChain(Enum):
     """Enum indicating which blockchain/RPC an adapter uses."""
 
-    L1 = "l1"  # Ethereum L1 (uses l1_rpc)
+    VAULT_CHAIN = "vault_chain"  # Main vault network (uses vault_rpc)
     HYPERLIQUID = "hyperliquid"  # Hyperliquid chain (uses hl_rpc)
 
 
@@ -24,12 +24,12 @@ class AssetData:
 class BaseAssetAdapter(ABC):
     """Abstract base class for asset adapters."""
 
-    def __init__(self, config: OracleSettings, chain: str = "l1"):
+    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
         """Initialize the adapter with configuration.
 
         Args:
             config: Oracle configuration
-            chain: Which chain to operate on - "l1" or "hyperliquid"
+            chain: Which chain to operate on - "vault_chain" or "hyperliquid"
         """
         self.config = config
         self._chain = chain
