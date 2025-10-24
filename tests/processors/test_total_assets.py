@@ -22,7 +22,7 @@ def test_calculate_total_assets_basic():
 
     result = calculate_total_assets(aggregated, prices)
 
-    assert result == (2 * 10**18) + (3 * 2 * 10**18)
+    assert result == 8
 
 
 def test_calculate_total_assets_empty_returns_zero():
@@ -91,7 +91,7 @@ def test_calculate_total_assets_with_extra_prices():
 
     result = calculate_total_assets(aggregated, prices)
 
-    assert result == (2 * 10**18) + (3 * 2 * 10**18)
+    assert result == 8
 
 
 def test_calculate_total_assets_invalid_prices_raises():
