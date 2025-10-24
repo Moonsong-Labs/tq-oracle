@@ -11,6 +11,8 @@ from typing import Annotated
 import typer
 
 from .constants import (
+    BASE_ORACLE_HELPER,
+    DEFAULT_BASE_RPC_URL,
     DEFAULT_MAINNET_RPC_URL,
     DEFAULT_SEPOLIA_RPC_URL,
     HL_PROD_EVM_RPC,
@@ -21,6 +23,18 @@ from .constants import (
 from .logger import setup_logging
 from .settings import CCTPEnv, HyperliquidEnv, Network, OracleSettings
 from .state import AppState
+
+NETWORK_RPC_DEFAULTS = {
+    Network.MAINNET: DEFAULT_MAINNET_RPC_URL,
+    Network.SEPOLIA: DEFAULT_SEPOLIA_RPC_URL,
+    Network.BASE: DEFAULT_BASE_RPC_URL,
+}
+
+NETWORK_ORACLE_HELPER_DEFAULTS = {
+    Network.MAINNET: MAINNET_ORACLE_HELPER,
+    Network.SEPOLIA: SEPOLIA_ORACLE_HELPER,
+    Network.BASE: BASE_ORACLE_HELPER,
+}
 
 app = typer.Typer(
     add_completion=False,
@@ -42,7 +56,7 @@ def _redacted_dump(settings: OracleSettings) -> dict:
 
 
 @app.callback()
-def main(
+def initialize_context(
     ctx: typer.Context,
     config_path: Annotated[
         Path | None,
@@ -53,34 +67,34 @@ def main(
         ),
     ] = None,
     network: Annotated[
-        Network,
+        Network | None,
         typer.Option(
             "--network",
             "-n",
             help="Network to use (mainnet, sepolia, or base).",
         ),
-    ] = Network.MAINNET,
+    ] = None,
     hyperliquid_env: Annotated[
-        HyperliquidEnv,
+        HyperliquidEnv | None,
         typer.Option(
             "--hyperliquid-env",
             help="Hyperliquid environment (mainnet or testnet); overrides env/config.",
         ),
-    ] = "mainnet",
+    ] = None,
     cctp_env: Annotated[
-        CCTPEnv,
+        CCTPEnv | None,
         typer.Option(
             "--cctp-env",
             help="CCTP environment (mainnet or testnet); overrides env/config.",
         ),
-    ] = "mainnet",
+    ] = None,
     dry_run: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--dry-run/--no-dry-run",
             help="Do not post onchain; overrides env/config.",
         ),
-    ] = True,
+    ] = None,
     show_config: Annotated[
         bool,
         typer.Option(
@@ -89,32 +103,38 @@ def main(
         ),
     ] = False,
 ):
-    """Initialize application state once and pass it to subcommands via ctx.obj."""
+    """Typer callback to initialize application state before any subcommand executes.
+
+    This function runs automatically before commands like 'report'. It loads configuration,
+    applies network-specific defaults, and stores the initialized AppState in ctx.obj
+    for subcommands to access.
+    """
     import os
 
     if config_path:
         os.environ["TQ_ORACLE_CONFIG"] = str(config_path)
 
-    settings = OracleSettings(
-        network=network,
-        hyperliquid_env=hyperliquid_env,
-        cctp_env=cctp_env,
-        dry_run=dry_run,
-    )
+    init_kwargs: dict[str, Network | HyperliquidEnv | CCTPEnv | bool] = {}
+    if network is not None:
+        init_kwargs["network"] = network
+    if hyperliquid_env is not None:
+        init_kwargs["hyperliquid_env"] = hyperliquid_env
+    if cctp_env is not None:
+        init_kwargs["cctp_env"] = cctp_env
+    if dry_run is not None:
+        init_kwargs["dry_run"] = dry_run
+
+    settings = OracleSettings(**init_kwargs)
 
     used_default_l1_rpc = False
     if settings.l1_rpc is None:
-        if settings.network == Network.SEPOLIA:
-            settings.l1_rpc = DEFAULT_SEPOLIA_RPC_URL
-        else:
-            settings.l1_rpc = DEFAULT_MAINNET_RPC_URL
+        settings.l1_rpc = NETWORK_RPC_DEFAULTS[settings.network]
         used_default_l1_rpc = True
 
     if settings.oracle_helper_address is None:
-        if settings.network == Network.SEPOLIA:
-            settings.oracle_helper_address = SEPOLIA_ORACLE_HELPER
-        else:
-            settings.oracle_helper_address = MAINNET_ORACLE_HELPER
+        settings.oracle_helper_address = NETWORK_ORACLE_HELPER_DEFAULTS[
+            settings.network
+        ]
 
     default_hl_rpc = (
         HL_TEST_EVM_RPC if settings.hyperliquid_env == "testnet" else HL_PROD_EVM_RPC
