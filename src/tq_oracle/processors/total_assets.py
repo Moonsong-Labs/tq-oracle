@@ -25,5 +25,6 @@ def calculate_total_assets(
         raise ValueError(f"Invalid prices for assets: {invalid_details}")
 
     return sum(
-        aggregated_assets.assets[i] * prices.prices[i] for i in aggregated_assets.assets
+        aggregated_assets.assets[i] * prices.prices[i] // (10**18)
+        for i in aggregated_assets.assets
     )

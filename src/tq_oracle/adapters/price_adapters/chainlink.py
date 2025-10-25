@@ -26,7 +26,7 @@ class ChainlinkAdapter(BasePriceAdapter):
 
     def __init__(self, config: OracleSettings):
         super().__init__(config)
-        self.l1_rpc = config.l1_rpc
+        self.vault_rpc = config.vault_rpc
         assets = config.assets
         eth_address = assets["ETH"]
         if eth_address is None:
@@ -83,7 +83,7 @@ class ChainlinkAdapter(BasePriceAdapter):
         if not direct_feed_assets and not has_usds:
             return prices_accumulator
 
-        w3 = Web3(Web3.HTTPProvider(self.l1_rpc))
+        w3 = Web3(Web3.HTTPProvider(self.vault_rpc))
         aggregator_abi = load_aggregator_abi()
 
         for asset_address, price_feed in direct_feed_assets:

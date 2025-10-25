@@ -88,17 +88,13 @@ async def send_to_safe(
     if not config.private_key:
         raise ValueError("private_key required for Broadcast mode")
 
-    private_key_str = (
-        config.private_key.get_secret_value() if config.private_key else None
-    )
-    if not private_key_str:
-        raise ValueError("private_key required for Broadcast mode")
+    private_key_str = config.private_key.get_secret_value()
 
     account: LocalAccount = Account.from_key(private_key_str)  # pyrefly: ignore
     logger.info("Proposing transaction as: %s", account.address)
 
     network = EthereumNetwork(config.chain_id)
-    ethereum_client = EthereumClient(URI(config.l1_rpc_required))
+    ethereum_client = EthereumClient(URI(config.vault_rpc_required))
 
     api_key = (
         config.safe_txn_srvc_api_key.get_secret_value()
@@ -167,6 +163,7 @@ async def send_to_safe(
         11155111: "sep",
         100: "gno",
         137: "matic",
+        8453: "base",
         42161: "arb1",
         10: "oeth",
     }.get(config.chain_id, "eth")

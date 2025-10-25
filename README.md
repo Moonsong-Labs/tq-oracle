@@ -8,6 +8,13 @@ TQ Oracle performs read smart contract READ calls through a registry of protocol
 
 For detailed system architecture and integration with Mellow Finance flexible-vaults, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## Known Limitations & Assumptions
+
+> [!WARNING]
+> **stETH/ETH Peg Assumption**: The wstETH price adapter assumes a 1:1 peg between stETH and ETH when calculating wstETH prices. This assumption is **not validated** against market prices.
+>
+> **Impact**: During stETH depeg events (e.g., market stress, liquidity crises), the oracle will report inaccurate TVL for vaults holding wstETH. The reported value will reflect the stETH/wstETH exchange rate multiplied by an assumed 1:1 stETH/ETH rate, not the actual market value.
+
 ## Running without installing
 
 You can run this CLI without any git cloning, directly with `uv`
@@ -67,7 +74,7 @@ All configuration options can be set via CLI arguments, environment variables, o
 | `VAULT_ADDRESS` | - | `vault_address` | *required* | Vault contract address (positional argument) |
 | `--config` `-c` | - | - | Auto-detect | Path to TOML configuration file |
 | `--oracle-helper-address` `-h` | - | `oracle_helper_address` | Auto (mainnet/testnet) | OracleHelper contract address |
-| `--l1-rpc` | `L1_RPC` | `l1_rpc` | Auto (mainnet/testnet) | Ethereum L1 RPC endpoint |
+| `--vault-rpc` | `VAULT_RPC` | `vault_rpc` | Auto (mainnet/sepolia/base) | Vault network RPC endpoint |
 | `--hl-rpc` | `HL_EVM_RPC` | `hl_rpc` | Auto (mainnet/testnet) | Hyperliquid RPC endpoint |
 | `--l1-subvault-address` | `L1_SUBVAULT_ADDRESS` | `l1_subvault_address` | - | L1 subvault for CCTP monitoring |
 | `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | `hl_subvault_address` | Vault address | Hyperliquid subvault address |

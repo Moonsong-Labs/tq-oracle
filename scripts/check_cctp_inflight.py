@@ -25,7 +25,7 @@ async def test_cctp_bridge(
     l1_subvault_address: str,
     hl_subvault_address: str,
     testnet: bool = False,
-    l1_rpc: str | None = None,
+    vault_rpc: str | None = None,
     hl_rpc: str | None = None,
 ) -> int:
     """Test CCTP bridge in-flight transaction detection.
@@ -34,13 +34,13 @@ async def test_cctp_bridge(
         l1_subvault_address: L1 subvault address to monitor
         hl_subvault_address: Hyperliquid subvault address to monitor
         testnet: Whether to use testnet (default: False for mainnet)
-        l1_rpc: Custom L1 RPC URL (optional, defaults based on testnet flag)
+        vault_rpc: Custom L1 RPC URL (optional, defaults based on testnet flag)
         hl_rpc: Custom Hyperliquid RPC URL (optional, defaults based on testnet flag)
     """
-    using_default_rpc = l1_rpc is None or hl_rpc is None
+    using_default_rpc = vault_rpc is None or hl_rpc is None
 
-    if l1_rpc is None:
-        l1_rpc = DEFAULT_SEPOLIA_RPC_URL if testnet else DEFAULT_MAINNET_RPC_URL
+    if vault_rpc is None:
+        vault_rpc = DEFAULT_SEPOLIA_RPC_URL if testnet else DEFAULT_MAINNET_RPC_URL
 
     if hl_rpc is None:
         hl_rpc = HL_TEST_EVM_RPC if testnet else HL_PROD_EVM_RPC
@@ -48,7 +48,7 @@ async def test_cctp_bridge(
     config = OracleSettings(
         vault_address="",
         oracle_helper_address="",
-        l1_rpc=l1_rpc,
+        vault_rpc=vault_rpc,
         l1_subvault_address=l1_subvault_address,
         safe_address=None,
         hl_rpc=hl_rpc,
@@ -65,7 +65,7 @@ async def test_cctp_bridge(
     logger.info(f"L1 Subvault: {l1_subvault_address}")
     logger.info(f"HL Subvault: {hl_subvault_address}")
     logger.info(f"Network: {'Testnet' if testnet else 'Mainnet'}")
-    logger.info(f"L1 RPC: {l1_rpc}")
+    logger.info(f"Vault RPC: {vault_rpc}")
     logger.info(f"HL RPC: {hl_rpc}")
     logger.info("=" * 60)
 
@@ -116,7 +116,7 @@ def main() -> int:
                 l1_subvault_address=args.l1_subvault_address,
                 hl_subvault_address=args.hl_subvault_address,
                 testnet=args.testnet,
-                l1_rpc=args.l1_rpc,
+                vault_rpc=args.vault_rpc,
                 hl_rpc=args.hl_rpc,
             )
         )

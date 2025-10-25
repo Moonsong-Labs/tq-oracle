@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+import requests
 from eth_typing import URI
 from safe_eth.eth import EthereumClient, EthereumNetwork
 from safe_eth.safe.api import TransactionServiceApi
@@ -93,7 +94,7 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
             List of active submitReport() proposals
         """
         network = EthereumNetwork(self._config.chain_id)
-        ethereum_client = EthereumClient(URI(self._config.l1_rpc_required))
+        ethereum_client = EthereumClient(URI(self._config.vault_rpc_required))
 
         api_key = (
             self._config.safe_txn_srvc_api_key.get_secret_value()
@@ -103,6 +104,12 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
         tx_service = TransactionServiceApi(network, ethereum_client, api_key=api_key)
 
         safe_checksum = Web3.to_checksum_address(self._config.safe_address)
+
+        safe_api_url = f"{tx_service.base_url}/api/v1/safes/{safe_checksum}/"
+        safe_info_response = await asyncio.to_thread(requests.get, safe_api_url)
+        safe_info_response.raise_for_status()
+        safe_info_data = safe_info_response.json()
+        current_nonce = int(safe_info_data.get("nonce", 0))
 
         pending_txs = await asyncio.to_thread(
             tx_service.get_transactions,
@@ -117,6 +124,10 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
             if not tx.get("isExecuted", False):
                 tx_data = tx.get("data", "")
                 if tx_data and tx_data.startswith(SUBMIT_REPORTS_SELECTOR):
-                    active_submit_report_proposals.append(tx)
+                    # Filter out stale transactions (nonce < current_nonce)
+                    # These are rejected/superseded proposals that can never execute
+                    tx_nonce = tx.get("nonce")
+                    if tx_nonce is not None and int(tx_nonce) >= current_nonce:
+                        active_submit_report_proposals.append(tx)
 
         return active_submit_report_proposals

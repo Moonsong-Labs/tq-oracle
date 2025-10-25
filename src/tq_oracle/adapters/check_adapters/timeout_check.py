@@ -59,7 +59,7 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
         """
         w3 = None
         try:
-            w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.l1_rpc))
+            w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.vault_rpc))
 
             oracle_address = self._config.oracle_address
             logger.debug(f"Using oracle address: {oracle_address}")

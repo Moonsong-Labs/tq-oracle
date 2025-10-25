@@ -11,7 +11,7 @@ def config():
     return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://eth.drpc.org",
+        vault_rpc="https://eth.drpc.org",
         network=Network.MAINNET,
         safe_address=None,
         l1_subvault_address=None,
@@ -151,7 +151,7 @@ async def test_fetch_prices_usdt_not_supported_on_testnet(eth_address, usdt_addr
     testnet_config = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://sepolia.drpc.org",
+        vault_rpc="https://sepolia.drpc.org",
         network=Network.SEPOLIA,
         safe_address=None,
         l1_subvault_address=None,
@@ -216,7 +216,7 @@ async def test_fetch_prices_usds_not_supported_on_testnet(eth_address, usds_addr
     testnet_config = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://sepolia.drpc.org",
+        vault_rpc="https://sepolia.drpc.org",
         network=Network.SEPOLIA,
         safe_address=None,
         l1_subvault_address=None,

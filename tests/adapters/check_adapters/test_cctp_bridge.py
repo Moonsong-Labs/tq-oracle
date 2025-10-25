@@ -46,7 +46,7 @@ def config():
     return OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
-        l1_rpc="https://eth.example",
+        vault_rpc="https://eth.example",
         hl_rpc="https://hl.example",
         l1_subvault_address=DEPOSITOR_ADDRESS,
         hl_subvault_address=RECIPIENT_ADDRESS,
@@ -329,7 +329,7 @@ def test_messenger_addresses_testnet():
     testnet_config = OracleSettings(
         vault_address="0xVAULT",
         oracle_helper_address="0xORACLE_HELPER",
-        l1_rpc="https://eth.example",
+        vault_rpc="https://eth.example",
         hl_rpc="https://hl.example",
         l1_subvault_address=DEPOSITOR_ADDRESS,
         hl_subvault_address=RECIPIENT_ADDRESS,

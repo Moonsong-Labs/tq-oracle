@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -11,6 +12,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
+from dotenv import load_dotenv
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
@@ -18,9 +20,9 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-from enum import Enum
-
 from .constants import NetworkAssets
+
+load_dotenv()
 
 
 class Network(str, Enum):
@@ -52,7 +54,8 @@ class OracleSettings(BaseSettings):
     # --- core addresses / endpoints ---
     vault_address: str | None = None
     oracle_helper_address: str | None = None
-    l1_rpc: str | None = None
+    vault_rpc: str | None = None
+    eth_mainnet_rpc: str | None = None  # Needed for when vault is not on mainnet
     network: Network = Network.MAINNET
 
     # --- hyperliquid ---
@@ -244,26 +247,26 @@ class OracleSettings(BaseSettings):
         return self.vault_address
 
     @property
-    def l1_rpc_required(self) -> str:
-        """Get l1_rpc, raising ValueError if not set."""
-        if self.l1_rpc is None:
-            raise ValueError("l1_rpc must be configured")
-        return self.l1_rpc
+    def vault_rpc_required(self) -> str:
+        """Get vault_rpc, raising ValueError if not set."""
+        if self.vault_rpc is None:
+            raise ValueError("vault_rpc must be configured")
+        return self.vault_rpc
 
     @property
     def chain_id(self) -> int:
         """Derive chain ID from the RPC endpoint."""
         if self._chain_id is None:
-            if not self.l1_rpc:
-                raise ValueError("l1_rpc must be set before accessing chain_id")
+            if not self.vault_rpc:
+                raise ValueError("vault_rpc must be set before accessing chain_id")
             from eth_typing import URI
             from web3 import Web3
 
             w3 = Web3(
-                Web3.HTTPProvider(URI(self.l1_rpc), request_kwargs={"timeout": 15})
+                Web3.HTTPProvider(URI(self.vault_rpc), request_kwargs={"timeout": 15})
             )
             if not w3.is_connected():
-                raise ConnectionError(f"Failed to connect to RPC: {self.l1_rpc}")
+                raise ConnectionError(f"Failed to connect to RPC: {self.vault_rpc}")
             self._chain_id = w3.eth.chain_id
         return self._chain_id
 
@@ -271,14 +274,14 @@ class OracleSettings(BaseSettings):
     def oracle_address(self) -> str:
         """Fetch oracle address from the vault contract."""
         if self._oracle_address is None:
-            if not self.vault_address or not self.l1_rpc:
+            if not self.vault_address or not self.vault_rpc:
                 raise ValueError(
-                    "vault_address and l1_rpc must be set before accessing oracle_address"
+                    "vault_address and vault_rpc must be set before accessing oracle_address"
                 )
             from .abi import get_oracle_address_from_vault
 
             self._oracle_address = get_oracle_address_from_vault(
-                self.vault_address, self.l1_rpc
+                self.vault_address, self.vault_rpc
             )
         return self._oracle_address
 

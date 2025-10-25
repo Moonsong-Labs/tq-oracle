@@ -12,7 +12,7 @@ def config():
     return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://eth.drpc.org",
+        vault_rpc="https://eth.drpc.org",
         network=Network.MAINNET,
         safe_address=None,
         l1_subvault_address=None,

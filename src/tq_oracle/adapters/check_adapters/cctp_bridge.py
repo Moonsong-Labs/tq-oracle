@@ -125,8 +125,8 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
                     message="Skipping CCTP bridge checks - HL subvault address not configured",
                     retry_recommended=False,
                 )
-            logger.debug(f"Connecting to L1 RPC: {self._config.l1_rpc}")
-            l1_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.l1_rpc))
+            logger.debug(f"Connecting to vault-chain RPC: {self._config.vault_rpc}")
+            l1_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.vault_rpc))
             logger.debug(f"Connecting to HL RPC: {self._config.hl_rpc}")
             hl_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.hl_rpc))
 

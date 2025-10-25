@@ -18,7 +18,7 @@ def mainnet_config():
     return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://mainnet.rpc",
+        vault_rpc="https://mainnet.rpc",
         network=Network.MAINNET,
         l1_subvault_address=None,
         safe_address=None,
@@ -37,7 +37,7 @@ def testnet_config():
     return OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://testnet.rpc",
+        vault_rpc="https://testnet.rpc",
         network=Network.SEPOLIA,
         l1_subvault_address=None,
         safe_address=None,
@@ -307,7 +307,7 @@ async def test_hl_subvault_address_from_config_overrides_parameter(mainnet_confi
     config_with_subvault = OracleSettings(
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
-        l1_rpc="https://mainnet.rpc",
+        vault_rpc="https://mainnet.rpc",
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
