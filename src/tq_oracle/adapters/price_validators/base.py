@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
 
 from tq_oracle.adapters.check_adapters.base import CheckResult
-
-if TYPE_CHECKING:
-    from tq_oracle.adapters.price_adapters.base import PriceData
-    from tq_oracle.settings import OracleSettings
+from tq_oracle.adapters.price_adapters.base import PriceData
+from tq_oracle.settings import OracleSettings
 
 
 class BasePriceValidator(ABC):

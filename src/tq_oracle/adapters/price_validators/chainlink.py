@@ -3,10 +3,9 @@ from __future__ import annotations
 import logging
 
 from tq_oracle.adapters.check_adapters.base import CheckResult
-from tq_oracle.adapters.price_validators.base import BasePriceValidator
-from tq_oracle.adapters.price_adapters.chainlink import ChainlinkAdapter
-
 from tq_oracle.adapters.price_adapters.base import PriceData
+from tq_oracle.adapters.price_adapters.chainlink import ChainlinkAdapter
+from tq_oracle.adapters.price_validators.base import BasePriceValidator
 from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)

@@ -130,13 +130,13 @@ class OracleSettings(BaseSettings):
         """
         from .constants import (
             HL_MAINNET_API_URL,
-            HL_TESTNET_API_URL,
             HL_PROD_EVM_RPC,
             HL_TEST_EVM_RPC,
-            USDC_HL_MAINNET,
-            USDC_HL_TESTNET,
+            HL_TESTNET_API_URL,
             TOKEN_MESSENGER_V2_PROD,
             TOKEN_MESSENGER_V2_TEST,
+            USDC_HL_MAINNET,
+            USDC_HL_TESTNET,
         )
 
         if self.hyperliquid_api_url is None:
@@ -298,7 +298,7 @@ class OracleSettings(BaseSettings):
         Returns:
             NetworkAssets for the configured network
         """
-        from .constants import ETH_MAINNET_ASSETS, SEPOLIA_ASSETS, BASE_ASSETS
+        from .constants import BASE_ASSETS, ETH_MAINNET_ASSETS, SEPOLIA_ASSETS
 
         network_assets_map = {
             Network.MAINNET: ETH_MAINNET_ASSETS,

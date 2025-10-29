@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from .base import BaseAssetAdapter
 from .hyperliquid import HyperliquidAdapter
 from .idle_balances import IdleBalancesAdapter
-from .base import BaseAssetAdapter
 
 ADAPTER_REGISTRY: dict[str, type[BaseAssetAdapter]] = {
     "idle_balances": IdleBalancesAdapter,

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import backoff
 
 from ..checks.pre_checks import PreCheckError, run_pre_checks
-
-if TYPE_CHECKING:
-    from ..state import AppState
+from ..state import AppState
 
 
 async def run_preflight(state: AppState, vault_address: str) -> None:

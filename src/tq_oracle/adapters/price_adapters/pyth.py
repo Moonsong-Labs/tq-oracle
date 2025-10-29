@@ -3,17 +3,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING
 
 import requests
 from web3 import Web3
 
 from tq_oracle.constants import PYTH_PRICE_FEED_IDS
+from tq_oracle.settings import OracleSettings
 
 from .base import BasePriceAdapter, PriceData
-
-if TYPE_CHECKING:
-    from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 

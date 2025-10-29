@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-import time
 import math
-from typing import TYPE_CHECKING, Optional, Any
+import time
+from typing import Any, Optional
 
 from hyperliquid.info import Info
 
 from ...constants import HL_MAX_PORTFOLIO_STALENESS_SECONDS
 from ...logger import get_logger
-from .base import AssetData, BaseAssetAdapter, AdapterChain
-
-if TYPE_CHECKING:
-    from ...settings import OracleSettings
+from ...settings import OracleSettings
+from .base import AdapterChain, AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
 

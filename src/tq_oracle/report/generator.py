@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from ..processors.asset_aggregator import AggregatedAssets
-    from ..processors.oracle_helper import FinalPrices
+from ..processors.asset_aggregator import AggregatedAssets
+from ..processors.oracle_helper import FinalPrices
 
 
 @dataclass

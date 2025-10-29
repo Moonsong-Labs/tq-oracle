@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from web3 import Web3
 
@@ -13,13 +12,11 @@ from ...constants import (
     PRICE_FEED_USDT_ETH,
     PRICE_FEED_WSTETH_ETH_BASE,
 )
+from ...settings import OracleSettings
 from ...units import scale_to_18
 from .base import BasePriceAdapter, PriceData
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from ...settings import OracleSettings
 
 
 class ChainlinkAdapter(BasePriceAdapter):

@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
+from ...settings import OracleSettings
 from .base import BasePriceAdapter, PriceData
-
-if TYPE_CHECKING:
-    from ...settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 

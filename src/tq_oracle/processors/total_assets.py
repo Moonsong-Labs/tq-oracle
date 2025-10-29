@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ..processors.asset_aggregator import AggregatedAssets
 from ..adapters.price_adapters.base import PriceData
+from ..processors.asset_aggregator import AggregatedAssets
 
 
 def calculate_total_assets(

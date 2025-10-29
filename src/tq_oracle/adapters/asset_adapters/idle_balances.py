@@ -1,23 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
-
-from web3 import Web3
-import backoff
 import random
+
+import backoff
+from web3 import Web3
 from web3.exceptions import ProviderConnectionError
-from ...logger import get_logger
+
 from ...abi import (
-    load_vault_abi,
-    load_oracle_abi,
     get_oracle_address_from_vault,
     load_erc20_abi,
+    load_oracle_abi,
+    load_vault_abi,
 )
-from .base import AssetData, BaseAssetAdapter, AdapterChain
-
-if TYPE_CHECKING:
-    from ...settings import OracleSettings
+from ...logger import get_logger
+from ...settings import OracleSettings
+from .base import AdapterChain, AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
 

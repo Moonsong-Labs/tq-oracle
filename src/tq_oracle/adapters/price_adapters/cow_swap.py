@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from decimal import Decimal
-from typing import TYPE_CHECKING
 import logging
+from decimal import Decimal
+
 import backoff
 import requests
 from web3 import Web3
 
 from ...abi import load_erc20_abi
-from ...settings import Network
+from ...settings import Network, OracleSettings
 from .base import BasePriceAdapter, PriceData
-
-if TYPE_CHECKING:
-    from ...settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 
