@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from tq_oracle.settings import OracleSettings
+from ...settings import OracleSettings
 
 
 @dataclass
