@@ -102,7 +102,7 @@ async def test_validate_prices_with_mocked_pyth(config, eth_address, usdc_addres
                 "price": {
                     "price": "1",
                     "expo": 0,
-                    "conf": "0.001",
+                    "conf": "1",
                     "publish_time": current_time,
                 },
             },
@@ -152,7 +152,7 @@ async def test_validate_prices_fails_on_excessive_deviation(
                 "price": {
                     "price": "1",
                     "expo": 0,
-                    "conf": "0.001",
+                    "conf": "1",
                     "publish_time": current_time,
                 },
             },
