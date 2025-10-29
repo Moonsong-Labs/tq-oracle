@@ -81,8 +81,14 @@ class OracleSettings(BaseSettings):
     pre_check_timeout: float = 12.0
 
     # --- price validation ---
-    chainlink_price_warning_tolerance_percentage: float = 0.5
-    chainlink_price_failure_tolerance_percentage: float = 1.0
+    price_warning_tolerance_percentage: float = 0.5
+    price_failure_tolerance_percentage: float = 1.0
+
+    # Pyth-specific settings
+    pyth_enabled: bool = True
+    pyth_hermes_endpoint: str = "https://hermes.pyth.network"
+    pyth_staleness_threshold: int = 60
+    pyth_max_confidence_ratio: float = 0.03
 
     # --- RPC settings ---
     max_calls: int = 3

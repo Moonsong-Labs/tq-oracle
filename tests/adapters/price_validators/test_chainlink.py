@@ -23,8 +23,8 @@ def config():
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
-        chainlink_price_warning_tolerance_percentage=0.5,
-        chainlink_price_failure_tolerance_percentage=1.0,
+        price_warning_tolerance_percentage=0.5,
+        price_failure_tolerance_percentage=1.0,
     )
 
 

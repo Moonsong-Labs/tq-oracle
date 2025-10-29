@@ -16,25 +16,36 @@ class ChainlinkValidator(BasePriceValidator):
     def __init__(self, config: OracleSettings):
         super().__init__(config)
         self.chainlink_adapter = ChainlinkAdapter(config)
-        self.warning_tolerance = config.chainlink_price_warning_tolerance_percentage
-        self.failure_tolerance = config.chainlink_price_failure_tolerance_percentage
+        self.warning_tolerance = config.price_warning_tolerance_percentage
+        self.failure_tolerance = config.price_failure_tolerance_percentage
 
     @property
     def name(self) -> str:
         return "Chainlink Validator"
 
     async def validate_prices(self, price_data: PriceData) -> CheckResult:
+        logger.debug(
+            f" Starting validation with price_data.prices keys: {list(price_data.prices.keys())}"
+        )
         asset_addresses = list(price_data.prices.keys())
+        logger.debug(f" Asset addresses to validate: {asset_addresses}")
         chainlink_prices = PriceData(base_asset=price_data.base_asset, prices={})
         chainlink_prices = await self.chainlink_adapter.fetch_prices(
             asset_addresses, chainlink_prices
         )
+        logger.debug(f" Fetched prices for {len(chainlink_prices.prices)} assets")
+        logger.debug(f" Chainlink price keys: {list(chainlink_prices.prices.keys())}")
 
         for asset_address, chainlink_price in chainlink_prices.prices.items():
+            logger.debug(f" Processing asset {asset_address}")
             asset_price = price_data.prices[asset_address]
+            logger.debug(
+                f" {asset_address}: Chainlink price={chainlink_price}, Oracle price={asset_price}"
+            )
             delta_percentage = self._calculate_price_deviation_percentage(
                 chainlink_price, asset_price
             )
+            logger.debug(f" {asset_address}: Deviation = {delta_percentage:.2f}%")
 
             if delta_percentage > self.failure_tolerance:
                 return CheckResult(
@@ -53,23 +64,3 @@ class ChainlinkValidator(BasePriceValidator):
             message="All prices are within acceptable deviation from Chainlink",
             retry_recommended=False,
         )
-
-    def _calculate_price_deviation_percentage(
-        self, reference_price: int, actual_price: int
-    ) -> float:
-        """Calculate the percentage deviation between two prices.
-
-        Args:
-            reference_price: The reference price (e.g., from Chainlink)
-            actual_price: The actual price being validated
-
-        Returns:
-            Absolute percentage deviation between the prices
-
-        Raises:
-            ValueError: If actual_price is zero
-        """
-        if actual_price == 0:
-            raise ValueError("actual_price cannot be zero")
-
-        return abs((reference_price - actual_price) / actual_price * 100)

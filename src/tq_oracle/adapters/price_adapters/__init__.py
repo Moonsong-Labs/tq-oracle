@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from .chainlink import ChainlinkAdapter
 from .cow_swap import CowSwapAdapter
-from .wsteth import WstETHAdapter
+from .eth import ETHAdapter
 
 PRICE_ADAPTERS = [
     CowSwapAdapter,
-    WstETHAdapter,
+    ETHAdapter,
 ]
 
-__all__ = ["PRICE_ADAPTERS", "ChainlinkAdapter", "CowSwapAdapter", "WstETHAdapter"]
+__all__ = ["PRICE_ADAPTERS", "ChainlinkAdapter", "CowSwapAdapter", "ETHAdapter"]
