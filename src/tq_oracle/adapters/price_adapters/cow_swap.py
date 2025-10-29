@@ -74,7 +74,9 @@ class CowSwapAdapter(BasePriceAdapter):
             abi=erc20_abi,
         )
 
-        decimals = int(token_contract.functions.decimals().call())
+        decimals = await asyncio.to_thread(
+            lambda: int(token_contract.functions.decimals().call())
+        )
 
         self._decimals_cache[token_address] = decimals
         logger.debug(f" Fetched decimals for {token_address}: {decimals}")
