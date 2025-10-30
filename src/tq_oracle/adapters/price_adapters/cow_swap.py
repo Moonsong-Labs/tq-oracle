@@ -34,6 +34,7 @@ class CowSwapAdapter(BasePriceAdapter):
         super().__init__(config)
         self.api_base_url = self.NETWORK_API_URLS[config.network]
         self.vault_rpc = config.vault_rpc
+        self.block_number = config.block_number_required
         assets = config.assets
         eth_address = assets["ETH"]
         if eth_address is None:
@@ -68,7 +69,6 @@ class CowSwapAdapter(BasePriceAdapter):
             return self._decimals_cache[token_address]
 
         w3 = Web3(Web3.HTTPProvider(self.vault_rpc))
-        block_number = self.block_number_required
         erc20_abi = load_erc20_abi()
         token_contract = w3.eth.contract(
             address=w3.to_checksum_address(token_address),
@@ -77,7 +77,9 @@ class CowSwapAdapter(BasePriceAdapter):
 
         decimals = await asyncio.to_thread(
             lambda: int(
-                token_contract.functions.decimals().call(block_identifier=block_number)
+                token_contract.functions.decimals().call(
+                    block_identifier=self.block_number
+                )
             )
         )
 
