@@ -11,7 +11,7 @@ async def build_report(ctx: PipelineContext) -> None:
     """Generate the oracle report.
 
     Args:
-    ctx: Pipeline context containing state, aggregated assets, and final prices
+        ctx: Pipeline context containing state, aggregated assets, and final prices
 
     Sets the report in the context.
     """
@@ -34,7 +34,7 @@ async def publish_report(ctx: PipelineContext) -> None:
     """Publish the oracle report.
 
     Args:
-    ctx: Pipeline context containing state and report
+        ctx: Pipeline context containing state and report
 
     Publishes the report to the appropriate destination based on the configuration.
     """
