@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..report import publish_report
 from ..state import AppState
 from .assets import collect_assets
+from .context import PipelineContext
 from .preflight import run_preflight
 from .pricing import price_assets
 from .report import build_report
@@ -37,7 +38,9 @@ async def run_report(state: AppState, vault_address: str) -> None:
         },
     )
 
-    await run_preflight(state, vault_address)
+    ctx = PipelineContext(state=state, vault_address=vault_address)
+
+    await run_preflight(ctx)
 
     aggregated = await collect_assets(state)
 
