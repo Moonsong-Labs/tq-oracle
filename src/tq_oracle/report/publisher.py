@@ -25,6 +25,7 @@ async def publish_to_stdout(report: OracleReport, oracle_address: str) -> None:
 
     Args:
         report: The oracle report to publish
+        oracle_address: The address of the oracle contract
 
     This corresponds to the "Report published to stdout" step in the flowchart.
     """
