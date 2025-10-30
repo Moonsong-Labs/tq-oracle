@@ -29,7 +29,7 @@ async def publish_to_stdout(report: OracleReport, safe_tx: SafeTx) -> None:
 
     This corresponds to the "Report published to stdout" step in the flowchart.
     """
-    safe_tx_hex = safe_tx.safe_tx_hash_preimage()
+    safe_tx_hex = safe_tx.safe_tx_hash_preimage.hex()
     data = {
         "report": report.to_dict(),
         "safe_tx_hex": safe_tx_hex,

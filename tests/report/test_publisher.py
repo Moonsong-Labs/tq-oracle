@@ -3,6 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import requests
+from eth_typing import URI
+from safe_eth.eth import EthereumClient
+from safe_eth.safe.safe_tx import SafeTx
+from web3 import Web3
 
 from tq_oracle.settings import OracleSettings
 from tq_oracle.report.generator import OracleReport
@@ -43,22 +47,55 @@ def broadcast_config() -> OracleSettings:
     )
 
 
+@pytest.fixture
+def sample_safe_tx(broadcast_config: OracleSettings) -> SafeTx:
+    """Provides a sample SafeTx for testing."""
+    ethereum_client = EthereumClient(URI(broadcast_config.vault_rpc))
+    safe_address = Web3.to_checksum_address(broadcast_config.safe_address)
+
+    return SafeTx(
+        ethereum_client=ethereum_client,
+        safe_address=safe_address,
+        to=Web3.to_checksum_address("0x4234567890123456789012345678901234567890"),
+        value=0,
+        data=b"\x12\x34\x56\x78",
+        operation=0,
+        safe_tx_gas=0,
+        base_gas=0,
+        gas_price=0,
+        gas_token=Web3.to_checksum_address(
+            "0x0000000000000000000000000000000000000000"
+        ),
+        refund_receiver=Web3.to_checksum_address(
+            "0x0000000000000000000000000000000000000000"
+        ),
+        safe_nonce=42,
+        safe_version="1.3.0",
+        chain_id=1,
+    )
+
+
 @pytest.mark.asyncio
 async def test_publish_to_stdout_prints_correct_json(
-    capsys, sample_report: OracleReport
+    capsys, sample_report: OracleReport, sample_safe_tx: SafeTx
 ):
     """
     Verify that publish_to_stdout correctly serializes the report
     to JSON and prints it to standard output.
     """
-    expected_dict = sample_report.to_dict()
+    expected_report = sample_report.to_dict()
+    expected_safe_tx_hex = sample_safe_tx.safe_tx_hash_preimage.hex()
 
-    await publish_to_stdout(sample_report)
+    await publish_to_stdout(sample_report, sample_safe_tx)
 
     captured = capsys.readouterr()
     assert captured.err == ""
     parsed_output = json.loads(captured.out)
-    assert parsed_output == expected_dict
+
+    assert "report" in parsed_output
+    assert parsed_output["report"] == expected_report
+    assert "safe_tx_hex" in parsed_output
+    assert parsed_output["safe_tx_hex"] == expected_safe_tx_hex
 
 
 @pytest.mark.asyncio
