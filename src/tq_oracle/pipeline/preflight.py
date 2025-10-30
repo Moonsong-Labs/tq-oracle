@@ -14,8 +14,7 @@ async def run_preflight(ctx: PipelineContext) -> None:
     """Run pre-flight checks with retry logic.
 
     Args:
-        state: Application state containing settings and logger
-        vault_address: The vault address to check
+        ctx: Pipeline context containing state and vault address
 
     Raises:
         PreCheckError: If pre-checks fail after all retries
