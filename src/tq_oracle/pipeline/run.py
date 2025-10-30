@@ -42,11 +42,14 @@ async def run_report(state: AppState, vault_address: str) -> None:
 
     await run_preflight(ctx)
 
-    aggregated = await collect_assets(state)
+    await collect_assets(ctx)
 
-    _price_data, _total_assets, final_prices = await price_assets(state, aggregated)
+    assert ctx.aggregated is not None
+    _price_data, _total_assets, final_prices = await price_assets(
+        ctx.state, ctx.aggregated
+    )
 
-    report = await build_report(state, aggregated, final_prices)
+    report = await build_report(ctx.state, ctx.aggregated, final_prices)
 
     log.info("Publishing report (dry_run=%s)...", s.dry_run)
     await publish_report(s, report)
