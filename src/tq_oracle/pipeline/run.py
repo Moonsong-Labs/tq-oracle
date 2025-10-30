@@ -44,12 +44,11 @@ async def run_report(state: AppState, vault_address: str) -> None:
 
     await collect_assets(ctx)
 
-    assert ctx.aggregated is not None
-    _price_data, _total_assets, final_prices = await price_assets(
-        ctx.state, ctx.aggregated
-    )
+    await price_assets(ctx)
 
-    report = await build_report(ctx.state, ctx.aggregated, final_prices)
+    assert ctx.aggregated is not None
+    assert ctx.final_prices is not None
+    report = await build_report(ctx.state, ctx.aggregated, ctx.final_prices)
 
     log.info("Publishing report (dry_run=%s)...", s.dry_run)
     await publish_report(s, report)
