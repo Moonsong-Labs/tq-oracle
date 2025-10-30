@@ -364,12 +364,15 @@ async def test_publish_report_routes_to_broadcast_flow(
 
 @pytest.mark.asyncio
 @patch("tq_oracle.report.publisher.send_to_safe", new_callable=AsyncMock)
+@patch("tq_oracle.report.publisher.build_safe_transaction", new_callable=AsyncMock)
 @patch("tq_oracle.report.publisher.build_transaction", new_callable=AsyncMock)
 async def test_publish_report_handles_broadcast_error_and_exits(
     mock_build_transaction: AsyncMock,
+    mock_build_safe_transaction: AsyncMock,
     mock_send_to_safe: AsyncMock,
     broadcast_config: OracleSettings,
     sample_report: OracleReport,
+    sample_safe_tx: SafeTx,
     caplog,
 ):
     """
@@ -381,6 +384,7 @@ async def test_publish_report_handles_broadcast_error_and_exits(
     caplog.set_level(logging.ERROR)
     broadcast_config.dry_run = False
     mock_build_transaction.return_value = {"tx": "data"}
+    mock_build_safe_transaction.return_value = sample_safe_tx
     mock_send_to_safe.side_effect = ValueError("Missing API key")
 
     with pytest.raises(SystemExit) as excinfo:
