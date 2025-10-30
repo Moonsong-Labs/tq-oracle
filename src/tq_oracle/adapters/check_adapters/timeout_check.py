@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from web3 import AsyncWeb3
 
 from tq_oracle.abi import load_oracle_abi
 from tq_oracle.adapters.check_adapters.base import BaseCheckAdapter, CheckResult
-
-if TYPE_CHECKING:
-    from tq_oracle.settings import OracleSettings
+from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 

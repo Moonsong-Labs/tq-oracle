@@ -2,13 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from eth_typing import URI
+from eth_typing import URI, ChecksumAddress
 from web3 import Web3
-
-if TYPE_CHECKING:
-    from eth_typing import ChecksumAddress
 
 ABIS_DIR = Path(__file__).parent / "abis"
 

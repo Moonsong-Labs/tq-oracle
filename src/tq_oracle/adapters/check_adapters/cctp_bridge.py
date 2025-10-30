@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple
 
 from typing_extensions import Literal
 from web3 import AsyncWeb3
@@ -21,9 +21,7 @@ from tq_oracle.constants import (
     L1_BLOCK_TIME,
     RPC_RATE_LIMIT_DELAY,
 )
-
-if TYPE_CHECKING:
-    from tq_oracle.settings import OracleSettings
+from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 

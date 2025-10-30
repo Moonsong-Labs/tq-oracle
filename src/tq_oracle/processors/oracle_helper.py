@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from web3 import Web3
 from web3.contract import Contract
 from web3.exceptions import ContractLogicError
 
 from ..abi import load_oracle_helper_abi
-from ..logger import get_logger
 from ..adapters.price_adapters.base import PriceData
-
-if TYPE_CHECKING:
-    from ..settings import OracleSettings
+from ..logger import get_logger
+from ..settings import OracleSettings
 
 logger = get_logger(__name__)
 

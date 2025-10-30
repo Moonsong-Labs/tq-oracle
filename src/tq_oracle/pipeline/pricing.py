@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from ..adapters import PRICE_ADAPTERS
 from ..adapters.price_adapters.base import PriceData
 from ..checks.price_validators import PriceValidationError, run_price_validations
 from ..constants import ETH_ASSET
-from ..processors import calculate_total_assets, derive_final_prices, FinalPrices
-
-if TYPE_CHECKING:
-    from ..processors import AggregatedAssets
-    from ..state import AppState
+from ..processors import (
+    AggregatedAssets,
+    FinalPrices,
+    calculate_total_assets,
+    derive_final_prices,
+)
+from ..state import AppState
 
 
 async def price_assets(
