@@ -39,8 +39,10 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             if not config.hl_rpc:
                 raise ValueError("hl_rpc must be configured to use hyperliquid chain")
             self.w3 = Web3(Web3.HTTPProvider(config.hl_rpc))
+            self.block_number = config.hl_block_number_required
         else:
             self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
+            self.block_number = config.block_number_required
 
         assets = config.assets
         logger.debug(f"Assets available: {assets}")
@@ -190,12 +192,16 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         logger.debug("Fetching %ss from contract: %s", item_type, checksum_address)
 
         contract = self.w3.eth.contract(address=checksum_address, abi=abi)
-        count = await self._rpc(getattr(contract.functions, count_function)().call)
+        count = await self._rpc(
+            getattr(contract.functions, count_function)().call,
+            block_identifier=self.block_number,
+        )
         logger.debug("Found %d %ss", count, item_type)
 
         async def fetch_item_at(index: int) -> str:
             item: str = await self._rpc(
-                getattr(contract.functions, item_function)(index).call
+                getattr(contract.functions, item_function)(index).call,
+                block_identifier=self.block_number,
             )
             logger.debug("%s %d: %s", item_type.capitalize(), index, item)
             return item
@@ -237,7 +243,11 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         checksum_subvault_address = w3.to_checksum_address(subvault_address)
 
         if asset_address == self.eth_address:
-            balance = await self._rpc(w3.eth.get_balance, checksum_subvault_address)
+            balance = await self._rpc(
+                w3.eth.get_balance,
+                checksum_subvault_address,
+                block_identifier=self.block_number,
+            )
         else:
             erc20_abi = load_erc20_abi()
             checksum_asset_address = w3.to_checksum_address(asset_address)
@@ -245,7 +255,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 address=checksum_asset_address, abi=erc20_abi
             )
             balance = await self._rpc(
-                erc20_contract.functions.balanceOf(checksum_subvault_address).call
+                erc20_contract.functions.balanceOf(checksum_subvault_address).call,
+                block_identifier=self.block_number,
             )
 
         return AssetData(asset_address=asset_address, amount=balance)

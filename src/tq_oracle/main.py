@@ -85,6 +85,13 @@ def initialize_context(
             help="Block number to use for rpc calls. If not provided, the latest block will be used.",
         ),
     ] = None,
+    hl_block_number: Annotated[
+        int | None,
+        typer.Option(
+            "--hl-block-number",
+            help="Block number to use for hyperliquid rpc calls. If not provided, the latest block will be used.",
+        ),
+    ] = None,
     hyperliquid_env: Annotated[
         HyperliquidEnv | None,
         typer.Option(
@@ -130,6 +137,8 @@ def initialize_context(
         init_kwargs["network"] = network
     if block_number is not None:
         init_kwargs["block_number"] = block_number
+    if hl_block_number is not None:
+        init_kwargs["hl_block_number"] = hl_block_number
     if hyperliquid_env is not None:
         init_kwargs["hyperliquid_env"] = hyperliquid_env
     if cctp_env is not None:
@@ -165,6 +174,10 @@ def initialize_context(
         fields_set = getattr(settings, "model_fields_set", set())
         if "hl_rpc" not in fields_set and settings.hl_rpc == default_hl_rpc:
             used_default_hl_rpc = True
+
+    if settings.hl_block_number is None:
+        w3 = Web3(Web3.HTTPProvider(settings.hl_rpc_required))
+        settings.hl_block_number = w3.eth.block_number
 
     settings.using_default_rpc = used_default_vault_rpc or used_default_hl_rpc
 
