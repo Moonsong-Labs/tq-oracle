@@ -298,20 +298,31 @@ async def test_build_safe_transaction_handles_http_error_on_nonce_fetch(
 @pytest.mark.asyncio
 @patch("tq_oracle.report.publisher.publish_to_stdout", new_callable=AsyncMock)
 @patch("tq_oracle.report.publisher.send_to_safe", new_callable=AsyncMock)
+@patch("tq_oracle.report.publisher.build_safe_transaction", new_callable=AsyncMock)
+@patch("tq_oracle.report.publisher.build_transaction", new_callable=AsyncMock)
 async def test_publish_report_routes_to_stdout_on_dry_run(
+    mock_build_transaction: AsyncMock,
+    mock_build_safe_transaction: AsyncMock,
     mock_send_to_safe: AsyncMock,
     mock_publish_to_stdout: AsyncMock,
     broadcast_config: OracleSettings,
     sample_report: OracleReport,
+    sample_safe_tx: SafeTx,
 ):
     """
     Verify that publish_report calls publish_to_stdout when config.dry_run is True.
     """
     broadcast_config.dry_run = True
+    mock_build_transaction.return_value = {"tx": "data"}
+    mock_build_safe_transaction.return_value = sample_safe_tx
 
     await publish_report(broadcast_config, sample_report)
 
-    mock_publish_to_stdout.assert_awaited_once_with(sample_report)
+    mock_build_transaction.assert_awaited_once_with(broadcast_config, sample_report)
+    mock_build_safe_transaction.assert_awaited_once_with(
+        broadcast_config, {"tx": "data"}
+    )
+    mock_publish_to_stdout.assert_awaited_once_with(sample_report, sample_safe_tx)
     mock_send_to_safe.assert_not_awaited()
 
 
