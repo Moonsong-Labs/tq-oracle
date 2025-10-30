@@ -50,7 +50,7 @@ def load_compact_collector_bytecode() -> str:
     return load_bytecode(COMPACT_COLLECTOR_ABI_PATH)
 
 
-def load_compact_collector_abi() -> str:
+def load_compact_collector_abi() -> list[dict]:
     return load_abi(COMPACT_COLLECTOR_ABI_PATH)
 
 

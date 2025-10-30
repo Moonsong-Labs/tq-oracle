@@ -4,7 +4,6 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from web3 import Web3
-from web3.contract import Contract
 import backoff
 import random
 from web3.exceptions import ProviderConnectionError
@@ -30,15 +29,15 @@ class StrETHAdapter(BaseAssetAdapter):
     multicall: str
     chain: AdapterChain
 
-    def __init__(self, config: OracleSettings, chain: str = AdapterChain.VAULT_CHAIN):
+    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
         """Initialize the adapter."""
         super().__init__(config, chain=chain)
 
         self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
 
         self.streth_address = config.streth
-        self.multi_call: Contract = self.w3.eth.contract(
-            address=config.multicall, abi=load_multicall_abi()
+        self.multi_call = self.w3.eth.contract(
+            address=Web3.to_checksum_address(config.multicall), abi=load_multicall_abi()
         )
 
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
@@ -68,13 +67,14 @@ class StrETHAdapter(BaseAssetAdapter):
 
     async def _fetch_assets(self, subvault_addresses: list[str]) -> list[AssetData]:
         compact_collector_abi = load_compact_collector_abi()
-        compact_collector: Contract = self.w3.eth.contract(
-            address=None, abi=compact_collector_abi
+        compact_collector = self.w3.eth.contract(
+            address=Web3.to_checksum_address("0x" + "".zfill(40)),
+            abi=compact_collector_abi,
         )
 
         compact_collector_bytecode = load_compact_collector_bytecode()
         runtime_bytecode = self.w3.eth.call(
-            transaction={"to": None, "data": compact_collector_bytecode}
+            transaction={"to": "", "data": bytes(compact_collector_bytecode)}
         )
 
         address = Web3.to_checksum_address("0x" + "dead0dead".zfill(40))
@@ -106,8 +106,8 @@ class StrETHAdapter(BaseAssetAdapter):
         return await self._fetch_assets([subvault_address])
 
     async def fetch_all_assets(self) -> list[AssetData]:
-        streth_contract: Contract = self.w3.eth.contract(
-            address=self.streth_address, abi=load_vault_abi()
+        streth_contract = self.w3.eth.contract(
+            address=Web3.to_checksum_address(self.streth_address), abi=load_vault_abi()
         )
         count: int = await self._rpc(streth_contract.functions.subvaults().call)
 
