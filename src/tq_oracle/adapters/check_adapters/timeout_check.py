@@ -57,6 +57,7 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
         w3 = None
         try:
             w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.vault_rpc))
+            block_number = self._config.block_number_required
 
             oracle_address = self._config.oracle_address
             logger.debug(f"Using oracle address: {oracle_address}")
@@ -65,7 +66,9 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
             oracle_checksum = w3.to_checksum_address(oracle_address)
             oracle = w3.eth.contract(address=oracle_checksum, abi=oracle_abi)
 
-            supported_count = await oracle.functions.supportedAssets().call()
+            supported_count = await oracle.functions.supportedAssets().call(
+                block_identifier=block_number
+            )
 
             if supported_count == 0:
                 return CheckResult(
@@ -74,13 +77,17 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
                 )
 
             # only looking at first asset since we do global reports
-            first_asset = await oracle.functions.supportedAssetAt(0).call()
+            first_asset = await oracle.functions.supportedAssetAt(0).call(
+                block_identifier=block_number
+            )
             logger.debug(f"Checking timeout for asset: {first_asset}")
             (
                 _price_d18,
                 last_report_timestamp,
                 _is_suspicious,
-            ) = await oracle.functions.getReport(first_asset).call()
+            ) = await oracle.functions.getReport(first_asset).call(
+                block_identifier=block_number
+            )
 
             if last_report_timestamp == 0:
                 return CheckResult(
@@ -95,7 +102,9 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
                 timeout,
                 _deposit_interval,
                 _redeem_interval,
-            ) = await oracle.functions.securityParams().call()
+            ) = await oracle.functions.securityParams().call(
+                block_identifier=block_number
+            )
 
             latest_block = await w3.eth.get_block("latest")
             current_timestamp = latest_block["timestamp"]
