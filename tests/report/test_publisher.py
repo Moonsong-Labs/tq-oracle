@@ -241,22 +241,27 @@ async def test_send_to_safe_happy_path(
 
 
 @pytest.mark.asyncio
-async def test_send_to_safe_raises_error_if_config_missing(
+async def test_build_safe_transaction_raises_error_if_config_missing(
     broadcast_config: OracleSettings,
 ):
     """
-    Verify that send_to_safe raises ValueError if essential config
+    Verify that build_safe_transaction raises ValueError if essential config
     (safe_address, private_key) is missing.
     """
-    transaction = {}
+    transaction = {
+        "to": "0x4234567890123456789012345678901234567890",
+        "data": b"calldata",
+        "value": 0,
+        "operation": 0,
+    }
     config_no_safe = broadcast_config.model_copy(update={"safe_address": None})
     config_no_key = broadcast_config.model_copy(update={"private_key": None})
 
     with pytest.raises(ValueError, match="safe_address required for Broadcast mode"):
-        await send_to_safe(config_no_safe, transaction)
+        await build_safe_transaction(config_no_safe, transaction)
 
     with pytest.raises(ValueError, match="private_key required for Broadcast mode"):
-        await send_to_safe(config_no_key, transaction)
+        await build_safe_transaction(config_no_key, transaction)
 
 
 @pytest.mark.asyncio
