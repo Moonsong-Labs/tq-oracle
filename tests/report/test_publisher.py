@@ -51,7 +51,9 @@ def broadcast_config() -> OracleSettings:
 @pytest.fixture
 def sample_safe_tx(broadcast_config: OracleSettings) -> SafeTx:
     """Provides a sample SafeTx for testing."""
+    assert broadcast_config.vault_rpc is not None
     ethereum_client = EthereumClient(URI(broadcast_config.vault_rpc))
+    assert broadcast_config.safe_address is not None
     safe_address = Web3.to_checksum_address(broadcast_config.safe_address)
 
     return SafeTx(
