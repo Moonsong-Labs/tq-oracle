@@ -45,8 +45,7 @@ async def run_report(state: AppState, vault_address: str) -> None:
     await price_assets(ctx)
     await build_report(ctx)
 
-    assert ctx.report is not None
     log.info("Publishing report (dry_run=%s)...", s.dry_run)
-    await publish_report(s, ctx.report)
+    await publish_report(s, ctx.report_required)
 
     log.info("Report completed", extra={"vault": vault_address})
