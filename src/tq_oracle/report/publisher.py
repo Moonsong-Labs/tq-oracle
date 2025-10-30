@@ -20,15 +20,21 @@ from .generator import OracleReport
 logger = logging.getLogger(__name__)
 
 
-async def publish_to_stdout(report: OracleReport) -> None:
+async def publish_to_stdout(report: OracleReport, safe_tx: SafeTx) -> None:
     """Publish report to stdout (dry run mode).
 
     Args:
         report: The oracle report to publish
+        safe_tx: The Safe transaction to publish
 
     This corresponds to the "Report published to stdout" step in the flowchart.
     """
-    print(json.dumps(report.to_dict(), indent=2))
+    safe_tx_hex = safe_tx.safe_tx_hash_preimage()
+    data = {
+        "report": report.to_dict(),
+        "safe_tx_hex": safe_tx_hex,
+    }
+    print(json.dumps(data, indent=2))
 
 
 async def build_transaction(
@@ -61,18 +67,18 @@ async def build_transaction(
     }
 
 
-async def send_to_safe(
+async def build_safe_transaction(
     config: OracleSettings,
     transaction: dict[str, str | bytes | int],
-) -> str:
-    """Send transaction to Gnosis Safe for signing.
+) -> SafeTx:
+    """Build a Safe transaction.
 
     Args:
         config: CLI configuration with Safe details
         transaction: The transaction to send
 
     Returns:
-        Safe UI URL for transaction approval
+        Safe transaction
 
     This corresponds to the "send txn to Safe" and "txn appears on Safe for signing" steps.
 
@@ -150,6 +156,34 @@ async def send_to_safe(
 
     safe_tx.sign(private_key_str)
 
+    return safe_tx
+
+
+async def send_to_safe(
+    config: OracleSettings,
+    safe_tx: SafeTx,
+) -> str:
+    """Send transaction to Gnosis Safe for signing.
+
+    Args:
+        config: CLI configuration with Safe details
+        safe_tx: The Safe transaction to send
+
+    Returns:
+        Safe UI URL for transaction approval
+
+    This corresponds to the "send txn to Safe" and "txn appears on Safe for signing" steps.
+    """
+    network = EthereumNetwork(config.chain_id)
+    ethereum_client = EthereumClient(URI(config.vault_rpc_required))
+
+    api_key = (
+        config.safe_txn_srvc_api_key.get_secret_value()
+        if config.safe_txn_srvc_api_key
+        else None
+    )
+    tx_service = TransactionServiceApi(network, ethereum_client, api_key=api_key)
+
     await asyncio.to_thread(tx_service.post_transaction, safe_tx)
 
     safe_tx_hash = safe_tx.safe_tx_hash.hex()
@@ -188,14 +222,16 @@ async def publish_report(
     - If dry_run: publish to stdout
     - If not dry_run and Broadcast mode: build transaction, send to Safe
     """
+    transaction = await build_transaction(config, report)
+    safe_tx = await build_safe_transaction(config, transaction)
+
     if config.dry_run:
-        await publish_to_stdout(report)
+        await publish_to_stdout(report, safe_tx)
         return
 
     if config.is_broadcast:
         try:
-            transaction = await build_transaction(config, report)
-            safe_url = await send_to_safe(config, transaction)
+            safe_url = await send_to_safe(config, safe_tx)
             logger.info("\nTransaction proposed to Safe")
             logger.info(f"Approve here: {safe_url}")
             return
