@@ -395,8 +395,13 @@ async def test_publish_report_handles_broadcast_error_and_exits(
 
 
 @pytest.mark.asyncio
+@patch("tq_oracle.report.publisher.build_safe_transaction", new_callable=AsyncMock)
+@patch("tq_oracle.report.publisher.build_transaction", new_callable=AsyncMock)
 async def test_publish_report_raises_for_unsupported_direct_mode(
-    broadcast_config: OracleSettings, sample_report: OracleReport
+    mock_build_transaction: AsyncMock,
+    mock_build_safe_transaction: AsyncMock,
+    broadcast_config: OracleSettings,
+    sample_report: OracleReport,
 ):
     """
     Verify that publish_report raises ValueError if not in
@@ -404,6 +409,9 @@ async def test_publish_report_raises_for_unsupported_direct_mode(
     """
     broadcast_config.dry_run = False
     broadcast_config.safe_address = None
+
+    mock_build_transaction.return_value = {"tx": "data"}
+    mock_build_safe_transaction.return_value = MagicMock()
 
     with pytest.raises(
         ValueError,
