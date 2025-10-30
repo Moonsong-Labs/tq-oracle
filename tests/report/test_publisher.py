@@ -328,12 +328,15 @@ async def test_publish_report_routes_to_stdout_on_dry_run(
 
 @pytest.mark.asyncio
 @patch("tq_oracle.report.publisher.send_to_safe", new_callable=AsyncMock)
+@patch("tq_oracle.report.publisher.build_safe_transaction", new_callable=AsyncMock)
 @patch("tq_oracle.report.publisher.build_transaction", new_callable=AsyncMock)
 async def test_publish_report_routes_to_broadcast_flow(
     mock_build_transaction: AsyncMock,
+    mock_build_safe_transaction: AsyncMock,
     mock_send_to_safe: AsyncMock,
     broadcast_config: OracleSettings,
     sample_report: OracleReport,
+    sample_safe_tx: SafeTx,
     caplog,
 ):
     """
@@ -345,12 +348,16 @@ async def test_publish_report_routes_to_broadcast_flow(
     caplog.set_level(logging.INFO)
     broadcast_config.dry_run = False
     mock_build_transaction.return_value = {"tx": "data"}
+    mock_build_safe_transaction.return_value = sample_safe_tx
     mock_send_to_safe.return_value = "http://safe.url"
 
     await publish_report(broadcast_config, sample_report)
 
     mock_build_transaction.assert_awaited_once_with(broadcast_config, sample_report)
-    mock_send_to_safe.assert_awaited_once_with(broadcast_config, {"tx": "data"})
+    mock_build_safe_transaction.assert_awaited_once_with(
+        broadcast_config, {"tx": "data"}
+    )
+    mock_send_to_safe.assert_awaited_once_with(broadcast_config, sample_safe_tx)
     assert "Transaction proposed to Safe" in caplog.text
     assert "Approve here: http://safe.url" in caplog.text
 
