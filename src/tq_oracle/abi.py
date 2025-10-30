@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 ABIS_DIR = Path(__file__).parent / "abis"
 
+COMPACT_COLLECTOR_ABI_PATH = ABIS_DIR / "CompactCollector.json"
+MULTICALL_ABI_PATH = ABIS_DIR / "Multicall.json"
 ORACLE_ABI_PATH = ABIS_DIR / "IOracle.json"
 ORACLE_HELPER_ABI_PATH = ABIS_DIR / "OracleHelper.json"
 VAULT_ABI_PATH = ABIS_DIR / "Vault.json"
@@ -39,6 +41,26 @@ def load_abi(path: str | Path) -> list[dict]:
     with p.open() as f:
         data = json.load(f)
     return data["abi"]
+
+
+def load_bytecode(path: str | Path) -> str:
+    p = Path(path)
+    with p.open() as f:
+        data = json.load(f)
+    return data["bytecode"]["object"]
+
+
+def load_compact_collector_bytecode() -> str:
+    return load_bytecode(COMPACT_COLLECTOR_ABI_PATH)
+
+
+def load_compact_collector_abi() -> str:
+    return load_abi(COMPACT_COLLECTOR_ABI_PATH)
+
+
+def load_multicall_abi() -> list[dict]:
+    """Load the Multicall ABI."""
+    return load_abi(MULTICALL_ABI_PATH)
 
 
 def load_oracle_abi() -> list[dict]:

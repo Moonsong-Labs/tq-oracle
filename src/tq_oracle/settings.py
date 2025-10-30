@@ -304,3 +304,15 @@ class OracleSettings(BaseSettings):
             raise ValueError(f"Unknown network: {self.network}")
 
         return network_assets_map[self.network]
+
+    @property
+    def streth(self) -> str:
+        from .constants import STRETH
+
+        return STRETH
+
+    @property
+    def multicall(self) -> str:
+        from .constants import MULTICALL_ADDRESSES
+
+        return MULTICALL_ADDRESSES

@@ -10,6 +10,7 @@ from web3 import Web3
 from ..adapters.asset_adapters import get_adapter_class
 from ..adapters.asset_adapters.base import AssetData
 from ..adapters.asset_adapters.idle_balances import IdleBalancesAdapter
+from ..adapters.asset_adapters.streth import StrETHAdapter
 from ..abi import load_vault_abi
 from ..processors import compute_total_aggregated_assets
 
@@ -139,6 +140,7 @@ async def collect_assets(state: AppState) -> AggregatedAssets:
             "chain": "vault_chain",
             "additional_adapters": [],
             "skip_idle_balances": False,
+            "skip_streth": False,
         }
 
     # 1. Add default vault_chain idle_balances (runs against ALL subvaults unless globally skipped)
@@ -153,6 +155,16 @@ async def collect_assets(state: AppState) -> AggregatedAssets:
             ("idle_balances_vault_chain", idle_vault_adapter.fetch_all_assets())
         )
         log.debug("Added default vault_chain idle_balances adapter (all subvaults)")
+
+    should_run_streth = any(
+        not get_subvault_config(addr).get("skip_streth", False)
+        for addr in subvault_addresses
+    )
+
+    if should_run_streth:
+        streth_adapter = StrETHAdapter(s, chain="vault_chain")
+        asset_fetch_tasks.append(("streth_chain", streth_adapter.fetch_all_assets()))
+        log.debug("Added default vault_chain strETH adapter")
 
     # 2. Add additional adapters per subvault
     def create_adapter_task(
