@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..report import generate_report
+from ..report import publish_report as publish_report_impl
 from .context import PipelineContext
 
 
@@ -43,4 +44,4 @@ async def publish_report(ctx: PipelineContext) -> None:
 
     log.info("Publishing report (dry_run=%s)...", s.dry_run)
 
-    await publish_report(s, report)
+    await publish_report_impl(s, report)
