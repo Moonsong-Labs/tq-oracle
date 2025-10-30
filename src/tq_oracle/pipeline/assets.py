@@ -12,10 +12,9 @@ from ..adapters.asset_adapters import get_adapter_class
 from ..adapters.asset_adapters.base import AssetData
 from ..adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from ..adapters.asset_adapters.streth import StrETHAdapter
-from ..abi import load_vault_abi
 from ..processors import compute_total_aggregated_assets
 
-from ..processors import AggregatedAssets, compute_total_aggregated_assets
+from ..processors import AggregatedAssets
 from ..state import AppState
 
 

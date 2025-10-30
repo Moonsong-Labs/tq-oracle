@@ -19,7 +19,7 @@ from .base import AssetData, BaseAssetAdapter, AdapterChain
 from eth_abi.abi import decode
 
 if TYPE_CHECKING:
-    from ...settings import OracleSettings, Network
+    from ...settings import OracleSettings
 
 logger = get_logger(__name__)
 
