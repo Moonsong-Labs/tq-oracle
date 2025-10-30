@@ -10,6 +10,8 @@ from typing import Annotated
 
 import typer
 
+from web3 import Web3
+
 from .constants import (
     BASE_ORACLE_HELPER,
     DEFAULT_BASE_RPC_URL,
@@ -76,6 +78,13 @@ def initialize_context(
             help="Network to use (mainnet, sepolia, or base).",
         ),
     ] = None,
+    block_number: Annotated[
+        int | None,
+        typer.Option(
+            "--block-number",
+            help="Block number to use for rpc calls. If not provided, the latest block will be used.",
+        ),
+    ] = None,
     hyperliquid_env: Annotated[
         HyperliquidEnv | None,
         typer.Option(
@@ -119,6 +128,8 @@ def initialize_context(
     init_kwargs: dict[str, Network | HyperliquidEnv | CCTPEnv | bool] = {}
     if network is not None:
         init_kwargs["network"] = network
+    if block_number is not None:
+        init_kwargs["block_number"] = block_number
     if hyperliquid_env is not None:
         init_kwargs["hyperliquid_env"] = hyperliquid_env
     if cctp_env is not None:
@@ -137,6 +148,10 @@ def initialize_context(
         settings.oracle_helper_address = NETWORK_ORACLE_HELPER_DEFAULTS[
             settings.network
         ]
+
+    if settings.block_number is None:
+        w3 = Web3(Web3.HTTPProvider(settings.vault_rpc_required))
+        settings.block_number = w3.eth.block_number
 
     default_hl_rpc = (
         HL_TEST_EVM_RPC if settings.hyperliquid_env == "testnet" else HL_PROD_EVM_RPC

@@ -57,6 +57,7 @@ class OracleSettings(BaseSettings):
     vault_rpc: str | None = None
     eth_mainnet_rpc: str | None = None  # Needed for when vault is not on mainnet
     network: Network = Network.MAINNET
+    block_number: int | None = None
 
     # --- hyperliquid ---
     hl_subvault_address: str | None = None
