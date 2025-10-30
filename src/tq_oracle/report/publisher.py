@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import TYPE_CHECKING
 
 import requests
 from eth_account import Account
@@ -15,10 +14,8 @@ from safe_eth.safe.safe_tx import SafeTx
 from web3 import Web3
 
 from ..safe.transaction_builder import encode_submit_reports
-
-if TYPE_CHECKING:
-    from ..settings import OracleSettings
-    from .generator import OracleReport
+from ..settings import OracleSettings
+from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
 

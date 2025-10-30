@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING
-
 from importlib.resources import files
+
 from web3 import Web3
 
-if TYPE_CHECKING:
-    from ..report.generator import OracleReport
+from ..report.generator import OracleReport
 
 logger = logging.getLogger(__name__)
 

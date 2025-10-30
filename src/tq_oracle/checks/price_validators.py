@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
 
+from ..adapters.price_adapters.base import PriceData
 from ..adapters.price_validators import PRICE_VALIDATORS
-
-if TYPE_CHECKING:
-    from ..adapters.price_adapters.base import PriceData
-    from ..settings import OracleSettings
+from ..settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 

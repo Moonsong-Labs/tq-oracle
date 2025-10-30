@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import logging
 
 from web3 import Web3
 
 from ...abi import load_aggregator_abi
 from ...constants import (
-    PRICE_FEED_USDC_ETH,
-    PRICE_FEED_USDT_ETH,
-    PRICE_FEED_USDS_USD,
     PRICE_FEED_ETH_USD,
+    PRICE_FEED_USDC_ETH,
+    PRICE_FEED_USDS_USD,
+    PRICE_FEED_USDT_ETH,
+    PRICE_FEED_WSTETH_ETH_BASE,
 )
+from ...settings import OracleSettings
 from ...units import scale_to_18
-
 from .base import BasePriceAdapter, PriceData
 
-if TYPE_CHECKING:
-    from ...settings import OracleSettings
+logger = logging.getLogger(__name__)
 
 
 class ChainlinkAdapter(BasePriceAdapter):
@@ -35,6 +35,7 @@ class ChainlinkAdapter(BasePriceAdapter):
         self.usdc_address = assets["USDC"]
         self.usdt_address = assets["USDT"]
         self.usds_address = assets["USDS"]
+        self.wsteth_address = assets["WSTETH"]
 
     @property
     def adapter_name(self) -> str:
@@ -70,15 +71,27 @@ class ChainlinkAdapter(BasePriceAdapter):
         direct_feed_assets = [
             (self.usdc_address, PRICE_FEED_USDC_ETH),
             (self.usdt_address, PRICE_FEED_USDT_ETH),
+            (self.wsteth_address, PRICE_FEED_WSTETH_ETH_BASE),
+        ]
+        logger.debug(f" Asset addresses to check: {asset_addresses}")
+        checksummed_asset_addresses = [
+            Web3.to_checksum_address(addr) for addr in asset_addresses
         ]
 
         direct_feed_assets = [
-            (asset_address, price_feed)
+            (Web3.to_checksum_address(asset_address), price_feed)
             for asset_address, price_feed in direct_feed_assets
-            if asset_address and asset_address in asset_addresses
+            if asset_address
+            and Web3.to_checksum_address(asset_address) in checksummed_asset_addresses
         ]
 
-        has_usds = self.usds_address and self.usds_address in asset_addresses
+        has_usds = (
+            self.usds_address
+            and Web3.to_checksum_address(self.usds_address)
+            in checksummed_asset_addresses
+            if self.usds_address
+            else False
+        )
 
         if not direct_feed_assets and not has_usds:
             return prices_accumulator

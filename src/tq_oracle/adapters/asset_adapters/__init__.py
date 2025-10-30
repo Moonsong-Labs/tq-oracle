@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .base import BaseAssetAdapter
 from .hyperliquid import HyperliquidAdapter
 from .idle_balances import IdleBalancesAdapter
 from .streth import StrETHAdapter

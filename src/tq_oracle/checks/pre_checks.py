@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
 
 from ..adapters.check_adapters import CHECK_ADAPTERS
 from ..adapters.check_adapters.base import CheckResult
-
-if TYPE_CHECKING:
-    from ..settings import OracleSettings
+from ..settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 

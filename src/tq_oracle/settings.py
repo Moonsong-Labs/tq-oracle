@@ -81,8 +81,14 @@ class OracleSettings(BaseSettings):
     pre_check_timeout: float = 12.0
 
     # --- price validation ---
-    chainlink_price_warning_tolerance_percentage: float = 0.5
-    chainlink_price_failure_tolerance_percentage: float = 1.0
+    price_warning_tolerance_percentage: float = 0.5
+    price_failure_tolerance_percentage: float = 1.0
+
+    # Pyth-specific settings
+    pyth_enabled: bool = True
+    pyth_hermes_endpoint: str = "https://hermes.pyth.network"
+    pyth_staleness_threshold: int = 60
+    pyth_max_confidence_ratio: float = 0.03
 
     # --- RPC settings ---
     max_calls: int = 3
@@ -124,13 +130,13 @@ class OracleSettings(BaseSettings):
         """
         from .constants import (
             HL_MAINNET_API_URL,
-            HL_TESTNET_API_URL,
             HL_PROD_EVM_RPC,
             HL_TEST_EVM_RPC,
-            USDC_HL_MAINNET,
-            USDC_HL_TESTNET,
+            HL_TESTNET_API_URL,
             TOKEN_MESSENGER_V2_PROD,
             TOKEN_MESSENGER_V2_TEST,
+            USDC_HL_MAINNET,
+            USDC_HL_TESTNET,
         )
 
         if self.hyperliquid_api_url is None:
@@ -292,7 +298,7 @@ class OracleSettings(BaseSettings):
         Returns:
             NetworkAssets for the configured network
         """
-        from .constants import ETH_MAINNET_ASSETS, SEPOLIA_ASSETS, BASE_ASSETS
+        from .constants import BASE_ASSETS, ETH_MAINNET_ASSETS, SEPOLIA_ASSETS
 
         network_assets_map = {
             Network.MAINNET: ETH_MAINNET_ASSETS,

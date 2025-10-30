@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from ...settings import OracleSettings
+
 
 @dataclass
 class PriceData:
@@ -15,7 +17,7 @@ class PriceData:
 class BasePriceAdapter(ABC):
     """Abstract base class for price adapters."""
 
-    def __init__(self, config: object):
+    def __init__(self, config: OracleSettings):
         """Initialize the adapter with configuration."""
         self.config = config
 

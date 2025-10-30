@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from ..report import publish_report
+from ..state import AppState
 from .assets import collect_assets
 from .preflight import run_preflight
 from .pricing import price_assets
 from .report import build_report
-
-if TYPE_CHECKING:
-    from ..state import AppState
 
 
 async def run_report(state: AppState, vault_address: str) -> None:

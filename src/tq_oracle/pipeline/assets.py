@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from web3 import Web3
 
+from ..abi import load_vault_abi
 from ..adapters.asset_adapters import get_adapter_class
 from ..adapters.asset_adapters.base import AssetData
 from ..adapters.asset_adapters.idle_balances import IdleBalancesAdapter
@@ -14,9 +15,8 @@ from ..adapters.asset_adapters.streth import StrETHAdapter
 from ..abi import load_vault_abi
 from ..processors import compute_total_aggregated_assets
 
-if TYPE_CHECKING:
-    from ..state import AppState
-    from ..processors import AggregatedAssets
+from ..processors import AggregatedAssets, compute_total_aggregated_assets
+from ..state import AppState
 
 
 async def _fetch_subvault_addresses(state: AppState) -> list[str]:

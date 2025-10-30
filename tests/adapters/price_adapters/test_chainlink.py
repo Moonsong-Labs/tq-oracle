@@ -58,7 +58,7 @@ async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(
     config, eth_address
 ):
     adapter = ChainlinkAdapter(config)
-    unsupported_address = "0xUnsupported"
+    unsupported_address = "0x0000000000000000000000000000000000000001"
 
     result = await adapter.fetch_prices(
         [unsupported_address], PriceData(base_asset=eth_address, prices={})
@@ -84,7 +84,7 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(
     config, eth_address
 ):
     adapter = ChainlinkAdapter(config)
-    unsupported_address = "0xUnsupported"
+    unsupported_address = "0x0000000000000000000000000000000000000001"
     result = await adapter.fetch_prices(
         [unsupported_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
     )

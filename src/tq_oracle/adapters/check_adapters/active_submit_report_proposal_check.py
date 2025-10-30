@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
 
 import requests
 from eth_typing import URI
@@ -13,9 +12,7 @@ from safe_eth.safe.api import TransactionServiceApi
 from web3 import Web3
 
 from tq_oracle.adapters.check_adapters.base import BaseCheckAdapter, CheckResult
-
-if TYPE_CHECKING:
-    from tq_oracle.settings import OracleSettings
+from tq_oracle.settings import OracleSettings
 
 logger = logging.getLogger(__name__)
 

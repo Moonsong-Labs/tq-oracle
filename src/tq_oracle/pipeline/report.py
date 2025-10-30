@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from ..report import generate_report
-
-if TYPE_CHECKING:
-    from ..processors import AggregatedAssets, FinalPrices
-    from ..report import OracleReport
-    from ..state import AppState
+from ..processors import AggregatedAssets, FinalPrices
+from ..report import OracleReport, generate_report
+from ..state import AppState
 
 
 async def build_report(
