@@ -41,16 +41,12 @@ async def run_report(state: AppState, vault_address: str) -> None:
     ctx = PipelineContext(state=state, vault_address=vault_address)
 
     await run_preflight(ctx)
-
     await collect_assets(ctx)
-
     await price_assets(ctx)
+    await build_report(ctx)
 
-    assert ctx.aggregated is not None
-    assert ctx.final_prices is not None
-    report = await build_report(ctx.state, ctx.aggregated, ctx.final_prices)
-
+    assert ctx.report is not None
     log.info("Publishing report (dry_run=%s)...", s.dry_run)
-    await publish_report(s, report)
+    await publish_report(s, ctx.report)
 
     log.info("Report completed", extra={"vault": vault_address})

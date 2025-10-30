@@ -23,16 +23,12 @@ async def price_assets(ctx: PipelineContext) -> None:
 
     Raises:
         PriceValidationError: If price validation fails
-        RuntimeError: If aggregated assets are not set
     """
     s = ctx.state.settings
     log = ctx.state.logger
-    aggregated = ctx.aggregated
-    if aggregated is None:
-        raise RuntimeError("Aggregated assets are not set")
+    aggregated = ctx.aggregated_required
 
     asset_addresses = list(aggregated.assets)
-
     log.info("Fetching prices for %d assets...", len(asset_addresses))
     price_data: PriceData = PriceData(base_asset=ETH_ASSET, prices={})
 
