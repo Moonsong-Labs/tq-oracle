@@ -28,7 +28,7 @@ class PipelineContext:
     @property
     def price_data_required(self) -> PriceData:
         if self.price_data is None:
-            raise RuntimeError("Price data are not set")
+            raise RuntimeError("Price data is not set")
         return self.price_data
 
     @property
