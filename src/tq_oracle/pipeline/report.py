@@ -27,3 +27,20 @@ async def build_report(ctx: PipelineContext) -> None:
     )
 
     ctx.report = report
+
+
+async def publish_report(ctx: PipelineContext) -> None:
+    """Publish the oracle report.
+
+    Args:
+    ctx: Pipeline context containing state and report
+
+    Publishes the report to the appropriate destination based on the configuration.
+    """
+    s = ctx.state.settings
+    report = ctx.report_required
+    log = ctx.state.logger
+
+    log.info("Publishing report (dry_run=%s)...", s.dry_run)
+
+    await publish_report(s, report)
