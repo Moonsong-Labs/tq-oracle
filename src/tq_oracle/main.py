@@ -132,7 +132,7 @@ def initialize_context(
     if config_path:
         os.environ["TQ_ORACLE_CONFIG"] = str(config_path)
 
-    init_kwargs: dict[str, Network | HyperliquidEnv | CCTPEnv | bool] = {}
+    init_kwargs: dict[str, Network | HyperliquidEnv | CCTPEnv | bool | int] = {}
     if network is not None:
         init_kwargs["network"] = network
     if block_number is not None:

@@ -276,6 +276,13 @@ class OracleSettings(BaseSettings):
         return self.vault_rpc
 
     @property
+    def hl_rpc_required(self) -> str:
+        """Get hl_rpc, raising ValueError if not set."""
+        if self.hl_rpc is None:
+            raise ValueError("hl_rpc must be configured")
+        return self.hl_rpc
+
+    @property
     def chain_id(self) -> int:
         """Derive chain ID from the RPC endpoint."""
         if self._chain_id is None:
