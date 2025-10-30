@@ -11,6 +11,7 @@ from web3 import Web3
 from tq_oracle.settings import OracleSettings
 from tq_oracle.report.generator import OracleReport
 from tq_oracle.report.publisher import (
+    build_safe_transaction,
     build_transaction,
     publish_report,
     publish_to_stdout,
@@ -140,7 +141,7 @@ async def test_build_transaction_creates_valid_tx_dict(
 @patch("tq_oracle.report.publisher.TransactionServiceApi")
 @patch("tq_oracle.report.publisher.EthereumClient")
 @patch("tq_oracle.report.publisher.asyncio.sleep", new_callable=AsyncMock)
-async def test_send_to_safe_happy_path(
+async def test_build_safe_transaction_happy_path(
     mock_sleep: AsyncMock,
     MockEthClient: MagicMock,
     MockTxService: MagicMock,
@@ -150,8 +151,8 @@ async def test_send_to_safe_happy_path(
     broadcast_config: OracleSettings,
 ):
     """
-    Verify the happy path for send_to_safe, ensuring all dependencies
-    are called correctly and a valid Safe URL is returned.
+    Verify the happy path for build_safe_transaction, ensuring all dependencies
+    are called correctly and a SafeTx is returned.
     """
     transaction = {
         "to": "0x4234567890123456789012345678901234567890",
@@ -168,9 +169,6 @@ async def test_send_to_safe_happy_path(
     mock_get_response.json.return_value = {"nonce": 42}
     mock_get_response.raise_for_status.return_value = None
 
-    mock_tx_service_instance = MockTxService.return_value
-    mock_tx_service_instance.post_transaction = MagicMock()
-
     async def to_thread_side_effect(func, *args, **kwargs):
         if hasattr(func, "__name__") and func.__name__ == "get":
             return mock_get_response
@@ -179,14 +177,11 @@ async def test_send_to_safe_happy_path(
     mock_to_thread.side_effect = to_thread_side_effect
 
     mock_safe_tx_instance = MockSafeTx.return_value
-    mock_safe_tx_instance.safe_tx_hash.hex.return_value = "0xTxHash"
 
-    # Mock the chain_id property by setting the cached value
     broadcast_config._chain_id = 1
 
-    result_url = await send_to_safe(broadcast_config, transaction)
+    result = await build_safe_transaction(broadcast_config, transaction)
 
-    # We now unwrap the SecretStr before passing to Account
     assert broadcast_config.private_key is not None
     MockAccount.from_key.assert_called_once_with(
         broadcast_config.private_key.get_secret_value()
@@ -202,21 +197,47 @@ async def test_send_to_safe_happy_path(
     assert kwargs["to"] == transaction["to"]
     assert kwargs["data"] == transaction["data"]
     assert kwargs["safe_nonce"] == 42
-    # chain_id is derived from the RPC, so we check it's passed through
     assert "chain_id" in kwargs
 
-    # We now unwrap the SecretStr before passing to sign
     assert broadcast_config.private_key is not None
     mock_safe_tx_instance.sign.assert_called_once_with(
         broadcast_config.private_key.get_secret_value()
     )
-    mock_to_thread.assert_any_call(
-        mock_tx_service_instance.post_transaction, mock_safe_tx_instance
+
+    assert result == mock_safe_tx_instance
+
+
+@pytest.mark.asyncio
+@patch("tq_oracle.report.publisher.asyncio.to_thread")
+@patch("tq_oracle.report.publisher.TransactionServiceApi")
+@patch("tq_oracle.report.publisher.EthereumClient")
+async def test_send_to_safe_happy_path(
+    MockEthClient: MagicMock,
+    MockTxService: MagicMock,
+    mock_to_thread: MagicMock,
+    broadcast_config: OracleSettings,
+    sample_safe_tx: SafeTx,
+):
+    """
+    Verify the happy path for send_to_safe, ensuring the transaction
+    is posted and a valid Safe URL is returned.
+    """
+    broadcast_config._chain_id = 1
+
+    mock_tx_service_instance = MockTxService.return_value
+    mock_tx_service_instance.post_transaction = MagicMock()
+
+    mock_to_thread.return_value = None
+
+    result_url = await send_to_safe(broadcast_config, sample_safe_tx)
+
+    mock_to_thread.assert_called_once_with(
+        mock_tx_service_instance.post_transaction, sample_safe_tx
     )
 
     assert "https://app.safe.global/transactions/queue" in result_url
     assert f"?safe=eth:{broadcast_config.safe_address}" in result_url
-    assert "#0xTxHash" in result_url
+    assert f"#{sample_safe_tx.safe_tx_hash.hex()}" in result_url
 
 
 @pytest.mark.asyncio
