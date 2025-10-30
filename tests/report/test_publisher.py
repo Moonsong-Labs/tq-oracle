@@ -267,7 +267,7 @@ async def test_build_safe_transaction_raises_error_if_config_missing(
 @pytest.mark.asyncio
 @patch("tq_oracle.report.publisher.Account")
 @patch("tq_oracle.report.publisher.asyncio.to_thread")
-async def test_send_to_safe_handles_http_error_on_nonce_fetch(
+async def test_build_safe_transaction_handles_http_error_on_nonce_fetch(
     mock_to_thread: MagicMock,
     MockAccount: MagicMock,
     broadcast_config: OracleSettings,
@@ -275,6 +275,13 @@ async def test_send_to_safe_handles_http_error_on_nonce_fetch(
     """
     Verify that an HTTP error during the nonce fetch is propagated correctly.
     """
+    transaction = {
+        "to": "0x4234567890123456789012345678901234567890",
+        "data": b"calldata",
+        "value": 0,
+        "operation": 0,
+    }
+
     MockAccount.from_key.return_value = MagicMock()
     mock_response = MagicMock()
     mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
@@ -282,11 +289,10 @@ async def test_send_to_safe_handles_http_error_on_nonce_fetch(
     )
     mock_to_thread.return_value = mock_response
 
-    # Mock the chain_id property by setting the cached value
     broadcast_config._chain_id = 1
 
     with pytest.raises(requests.exceptions.HTTPError, match="404 Not Found"):
-        await send_to_safe(broadcast_config, {})
+        await build_safe_transaction(broadcast_config, transaction)
 
 
 @pytest.mark.asyncio
