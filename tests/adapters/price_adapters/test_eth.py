@@ -39,13 +39,6 @@ def weth_address(config):
     return address
 
 
-@pytest.fixture
-def wsteth_address(config):
-    address = config.assets["WSTETH"]
-    assert address is not None
-    return address
-
-
 @pytest.mark.asyncio
 async def test_adapter_name(config):
     adapter = ETHAdapter(config)
@@ -143,35 +136,14 @@ async def test_fetch_prices_preserves_existing_prices(
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_fetch_prices_wsteth_integration(config, eth_address, wsteth_address):
+async def test_fetch_prices_all_assets_integration(config, eth_address, weth_address):
     adapter = ETHAdapter(config)
     result = await adapter.fetch_prices(
-        [wsteth_address], PriceData(base_asset=eth_address, prices={})
-    )
-    assert isinstance(result, PriceData)
-    assert len(result.prices) == 1
-    price = result.prices[wsteth_address]
-    assert isinstance(price, int)
-    assert price > 10**18
-    assert price < 2 * 10**18
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_fetch_prices_all_assets_integration(
-    config, eth_address, weth_address, wsteth_address
-):
-    adapter = ETHAdapter(config)
-    result = await adapter.fetch_prices(
-        [eth_address, weth_address, wsteth_address],
+        [eth_address, weth_address],
         PriceData(base_asset=eth_address, prices={"0x111": 456}),
     )
     assert isinstance(result, PriceData)
-    assert len(result.prices) == 4
+    assert len(result.prices) == 3
     assert result.prices["0x111"] == 456
     assert result.prices[eth_address] == 10**18
     assert result.prices[weth_address] == 10**18
-    wsteth_price = result.prices[wsteth_address]
-    assert isinstance(wsteth_price, int)
-    assert wsteth_price > 10**18
-    assert wsteth_price < 2 * 10**18
