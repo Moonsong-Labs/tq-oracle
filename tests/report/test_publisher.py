@@ -18,9 +18,11 @@ from tq_oracle.report.publisher import (
 def sample_report() -> OracleReport:
     """Provides a sample OracleReport for testing."""
     return OracleReport(
-        vault_address="0xVaultAddress",
-        total_assets={"0xAsset1": 1000000000000000000},
-        final_prices={"0xAsset1": 2000 * 10**18},
+        vault_address="0x3234567890123456789012345678901234567890",
+        total_assets={
+            "0x1234567890123456789012345678901234567890": 1000000000000000000
+        },
+        final_prices={"0x1234567890123456789012345678901234567890": 2000 * 10**18},
     )
 
 
@@ -53,12 +55,15 @@ async def test_publish_to_stdout_prints_correct_json(
     """
     expected_dict = sample_report.to_dict()
 
-    await publish_to_stdout(sample_report)
+    await publish_to_stdout(sample_report, "0x2234567890123456789012345678901234567890")
 
     captured = capsys.readouterr()
     assert captured.err == ""
     parsed_output = json.loads(captured.out)
-    assert parsed_output == expected_dict
+    assert parsed_output == {
+        "report": expected_dict,
+        "encoded_calldata": "8f88cbfb00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000123456789012345678901234567890123456789000000000000000000000000000000000000000000000006c6b935b8bbd400000",
+    }
 
 
 @pytest.mark.asyncio
@@ -239,10 +244,14 @@ async def test_publish_report_routes_to_stdout_on_dry_run(
     Verify that publish_report calls publish_to_stdout when config.dry_run is True.
     """
     broadcast_config.dry_run = True
+    expected_oracle_address = "0x2234567890123456789012345678901234567890"
+    broadcast_config._oracle_address = expected_oracle_address
 
     await publish_report(broadcast_config, sample_report)
 
-    mock_publish_to_stdout.assert_awaited_once_with(sample_report)
+    mock_publish_to_stdout.assert_awaited_once_with(
+        sample_report, expected_oracle_address
+    )
     mock_send_to_safe.assert_not_awaited()
 
 

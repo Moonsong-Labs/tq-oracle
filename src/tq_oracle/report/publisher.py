@@ -13,22 +13,31 @@ from safe_eth.safe.api import TransactionServiceApi
 from safe_eth.safe.safe_tx import SafeTx
 from web3 import Web3
 
-from ..safe.transaction_builder import encode_submit_reports
+from .encoder import encode_submit_reports
 from ..settings import OracleSettings
 from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
 
 
-async def publish_to_stdout(report: OracleReport) -> None:
+async def publish_to_stdout(report: OracleReport, oracle_address: str) -> None:
     """Publish report to stdout (dry run mode).
 
     Args:
         report: The oracle report to publish
+        oracle_address: The address of the oracle contract
 
     This corresponds to the "Report published to stdout" step in the flowchart.
     """
-    print(json.dumps(report.to_dict(), indent=2))
+    (_, encoded_calldata) = encode_submit_reports(
+        oracle_address=oracle_address,
+        report=report,
+    )
+    data = {
+        "report": report.to_dict(),
+        "encoded_calldata": encoded_calldata.hex(),
+    }
+    print(json.dumps(data, indent=2))
 
 
 async def build_transaction(
@@ -189,7 +198,7 @@ async def publish_report(
     - If not dry_run and Broadcast mode: build transaction, send to Safe
     """
     if config.dry_run:
-        await publish_to_stdout(report)
+        await publish_to_stdout(report, config.oracle_address)
         return
 
     if config.is_broadcast:

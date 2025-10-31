@@ -1,35 +1,15 @@
-"""Transaction builder for encoding Safe transactions."""
+"""Transaction encoder for Safe transactions."""
 
 from __future__ import annotations
 
-import json
 import logging
-from importlib.resources import files
 
 from web3 import Web3
 
-from ..report.generator import OracleReport
+from ..abi import load_oracle_abi
+from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
-
-
-def load_oracle_abi() -> list[dict]:
-    """Load IOracle ABI from package resources.
-
-    Returns:
-        ABI as a list of dictionaries
-
-    Raises:
-        FileNotFoundError: If ABI file doesn't exist
-        json.JSONDecodeError: If ABI file is malformed
-    """
-    try:
-        abi_file = files("tq_oracle.abis").joinpath("IOracle.json")
-        abi_data = abi_file.read_text()
-        data = json.loads(abi_data)
-        return data["abi"]
-    except (FileNotFoundError, KeyError) as e:
-        raise FileNotFoundError("IOracle ABI not found in package resources. ") from e
 
 
 def encode_submit_reports(
@@ -54,10 +34,9 @@ def encode_submit_reports(
     checksum_address = w3.to_checksum_address(oracle_address)
     contract = w3.eth.contract(address=checksum_address, abi=abi)
 
-    # Convert report.final_prices dict to list of tuples
-    # Format: [(asset_address, price_d18), ...]
     reports_array = [
-        (asset_addr, price_d18) for asset_addr, price_d18 in report.final_prices.items()
+        (w3.to_checksum_address(asset_addr), price_d18)
+        for asset_addr, price_d18 in report.final_prices.items()
     ]
 
     logger.info("Encoding submitReports() with %d report(s):", len(reports_array))
