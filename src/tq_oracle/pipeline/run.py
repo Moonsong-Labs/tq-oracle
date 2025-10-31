@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from ..report import publish_report
 from ..state import AppState
 from .assets import collect_assets
+from .context import PipelineContext
 from .preflight import run_preflight
 from .pricing import price_assets
-from .report import build_report
+from .report import build_report, publish_report
 
 
 async def run_report(state: AppState, vault_address: str) -> None:
@@ -37,15 +37,12 @@ async def run_report(state: AppState, vault_address: str) -> None:
         },
     )
 
-    await run_preflight(state, vault_address)
+    ctx = PipelineContext(state=state, vault_address=vault_address)
 
-    aggregated = await collect_assets(state)
-
-    _price_data, _total_assets, final_prices = await price_assets(state, aggregated)
-
-    report = await build_report(state, aggregated, final_prices)
-
-    log.info("Publishing report (dry_run=%s)...", s.dry_run)
-    await publish_report(s, report)
+    await run_preflight(ctx)
+    await collect_assets(ctx)
+    await price_assets(ctx)
+    await build_report(ctx)
+    await publish_report(ctx)
 
     log.info("Report completed", extra={"vault": vault_address})

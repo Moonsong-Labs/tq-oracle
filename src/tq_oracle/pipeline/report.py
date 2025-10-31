@@ -2,27 +2,23 @@
 
 from __future__ import annotations
 
-from ..processors import AggregatedAssets, FinalPrices
-from ..report import OracleReport, generate_report
-from ..state import AppState
+from ..report import generate_report
+from ..report import publish_report as publish_report_impl
+from .context import PipelineContext
 
 
-async def build_report(
-    state: AppState,
-    aggregated: AggregatedAssets,
-    final_prices: FinalPrices,
-) -> OracleReport:
+async def build_report(ctx: PipelineContext) -> None:
     """Generate the oracle report.
 
     Args:
-        state: Application state containing settings and logger
-        aggregated: Aggregated assets
-        final_prices: Final prices for assets
+        ctx: Pipeline context containing state, aggregated assets, and final prices
 
-    Returns:
-        OracleReport containing the report data
+    Sets the report in the context.
     """
-    log = state.logger
+    log = ctx.state.logger
+    state = ctx.state
+    aggregated = ctx.aggregated_required
+    final_prices = ctx.final_prices_required
 
     log.info("Generating report...")
     report = await generate_report(
@@ -31,4 +27,21 @@ async def build_report(
         final_prices,
     )
 
-    return report
+    ctx.report = report
+
+
+async def publish_report(ctx: PipelineContext) -> None:
+    """Publish the oracle report.
+
+    Args:
+        ctx: Pipeline context containing state and report
+
+    Publishes the report to the appropriate destination based on the configuration.
+    """
+    s = ctx.state.settings
+    report = ctx.report_required
+    log = ctx.state.logger
+
+    log.info("Publishing report (dry_run=%s)...", s.dry_run)
+
+    await publish_report_impl(s, report)
