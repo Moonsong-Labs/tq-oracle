@@ -2,34 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from importlib.resources import files
 
 from web3 import Web3
 
+from ..abi import load_oracle_abi
 from ..report.generator import OracleReport
 
 logger = logging.getLogger(__name__)
-
-
-def load_oracle_abi() -> list[dict]:
-    """Load IOracle ABI from package resources.
-
-    Returns:
-        ABI as a list of dictionaries
-
-    Raises:
-        FileNotFoundError: If ABI file doesn't exist
-        json.JSONDecodeError: If ABI file is malformed
-    """
-    try:
-        abi_file = files("tq_oracle.abis").joinpath("IOracle.json")
-        abi_data = abi_file.read_text()
-        data = json.loads(abi_data)
-        return data["abi"]
-    except (FileNotFoundError, KeyError) as e:
-        raise FileNotFoundError("IOracle ABI not found in package resources. ") from e
 
 
 def encode_submit_reports(
