@@ -167,7 +167,7 @@ async def test_fetch_assets_integration(hl_config):
         "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
     }
 
-    assert len(assets) == 24
+    assert len(assets) == 30
 
     for asset in assets:
         assert isinstance(asset, AssetData)
@@ -192,7 +192,7 @@ async def test_fetch_assets_without_hl_integration(config):
         "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
     }
 
-    assert len(assets) == 24
+    assert len(assets) == 30
 
     for asset in assets:
         assert isinstance(asset, AssetData)

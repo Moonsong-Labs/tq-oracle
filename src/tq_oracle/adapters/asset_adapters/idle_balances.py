@@ -130,39 +130,41 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         return assets
 
     async def fetch_all_assets(self) -> list[AssetData]:
-        """Fetch idle balances for ALL subvaults on the configured chain.
+        """Fetch idle balances for the main vault and ALL subvaults on the configured chain.
 
-        This method discovers all subvaults and fetches idle balances for each.
+        This method discovers all subvaults and fetches idle balances for each,
+        including the main vault contract itself.
         Use this for the default idle_balances collection on L1.
 
         Returns:
-            List of AssetData objects from all subvaults
+            List of AssetData objects from main vault and all subvaults
         """
         subvault_addresses = await self._fetch_subvault_addresses()
+        vault_addresses = [self.config.vault_address_required] + subvault_addresses
         logger.info(
-            "Fetching %s idle balances for %d subvaults",
+            "Fetching %s idle balances for main vault + %d subvaults",
             self._chain,
             len(subvault_addresses),
         )
 
         asset_results = await asyncio.gather(
-            *[self.fetch_assets(addr) for addr in subvault_addresses],
+            *[self.fetch_assets(addr) for addr in vault_addresses],
             return_exceptions=True,
         )
 
         all_assets: list[AssetData] = []
-        for subvault_addr, result in zip(subvault_addresses, asset_results):
+        for vault_addr, result in zip(vault_addresses, asset_results):
             if isinstance(result, Exception):
                 logger.error(
-                    "Failed to fetch idle balances for subvault %s: %s",
-                    subvault_addr,
+                    "Failed to fetch idle balances for vault/subvault %s: %s",
+                    vault_addr,
                     result,
                 )
             elif isinstance(result, list):
                 all_assets.extend(result)
 
         logger.info(
-            "Fetched %d total idle balance entries from %d subvaults",
+            "Fetched %d total idle balance entries from main vault + %d subvaults",
             len(all_assets),
             len(subvault_addresses),
         )
