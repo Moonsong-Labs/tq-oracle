@@ -35,7 +35,8 @@ def encode_submit_reports(
     contract = w3.eth.contract(address=checksum_address, abi=abi)
 
     reports_array = [
-        (asset_addr, price_d18) for asset_addr, price_d18 in report.final_prices.items()
+        (w3.to_checksum_address(asset_addr), price_d18)
+        for asset_addr, price_d18 in report.final_prices.items()
     ]
 
     logger.info("Encoding submitReports() with %d report(s):", len(reports_array))
