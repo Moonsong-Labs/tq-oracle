@@ -13,7 +13,7 @@ from safe_eth.safe.api import TransactionServiceApi
 from safe_eth.safe.safe_tx import SafeTx
 from web3 import Web3
 
-from ..safe.transaction_builder import encode_submit_reports
+from .encoder import encode_submit_reports
 from ..settings import OracleSettings
 from .generator import OracleReport
 
