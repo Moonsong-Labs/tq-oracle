@@ -12,6 +12,7 @@ def config():
         vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
         oracle_helper_address="0xOracleHelper",
         vault_rpc="https://eth.drpc.org",
+        block_number=23690139,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=None,
@@ -119,6 +120,8 @@ def hl_config():
         vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
         oracle_helper_address="0xOracleHelper",
         vault_rpc="https://eth.drpc.org",
+        block_number=23690139,
+        hl_block_number=780072257,
         l1_subvault_address=None,
         safe_address=None,
         hl_rpc=HL_PROD_EVM_RPC,
@@ -164,7 +167,7 @@ async def test_fetch_assets_integration(hl_config):
         "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
     }
 
-    assert len(assets) == 24
+    assert len(assets) == 30
 
     for asset in assets:
         assert isinstance(asset, AssetData)
@@ -189,7 +192,7 @@ async def test_fetch_assets_without_hl_integration(config):
         "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
     }
 
-    assert len(assets) == 24
+    assert len(assets) == 30
 
     for asset in assets:
         assert isinstance(asset, AssetData)

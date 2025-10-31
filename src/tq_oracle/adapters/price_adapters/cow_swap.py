@@ -34,6 +34,7 @@ class CowSwapAdapter(BasePriceAdapter):
         super().__init__(config)
         self.api_base_url = self.NETWORK_API_URLS[config.network]
         self.vault_rpc = config.vault_rpc
+        self.block_number = config.block_number_required
         assets = config.assets
         eth_address = assets["ETH"]
         if eth_address is None:
@@ -75,7 +76,11 @@ class CowSwapAdapter(BasePriceAdapter):
         )
 
         decimals = await asyncio.to_thread(
-            lambda: int(token_contract.functions.decimals().call())
+            lambda: int(
+                token_contract.functions.decimals().call(
+                    block_identifier=self.block_number
+                )
+            )
         )
 
         self._decimals_cache[token_address] = decimals

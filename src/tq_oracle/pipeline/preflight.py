@@ -7,21 +7,20 @@ from typing import Any
 import backoff
 
 from ..checks.pre_checks import PreCheckError, run_pre_checks
-from ..state import AppState
+from .context import PipelineContext
 
 
-async def run_preflight(state: AppState, vault_address: str) -> None:
+async def run_preflight(ctx: PipelineContext) -> None:
     """Run pre-flight checks with retry logic.
 
     Args:
-        state: Application state containing settings and logger
-        vault_address: The vault address to check
+        ctx: Pipeline context containing state and vault address
 
     Raises:
         PreCheckError: If pre-checks fail after all retries
     """
-    s = state.settings
-    log = state.logger
+    s = ctx.state.settings
+    log = ctx.state.logger
 
     log.info(
         "Running pre-checks (max retries: %d, timeout: %.1fs)...",
@@ -65,7 +64,7 @@ async def run_preflight(state: AppState, vault_address: str) -> None:
     )
     async def _run_pre_checks_with_retry() -> None:
         """Run pre-checks with automatic retry on retriable errors."""
-        await run_pre_checks(s, vault_address)
+        await run_pre_checks(s, ctx.vault_address)
 
     await _run_pre_checks_with_retry()
     log.info("Pre-checks passed successfully")

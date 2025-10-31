@@ -7,34 +7,28 @@ from ..adapters.price_adapters.base import PriceData
 from ..checks.price_validators import PriceValidationError, run_price_validations
 from ..constants import ETH_ASSET
 from ..processors import (
-    AggregatedAssets,
-    FinalPrices,
     calculate_total_assets,
     derive_final_prices,
 )
-from ..state import AppState
+from .context import PipelineContext
 
 
-async def price_assets(
-    state: AppState, aggregated: AggregatedAssets
-) -> tuple[PriceData, int, FinalPrices]:
+async def price_assets(ctx: PipelineContext) -> None:
     """Fetch prices for assets and validate them.
 
     Args:
-        state: Application state containing settings and logger
-        aggregated: Aggregated assets to price
+        ctx: Pipeline context containing state and aggregated assets
 
-    Returns:
-        Tuple of (price_data, total_assets, final_prices)
+    Sets the price data, total assets, and final prices in the context.
 
     Raises:
         PriceValidationError: If price validation fails
     """
-    s = state.settings
-    log = state.logger
+    s = ctx.state.settings
+    log = ctx.state.logger
+    aggregated = ctx.aggregated_required
 
     asset_addresses = list(aggregated.assets)
-
     log.info("Fetching prices for %d assets...", len(asset_addresses))
     price_data: PriceData = PriceData(base_asset=ETH_ASSET, prices={})
 
@@ -60,4 +54,6 @@ async def price_assets(
     log.info("Deriving final prices via OracleHelper...")
     final_prices = await derive_final_prices(s, total_assets, price_data)
 
-    return price_data, total_assets, final_prices
+    ctx.price_data = price_data
+    ctx.total_assets = total_assets
+    ctx.final_prices = final_prices

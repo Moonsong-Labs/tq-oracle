@@ -57,10 +57,12 @@ class OracleSettings(BaseSettings):
     vault_rpc: str | None = None
     eth_mainnet_rpc: str | None = None  # Needed for when vault is not on mainnet
     network: Network = Network.MAINNET
+    block_number: int | None = None
 
     # --- hyperliquid ---
     hl_subvault_address: str | None = None
     hl_rpc: str | None = None
+    hl_block_number: int | None = None
     l1_subvault_address: str | None = None
 
     # --- computed/derived values (set by validator) ---
@@ -253,11 +255,32 @@ class OracleSettings(BaseSettings):
         return self.vault_address
 
     @property
+    def block_number_required(self) -> int:
+        """Get block_number, raising ValueError if not set."""
+        if self.block_number is None:
+            raise ValueError("block_number must be configured")
+        return self.block_number
+
+    @property
+    def hl_block_number_required(self) -> int:
+        """Get hl_block_number, raising ValueError if not set."""
+        if self.hl_block_number is None:
+            raise ValueError("hl_block_number must be configured")
+        return self.hl_block_number
+
+    @property
     def vault_rpc_required(self) -> str:
         """Get vault_rpc, raising ValueError if not set."""
         if self.vault_rpc is None:
             raise ValueError("vault_rpc must be configured")
         return self.vault_rpc
+
+    @property
+    def hl_rpc_required(self) -> str:
+        """Get hl_rpc, raising ValueError if not set."""
+        if self.hl_rpc is None:
+            raise ValueError("hl_rpc must be configured")
+        return self.hl_rpc
 
     @property
     def chain_id(self) -> int:
