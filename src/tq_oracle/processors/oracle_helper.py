@@ -50,13 +50,14 @@ async def derive_final_prices(
 
     vault = Web3.to_checksum_address(config.vault_address)
     asset_prices = encode_asset_prices(price_data).asset_prices
+    block_number = config.block_number_required
 
     try:
         prices_array = oracle_helper.functions.getPricesD18(
             vault,
             total_assets,
             asset_prices,
-        ).call(block_identifier="latest")
+        ).call(block_identifier=block_number)
 
         prices = {asset_prices[i][0]: prices_array[i] for i in range(len(asset_prices))}
 

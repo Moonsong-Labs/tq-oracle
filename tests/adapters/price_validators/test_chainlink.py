@@ -13,6 +13,7 @@ def config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         vault_rpc="https://eth.drpc.org",
+        block_number=23690139,
         network=Network.MAINNET,
         safe_address=None,
         l1_subvault_address=None,

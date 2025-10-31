@@ -27,6 +27,7 @@ class ChainlinkAdapter(BasePriceAdapter):
     def __init__(self, config: OracleSettings):
         super().__init__(config)
         self.vault_rpc = config.vault_rpc
+        self.block_number = config.block_number_required
         assets = config.assets
         eth_address = assets["ETH"]
         if eth_address is None:
@@ -42,8 +43,12 @@ class ChainlinkAdapter(BasePriceAdapter):
         return "chainlink"
 
     async def latest_price_and_decimals(self, feed_contract) -> tuple[int, int]:
-        _, answer, _, _, _ = feed_contract.functions.latestRoundData().call()
-        decimals = feed_contract.functions.decimals().call()
+        _, answer, _, _, _ = feed_contract.functions.latestRoundData().call(
+            block_identifier=self.block_number
+        )
+        decimals = feed_contract.functions.decimals().call(
+            block_identifier=self.block_number
+        )
         return int(answer), int(decimals)
 
     async def fetch_prices(
