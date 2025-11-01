@@ -160,7 +160,9 @@ async def collect_assets(ctx: PipelineContext) -> None:
 
     if should_run_streth:
         streth_adapter = StrETHAdapter(s, chain="vault_chain")
-        asset_fetch_tasks.append(("streth_chain", streth_adapter.fetch_all_assets()))
+        asset_fetch_tasks.append(
+            ("streth_vault_chain", streth_adapter.fetch_all_assets())
+        )
         log.debug("Added default vault_chain strETH adapter")
 
     # 2. Add additional adapters per subvault
