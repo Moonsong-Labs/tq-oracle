@@ -32,7 +32,12 @@ class StrETHAdapter(BaseAssetAdapter):
     w3: Web3
 
     def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
-        """Initialize the adapter."""
+        """Initialize the adapter.
+
+        Args:
+            config: Oracle configuration
+            chain: Which chain to query - always "vault_chain"
+        """
         super().__init__(config, chain=chain)
 
         self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
@@ -70,6 +75,14 @@ class StrETHAdapter(BaseAssetAdapter):
         return AdapterChain.VAULT_CHAIN
 
     async def _fetch_assets(self, subvault_addresses: list[str]) -> list[AssetData]:
+        """Fetch strETH positions for the given subvaults on the configured chain.
+
+        Args:
+            subvault_addresses: List of subvaults to query
+
+        Returns:
+            List of AssetData objects containing asset addresses and balances
+        """
         compact_collector_abi = load_compact_collector_abi()
         compact_collector: Contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(ADDRESS_ZERO),
@@ -128,6 +141,11 @@ class StrETHAdapter(BaseAssetAdapter):
         return await self._fetch_assets([subvault_address])
 
     async def fetch_all_assets(self) -> list[AssetData]:
+        """Fetch strETH positions for all subvaults of the vault on the configured chain.
+
+        Returns:
+            List of AssetData objects containing asset addresses and balances
+        """
         vault_contract: Contract = self.w3.eth.contract(
             address=self.vault_address, abi=load_vault_abi()
         )
