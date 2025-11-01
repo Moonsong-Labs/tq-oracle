@@ -13,9 +13,8 @@ from ..adapters.asset_adapters.base import AssetData
 from ..adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from ..adapters.asset_adapters.streth import StrETHAdapter
 from ..processors import compute_total_aggregated_assets
-
-from ..processors import AggregatedAssets
 from ..state import AppState
+from .context import PipelineContext
 
 
 async def _fetch_subvault_addresses(state: AppState) -> list[str]:
@@ -93,20 +92,19 @@ def _process_adapter_results(
             asset_data.append(assets)
 
 
-async def collect_assets(state: AppState) -> AggregatedAssets:
+async def collect_assets(ctx: PipelineContext) -> None:
     """Collect assets from all configured adapters.
 
     Args:
-        state: Application state containing settings and logger
+        ctx: Pipeline context containing state
 
-    Returns:
-        AggregatedAssets containing all collected assets
+    Sets the aggregated assets in the context.
     """
-    s = state.settings
-    log = state.logger
+    s = ctx.state.settings
+    log = ctx.state.logger
 
     log.info("Discovering subvaults from vault contract...")
-    subvault_addresses = await _fetch_subvault_addresses(state)
+    subvault_addresses = await _fetch_subvault_addresses(ctx.state)
     log.info("Found %d subvaults", len(subvault_addresses))
 
     # Validate subvault_adapters config references existing subvaults
@@ -227,4 +225,4 @@ async def collect_assets(state: AppState) -> AggregatedAssets:
     aggregated = await compute_total_aggregated_assets(asset_data)
     log.debug("Total aggregated assets: %d", len(aggregated.assets))
 
-    return aggregated
+    ctx.aggregated = aggregated
