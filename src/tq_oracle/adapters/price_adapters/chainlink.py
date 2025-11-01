@@ -10,7 +10,6 @@ from ...constants import (
     PRICE_FEED_USDC_ETH,
     PRICE_FEED_USDS_USD,
     PRICE_FEED_USDT_ETH,
-    PRICE_FEED_WSTETH_ETH_BASE,
 )
 from ...settings import OracleSettings
 from ...units import scale_to_18
@@ -76,7 +75,7 @@ class ChainlinkAdapter(BasePriceAdapter):
         direct_feed_assets = [
             (self.usdc_address, PRICE_FEED_USDC_ETH),
             (self.usdt_address, PRICE_FEED_USDT_ETH),
-            (self.wsteth_address, PRICE_FEED_WSTETH_ETH_BASE),
+            # (self.wsteth_address, PRICE_FEED_WSTETH_ETH_BASE),
         ]
         logger.debug(f" Asset addresses to check: {asset_addresses}")
         checksummed_asset_addresses = [
