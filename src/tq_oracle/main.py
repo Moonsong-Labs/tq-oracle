@@ -62,7 +62,6 @@ def _redacted_dump(settings: OracleSettings) -> dict:
 
 @app.callback(invoke_without_command=True)
 def report(
-    ctx: typer.Context,
     vault_address: Annotated[
         str | None, typer.Argument(help="Vault address to report.")
     ] = None,
