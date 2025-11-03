@@ -23,6 +23,7 @@ async def build_report(ctx: PipelineContext) -> None:
     log.info("Generating report...")
     report = await generate_report(
         state.settings.vault_address_required,
+        ctx.price_data_required.base_asset,
         aggregated,
         final_prices,
     )
