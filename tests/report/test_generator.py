@@ -9,13 +9,15 @@ from tq_oracle.report.generator import OracleReport, generate_report
 async def test_generate_report_creates_correct_structure():
     """Report should correctly map vault address, assets, and prices."""
     vault_address = "0xVault123"
+    base_asset = "0xA"
     aggregated = AggregatedAssets(assets={"0xA": 1000, "0xB": 2000})
     final_prices = FinalPrices(prices={"0xA": 10**18, "0xB": 2 * 10**18})
 
-    report = await generate_report(vault_address, aggregated, final_prices)
+    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
 
     assert isinstance(report, OracleReport)
     assert report.vault_address == vault_address
+    assert report.base_asset == base_asset
     assert report.total_assets == {"0xA": 1000, "0xB": 2000}
     assert report.final_prices == {"0xA": 10**18, "0xB": 2 * 10**18}
 
@@ -24,12 +26,14 @@ async def test_generate_report_creates_correct_structure():
 async def test_generate_report_with_empty_data():
     """Report should handle empty assets and prices without error."""
     vault_address = "0xEmptyVault"
+    base_asset = "0xBase"
     aggregated = AggregatedAssets(assets={})
     final_prices = FinalPrices(prices={})
 
-    report = await generate_report(vault_address, aggregated, final_prices)
+    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
 
     assert report.vault_address == vault_address
+    assert report.base_asset == base_asset
     assert report.total_assets == {}
     assert report.final_prices == {}
 
@@ -38,17 +42,20 @@ async def test_generate_report_with_empty_data():
 async def test_report_to_dict_includes_all_fields():
     """to_dict should convert report to dictionary with all fields present."""
     vault_address = "0xVault"
+    base_asset = "0xA"
     aggregated = AggregatedAssets(assets={"0xA": 500})
     final_prices = FinalPrices(prices={"0xA": 10**18})
 
-    report = await generate_report(vault_address, aggregated, final_prices)
+    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
     report_dict = report.to_dict()
 
     assert isinstance(report_dict, dict)
     assert "vault_address" in report_dict
+    assert "base_asset" in report_dict
     assert "total_assets" in report_dict
     assert "final_prices" in report_dict
     assert report_dict["vault_address"] == vault_address
+    assert report_dict["base_asset"] == base_asset
     assert report_dict["total_assets"] == {"0xA": 500}
     assert report_dict["final_prices"] == {"0xA": 10**18}
 
@@ -59,10 +66,11 @@ async def test_report_to_dict_serializable():
     import json
 
     vault_address = "0xSerializableVault"
+    base_asset = "0xUSDC"
     aggregated = AggregatedAssets(assets={"0xUSDC": 123456})
     final_prices = FinalPrices(prices={"0xUSDC": 987654321})
 
-    report = await generate_report(vault_address, aggregated, final_prices)
+    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
     report_dict = report.to_dict()
 
     json_str = json.dumps(report_dict)
@@ -77,6 +85,7 @@ async def test_report_to_dict_serializable():
 async def test_multiple_assets_and_prices_in_report():
     """Report should correctly handle multiple assets with their corresponding prices."""
     vault_address = "0xMultiAssetVault"
+    base_asset = "0xETH"
     aggregated = AggregatedAssets(
         assets={
             "0xUSDC": 10000,
@@ -94,7 +103,7 @@ async def test_multiple_assets_and_prices_in_report():
         }
     )
 
-    report = await generate_report(vault_address, aggregated, final_prices)
+    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
 
     assert len(report.total_assets) == 4
     assert len(report.final_prices) == 4

@@ -11,6 +11,7 @@ class OracleReport:
     """Oracle report containing asset data and prices."""
 
     vault_address: str
+    base_asset: str
     total_assets: dict[str, int]
     final_prices: dict[str, int]
 
@@ -21,6 +22,7 @@ class OracleReport:
 
 async def generate_report(
     vault_address: str,
+    base_asset: str,
     aggregated_assets: AggregatedAssets,
     final_prices: FinalPrices,
 ) -> OracleReport:
@@ -38,6 +40,7 @@ async def generate_report(
     """
     return OracleReport(
         vault_address=vault_address,
+        base_asset=base_asset,
         total_assets=aggregated_assets.assets,
         final_prices=final_prices.prices,
     )
