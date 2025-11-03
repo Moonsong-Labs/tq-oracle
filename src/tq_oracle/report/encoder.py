@@ -39,7 +39,8 @@ def encode_submit_reports(
     reports_array: list[tuple[ChecksumAddress, int]] = [
         (w3.to_checksum_address(asset_addr), price_d18)
         for asset_addr, price_d18 in sorted(
-            report.final_prices.items(), key=lambda x: 0 if w3.to_checksum_address(x[0]) == base_asset else 1
+            report.final_prices.items(),
+            key=lambda x: 0 if w3.to_checksum_address(x[0]) == base_asset else 1,
         )
     ]
 
