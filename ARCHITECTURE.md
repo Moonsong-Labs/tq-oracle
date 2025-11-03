@@ -28,7 +28,7 @@ flowchart TD
 The CLI entry point uses Typer for command-line interface management. It:
 - Loads configuration from TOML files, environment variables, or CLI arguments
 - Initializes the application state (`AppState`)
-- Delegates to the `report` command for TVL reporting
+- Executes the TVL reporting pipeline as the default command
 
 **Key Configuration:**
 

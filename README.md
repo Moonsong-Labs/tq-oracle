@@ -123,8 +123,37 @@ See `tq-oracle-example.toml` for complete configuration examples.
 
 ### Usage Examples
 
-> [!IMPORTANT]
-> Until Mellow has deployments of the vaults available for testing, you may need to use `--ignore-empty-vault` flag to overcome empty-asset errors.
+**Run with auto-detected config file:**
+
+```bash
+# Loads from tq-oracle.toml or ~/.config/tq-oracle/config.toml
+tq-oracle
+```
+
+**Run with explicit vault address:**
+
+```bash
+# Override vault address from config
+tq-oracle 0xYourVaultAddress
+```
+
+**Run with custom config file:**
+
+```bash
+tq-oracle --config path/to/custom-config.toml
+```
+
+**Run with network override:**
+
+```bash
+tq-oracle --network sepolia 0xYourVaultAddress
+```
+
+**Preview configuration without running:**
+
+```bash
+tq-oracle --show-config
+```
 
 **Common Usage Patterns:**
 

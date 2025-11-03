@@ -5,11 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Annotated
 
 import typer
-
 from web3 import Web3
 
 from .constants import (
@@ -40,11 +40,12 @@ NETWORK_ORACLE_HELPER_DEFAULTS = {
 
 app = typer.Typer(
     add_completion=False,
-    no_args_is_help=True,
+    no_args_is_help=False,
     add_help_option=True,
     pretty_exceptions_enable=True,
     pretty_exceptions_short=True,
     pretty_exceptions_show_locals=False,
+    rich_markup_mode="rich",
     help="TVL reporting and Safe submission tool.",
 )
 
@@ -59,9 +60,12 @@ def _redacted_dump(settings: OracleSettings) -> dict:
     return settings.as_safe_dict()
 
 
-@app.callback()
-def initialize_context(
+@app.callback(invoke_without_command=True)
+def report(
     ctx: typer.Context,
+    vault_address: Annotated[
+        str | None, typer.Argument(help="Vault address to report.")
+    ] = None,
     config_path: Annotated[
         Path | None,
         typer.Option(
@@ -121,14 +125,11 @@ def initialize_context(
         ),
     ] = False,
 ):
-    """Typer callback to initialize application state before any subcommand executes.
+    """Build a TVL report and (optionally) submit to Safe.
 
-    This function runs automatically before commands like 'report'. It loads configuration,
-    applies network-specific defaults, and stores the initialized AppState in ctx.obj
-    for subcommands to access.
+    This is the default command that loads configuration, applies network-specific
+    defaults, validates settings, and executes the TVL reporting pipeline.
     """
-    import os
-
     if config_path:
         os.environ["TQ_ORACLE_CONFIG"] = str(config_path)
 
@@ -183,44 +184,31 @@ def initialize_context(
 
     setup_logging(settings.log_level)
     logger = _build_logger()
-
-    ctx.obj = AppState(settings=settings, logger=logger)
+    state = AppState(settings=settings, logger=logger)
 
     if show_config:
         typer.echo(json.dumps(_redacted_dump(settings), indent=2))
         raise typer.Exit(code=0)
 
-
-@app.command()
-def report(
-    ctx: typer.Context,
-    vault_address: Annotated[
-        str | None, typer.Argument(help="Vault address to report.")
-    ] = None,
-):
-    """Build a TVL report and (optionally) submit to Safe."""
-    state: AppState = ctx.obj
-    s = state.settings
-
     if vault_address:
-        s.vault_address = vault_address
+        state.settings.vault_address = vault_address
 
-    if not s.vault_address:
+    if not state.settings.vault_address:
         raise typer.BadParameter("vault_address must be configured")
-    if not s.vault_rpc:
+    if not state.settings.vault_rpc:
         raise typer.BadParameter("vault_rpc must be configured")
-    if not s.oracle_helper_address:
+    if not state.settings.oracle_helper_address:
         raise typer.BadParameter("oracle_helper_address must be configured")
-    if not s.hl_rpc:
+    if not state.settings.hl_rpc:
         raise typer.BadParameter("hl_rpc must be configured")
 
-    if not s.dry_run:
-        if not s.safe_address:
+    if not state.settings.dry_run:
+        if not state.settings.safe_address:
             raise typer.BadParameter(
                 "safe_address is required when running with --no-dry-run.",
                 param_hint=["--safe-address", "TQ_ORACLE_SAFE_ADDRESS"],
             )
-        if not s.private_key:
+        if not state.settings.private_key:
             raise typer.BadParameter(
                 "private_key is required when running with --no-dry-run.",
                 param_hint=["--private-key", "TQ_ORACLE_PRIVATE_KEY"],
@@ -228,7 +216,7 @@ def report(
 
     from .pipeline.run import run_report
 
-    asyncio.run(run_report(state, s.vault_address_required))
+    asyncio.run(run_report(state, state.settings.vault_address_required))
 
 
 def run() -> None:
