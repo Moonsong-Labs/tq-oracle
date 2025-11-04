@@ -105,6 +105,13 @@ class OracleSettings(BaseSettings):
     # --- subvault adapters (from config file only) ---
     subvault_adapters: list[dict[str, Any]] = []
 
+    # --- stakewise ---
+    stakewise_vault_address: str | None = None
+    stakewise_leverage_strategy_address: str | None = None
+    stakewise_os_token_vault_controller: str | None = None
+    stakewise_os_token_address: str | None = None
+    stakewise_debt_asset: str | None = None
+
     # --- runtime computed values ---
     using_default_rpc: bool = False
     _chain_id: int | None = None

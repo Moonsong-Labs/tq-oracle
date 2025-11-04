@@ -1,0 +1,50 @@
+{
+  "abi": [
+    {
+      "inputs": [
+        { "internalType": "address", "name": "vault", "type": "address" },
+        { "internalType": "address", "name": "user", "type": "address" }
+      ],
+      "name": "getStrategyProxy",
+      "outputs": [
+        { "internalType": "address", "name": "proxy", "type": "address" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "vault", "type": "address" },
+        { "internalType": "address", "name": "proxy", "type": "address" }
+      ],
+      "name": "getVaultState",
+      "outputs": [
+        { "internalType": "uint256", "name": "stakedAssets", "type": "uint256" },
+        { "internalType": "uint256", "name": "mintedOsTokenShares", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "proxy", "type": "address" }
+      ],
+      "name": "getBorrowState",
+      "outputs": [
+        { "internalType": "uint256", "name": "borrowedAssets", "type": "uint256" },
+        { "internalType": "uint256", "name": "suppliedOsTokenShares", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBorrowLtv",
+      "outputs": [
+        { "internalType": "uint256", "name": "", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}

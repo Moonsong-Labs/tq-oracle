@@ -3,10 +3,12 @@ from __future__ import annotations
 from .base import BaseAssetAdapter
 from .hyperliquid import HyperliquidAdapter
 from .idle_balances import IdleBalancesAdapter
+from .stakewise import StakeWiseAdapter
 
 ADAPTER_REGISTRY: dict[str, type[BaseAssetAdapter]] = {
     "idle_balances": IdleBalancesAdapter,
     "hyperliquid": HyperliquidAdapter,
+    "stakewise": StakeWiseAdapter,
 }
 
 ASSET_ADAPTERS: list[type[BaseAssetAdapter]] = list(ADAPTER_REGISTRY.values())
@@ -38,5 +40,6 @@ __all__ = [
     "ADAPTER_REGISTRY",
     "HyperliquidAdapter",
     "IdleBalancesAdapter",
+    "StakeWiseAdapter",
     "get_adapter_class",
 ]
