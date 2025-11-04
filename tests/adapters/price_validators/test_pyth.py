@@ -109,11 +109,37 @@ async def test_validate_prices_with_mocked_pyth(config, eth_address, usdc_addres
         ]
     }
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_data
-    mock_response.raise_for_status.return_value = None
+    mock_price_response = MagicMock()
+    mock_price_response.json.return_value = mock_response_data
+    mock_price_response.raise_for_status.return_value = None
 
-    with patch("requests.get", return_value=mock_response):
+    mock_discovery_response = MagicMock()
+    mock_discovery_response.json.return_value = [
+        {
+            "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+            "type": "derived",
+            "attributes": {
+                "base": "ETH",
+                "quote_currency": "USD",
+            },
+        },
+        {
+            "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+            "type": "derived",
+            "attributes": {
+                "base": "USDC",
+                "quote_currency": "USD",
+            },
+        },
+    ]
+    mock_discovery_response.raise_for_status.return_value = None
+
+    def _mock_requests_get(url, params=None, timeout=None):
+        if url.endswith("/v2/price_feeds"):
+            return mock_discovery_response
+        return mock_price_response
+
+    with patch("requests.get", side_effect=_mock_requests_get):
         # Oracle price: USDC is ~1/3000 ETH (since ETH is $3000 and USDC is $1)
         price_data = PriceData(
             base_asset=eth_address,
@@ -159,11 +185,37 @@ async def test_validate_prices_fails_on_excessive_deviation(
         ]
     }
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_data
-    mock_response.raise_for_status.return_value = None
+    mock_price_response = MagicMock()
+    mock_price_response.json.return_value = mock_response_data
+    mock_price_response.raise_for_status.return_value = None
 
-    with patch("requests.get", return_value=mock_response):
+    mock_discovery_response = MagicMock()
+    mock_discovery_response.json.return_value = [
+        {
+            "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+            "type": "derived",
+            "attributes": {
+                "base": "ETH",
+                "quote_currency": "USD",
+            },
+        },
+        {
+            "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+            "type": "derived",
+            "attributes": {
+                "base": "USDC",
+                "quote_currency": "USD",
+            },
+        },
+    ]
+    mock_discovery_response.raise_for_status.return_value = None
+
+    def _mock_requests_get(url, params=None, timeout=None):
+        if url.endswith("/v2/price_feeds"):
+            return mock_discovery_response
+        return mock_price_response
+
+    with patch("requests.get", side_effect=_mock_requests_get):
         # Oracle price: Intentionally wrong - USDC price way off
         price_data = PriceData(
             base_asset=eth_address,
@@ -203,11 +255,37 @@ async def test_validate_prices_handles_stale_eth_price(
         ]
     }
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_data
-    mock_response.raise_for_status.return_value = None
+    mock_price_response = MagicMock()
+    mock_price_response.json.return_value = mock_response_data
+    mock_price_response.raise_for_status.return_value = None
 
-    with patch("requests.get", return_value=mock_response):
+    mock_discovery_response = MagicMock()
+    mock_discovery_response.json.return_value = [
+        {
+            "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+            "type": "derived",
+            "attributes": {
+                "base": "ETH",
+                "quote_currency": "USD",
+            },
+        },
+        {
+            "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+            "type": "derived",
+            "attributes": {
+                "base": "USDC",
+                "quote_currency": "USD",
+            },
+        },
+    ]
+    mock_discovery_response.raise_for_status.return_value = None
+
+    def _mock_requests_get(url, params=None, timeout=None):
+        if url.endswith("/v2/price_feeds"):
+            return mock_discovery_response
+        return mock_price_response
+
+    with patch("requests.get", side_effect=_mock_requests_get):
         price_data = PriceData(
             base_asset=eth_address,
             prices={usdc_address: int((1 / 3000) * 1e18)},
@@ -256,11 +334,29 @@ async def test_validate_prices_passes_with_empty_prices(validator, eth_address):
         ]
     }
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_data
-    mock_response.raise_for_status.return_value = None
+    mock_price_response = MagicMock()
+    mock_price_response.json.return_value = mock_response_data
+    mock_price_response.raise_for_status.return_value = None
 
-    with patch("requests.get", return_value=mock_response):
+    mock_discovery_response = MagicMock()
+    mock_discovery_response.json.return_value = [
+        {
+            "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+            "type": "derived",
+            "attributes": {
+                "base": "ETH",
+                "quote_currency": "USD",
+            },
+        }
+    ]
+    mock_discovery_response.raise_for_status.return_value = None
+
+    def _mock_requests_get(url, params=None, timeout=None):
+        if url.endswith("/v2/price_feeds"):
+            return mock_discovery_response
+        return mock_price_response
+
+    with patch("requests.get", side_effect=_mock_requests_get):
         price_data = PriceData(base_asset=eth_address, prices={})
 
         result = await validator.validate_prices(price_data)
