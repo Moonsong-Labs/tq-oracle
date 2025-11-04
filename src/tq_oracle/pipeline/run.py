@@ -22,6 +22,16 @@ def _canonical_address(address: str) -> str:
         return address.lower()
 
 
+ZERO_ADDRESSES = {
+    "0x0000000000000000000000000000000000000000",
+    "0x0",
+}
+
+
+def _is_zero_address(address: str) -> bool:
+    return address.lower() in ZERO_ADDRESSES
+
+
 async def _discover_base_asset(state: AppState) -> str:
     """Fetch the vault's base asset by traversing the FeeManager contract."""
 
@@ -55,7 +65,7 @@ async def _discover_base_asset(state: AppState) -> str:
     )
     base_asset = _canonical_address(base_asset)
 
-    if base_asset in {"0x0000000000000000000000000000000000000000", "0x0"}:
+    if _is_zero_address(base_asset):
         raise ValueError(
             "FeeManager returned zero base asset address; ensure contract is configured"
         )
