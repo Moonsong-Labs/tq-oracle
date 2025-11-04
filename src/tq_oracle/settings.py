@@ -91,6 +91,7 @@ class OracleSettings(BaseSettings):
     pyth_hermes_endpoint: str = "https://hermes.pyth.network"
     pyth_staleness_threshold: int = 60
     pyth_max_confidence_ratio: float = 0.03
+    pyth_dynamic_discovery_enabled: bool = True
 
     # --- RPC settings ---
     max_calls: int = 3

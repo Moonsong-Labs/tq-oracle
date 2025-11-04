@@ -5,7 +5,6 @@ from __future__ import annotations
 from ..adapters import PRICE_ADAPTERS
 from ..adapters.price_adapters.base import PriceData
 from ..checks.price_validators import PriceValidationError, run_price_validations
-from ..constants import ETH_ASSET
 from ..processors import (
     calculate_total_assets,
     derive_final_prices,
@@ -30,7 +29,7 @@ async def price_assets(ctx: PipelineContext) -> None:
 
     asset_addresses = list(aggregated.assets)
     log.info("Fetching prices for %d assets...", len(asset_addresses))
-    price_data: PriceData = PriceData(base_asset=ETH_ASSET, prices={})
+    price_data: PriceData = PriceData(base_asset=ctx.base_asset_required, prices={})
 
     price_adapters = [AdapterClass(s) for AdapterClass in PRICE_ADAPTERS]
     for price_adapter in price_adapters:

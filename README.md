@@ -8,13 +8,6 @@ TQ Oracle performs read smart contract READ calls through a registry of protocol
 
 For detailed system architecture and integration with Mellow Finance flexible-vaults, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Known Limitations & Assumptions
-
-> [!WARNING]
-> **stETH/ETH Peg Assumption**: The wstETH price adapter assumes a 1:1 peg between stETH and ETH when calculating wstETH prices. This assumption is **not validated** against market prices.
->
-> **Impact**: During stETH depeg events (e.g., market stress, liquidity crises), the oracle will report inaccurate TVL for vaults holding wstETH. The reported value will reflect the stETH/wstETH exchange rate multiplied by an assumed 1:1 stETH/ETH rate, not the actual market value.
-
 ## Running without installing
 
 You can run this CLI without any git cloning, directly with `uv`
