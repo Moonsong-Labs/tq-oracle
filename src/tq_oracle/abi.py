@@ -15,6 +15,7 @@ AGGREGATOR_ABI_PATH = ABIS_DIR / "AggregatorV3Interface.json"
 ERC20_ABI_PATH = ABIS_DIR / "ERC20.json"
 GNOSIS_SAFE_ABI_PATH = ABIS_DIR / "SafeL2.json"
 WSTETH_ABI_PATH = ABIS_DIR / "WstETH.json"
+FEE_MANAGER_ABI_PATH = ABIS_DIR / "FeeManager.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -50,6 +51,11 @@ def load_oracle_helper_abi() -> list[dict]:
 def load_vault_abi() -> list[dict]:
     """Load the Vault ABI."""
     return load_abi(VAULT_ABI_PATH)
+
+
+def load_fee_manager_abi() -> list[dict]:
+    """Load the Fee Manager ABI."""
+    return load_abi(FEE_MANAGER_ABI_PATH)
 
 
 def load_aggregator_abi() -> list[dict]:

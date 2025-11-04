@@ -23,14 +23,110 @@ class PythAdapter(BasePriceAdapter):
         self.hermes_endpoint = config.pyth_hermes_endpoint
         self.staleness_threshold = config.pyth_staleness_threshold
         self.max_confidence_ratio = config.pyth_max_confidence_ratio
-        eth_address = config.assets["ETH"]
-        if eth_address is None:
-            raise ValueError("ETH address is required for Pyth adapter")
-        self.eth_address = eth_address
+
+        self._address_to_symbol: dict[str, str] = {}
+        for symbol, address in config.assets.items():
+            if isinstance(address, str) and address:
+                self._address_to_symbol[self._canonical_address(address)] = symbol
 
     @property
     def adapter_name(self) -> str:
         return "pyth"
+
+    async def _resolve_feed_id(self, symbol: str, quote: str = "USD") -> str | None:
+        """Resolve feed ID using cache → Hermes discovery → constants fallback.
+
+        Args:
+            symbol: Asset symbol (e.g., "WSTETH")
+            quote: Quote currency (default: "USD")
+
+        Returns:
+            Feed ID with 0x prefix, or None if not found
+        """
+        feed_id = await self._discover_feed_from_api(symbol, quote)
+        if feed_id:
+            return feed_id
+
+        fallback = PYTH_PRICE_FEED_IDS.get(f"{symbol}/{quote}")
+        if fallback:
+            logger.warning("Falling back to statically configured feed ID for %s/%s", symbol, quote)
+            return fallback
+
+        logger.warning("No feed ID found for %s/%s", symbol, quote)
+        return None
+
+    def _canonical_address(self, address: str) -> str:
+        """Return a canonical representation of an address for comparisons."""
+        try:
+            return Web3.to_checksum_address(address)
+        except ValueError:
+            return address.lower()
+
+    async def _discover_feed_from_api(
+        self, symbol: str, quote: str = "USD"
+    ) -> str | None:
+        """Query Pyth API to discover feed ID for symbol.
+
+        Args:
+            symbol: Asset symbol (e.g., "WSTETH")
+            quote: Quote currency (default: "USD")
+
+        Returns:
+            Feed ID with 0x prefix, or None if not found
+        """
+        query = f"{symbol.lower()}%2F{quote.lower()}"
+        url = f"{self.hermes_endpoint}/v2/price_feeds?query={query}&asset_type=crypto"
+
+        try:
+            response = await asyncio.to_thread(lambda: requests.get(url, timeout=2.0))
+            response.raise_for_status()
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - network failures already logged elsewhere
+            logger.error("Feed discovery failed for %s/%s: %s", symbol, quote, exc)
+            return None
+
+        feeds = response.json()
+        matches = [
+            ((feed.get("type") or "unknown").lower(), f"0x{feed['id']}")
+            for feed in feeds
+            if (feed.get("attributes", {}).get("base", "").upper() == symbol.upper())
+            and (
+                feed.get("attributes", {}).get("quote_currency", "").upper()
+                == quote.upper()
+            )
+        ]
+
+        for preferred in ("derived", "pythnet"):
+            for feed_type, feed_id in matches:
+                if feed_type == preferred:
+                    logger.info(
+                        "Discovered feed for %s/%s: %s (type: %s)",
+                        symbol,
+                        quote,
+                        feed_id,
+                        feed_type,
+                    )
+                    return feed_id
+
+        if matches:
+            feed_type, feed_id = matches[0]
+            logger.info(
+                "Discovered feed for %s/%s: %s (type: %s)",
+                symbol,
+                quote,
+                feed_id,
+                feed_type,
+            )
+            return feed_id
+
+        logger.warning(
+            "No exact match found for %s/%s in %d results",
+            symbol,
+            quote,
+            len(feeds),
+        )
+        return None
 
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
@@ -40,101 +136,109 @@ class PythAdapter(BasePriceAdapter):
         Args:
             asset_addresses: List of asset contract addresses to get prices for.
             prices_accumulator: Existing price accumulator to update. Must
-                have base_asset set to ETH (wei). All prices are 18-decimal values
-                representing wei per 1 unit of the asset.
+                use the pipeline's base asset address. All prices are 18-decimal
+                fixed-point values representing base-asset units per 1 unit of
+                the asset.
 
         Returns:
             The same accumulator with Pyth-derived prices merged in.
-
-        Notes:
-            - Only ETH as base asset is supported.
-            - Converts USD prices to ETH using ETH/USD feed.
-            - Validates price staleness and confidence intervals.
         """
-        if prices_accumulator.base_asset != self.eth_address:
-            raise ValueError("Pyth adapter only supports ETH as base asset")
 
-        feed_ids_to_fetch = ["ETH/USD"]
-        asset_symbol_map: dict[str, str] = {}
-        checksummed_asset_addresses = [
-            Web3.to_checksum_address(addr) for addr in asset_addresses
-        ]
+        base_address = self._canonical_address(prices_accumulator.base_asset)
+        base_symbol = self._symbol_for(base_address)
+        if not base_symbol:
+            raise ValueError(
+                f"Base asset {prices_accumulator.base_asset} is not recognized by Pyth adapter configuration"
+            )
 
-        for symbol, address in self.config.assets.items():
-            if address is None or f"{symbol}/USD" not in PYTH_PRICE_FEED_IDS:
+        base_feed_id = await self._resolve_feed_id(base_symbol, "USD")
+        if not base_feed_id:
+            raise ValueError(
+                f"{base_symbol}/USD price feed could not be resolved from Pyth Hermes"
+            )
+
+        assets_to_fetch: dict[str, tuple[str, str, str]] = {}
+        for address in asset_addresses:
+            canonical = self._canonical_address(address)
+            if canonical == base_address:
                 continue
-            checksummed = Web3.to_checksum_address(address)
-            if checksummed in checksummed_asset_addresses:
-                feed_ids_to_fetch.append(f"{symbol}/USD")
-                asset_symbol_map[checksummed] = symbol
 
-        if not asset_symbol_map:
+            symbol = self._symbol_for(canonical)
+            if not symbol:
+                logger.warning(
+                    "Address %s not recognized in adapter configuration, skipping",
+                    address,
+                )
+                continue
+
+            feed_id = await self._resolve_feed_id(symbol, "USD")
+            if not feed_id:
+                logger.warning("Could not resolve feed ID for %s/USD, skipping", symbol)
+                continue
+
+            assets_to_fetch[canonical] = (address, symbol, feed_id)
+
+        if not assets_to_fetch:
             return prices_accumulator
 
-        logger.debug(f" Fetching prices for {len(feed_ids_to_fetch)} feeds")
-
-        price_feed_ids = [PYTH_PRICE_FEED_IDS[f] for f in feed_ids_to_fetch]
-        query = "&".join(f"ids[]={fid}" for fid in price_feed_ids)
+        all_feed_ids = [base_feed_id] + [
+            feed_id for _, _, feed_id in assets_to_fetch.values()
+        ]
+        query = "&".join(f"ids[]={fid}" for fid in all_feed_ids)
         url = f"{self.hermes_endpoint}/v2/updates/price/latest?{query}"
 
         response = await asyncio.to_thread(lambda: requests.get(url, timeout=2.0))
         response.raise_for_status()
         parsed_feeds = response.json().get("parsed", [])
+        feeds_by_id = {feed.get("id"): feed for feed in parsed_feeds}
 
-        logger.debug(f" Received {len(parsed_feeds)} price feeds")
+        logger.debug(" Received %d price feeds", len(parsed_feeds))
 
-        eth_feed = next(
-            (
-                f
-                for f in parsed_feeds
-                if f.get("id") == PYTH_PRICE_FEED_IDS["ETH/USD"].removeprefix("0x")
-            ),
-            None,
-        )
-        if not eth_feed:
-            raise ValueError("ETH/USD price feed not found in Pyth response")
+        base_feed_key = base_feed_id.removeprefix("0x")
+        base_feed = feeds_by_id.get(base_feed_key)
+        if not base_feed:
+            raise ValueError(f"{base_symbol}/USD price feed not found in Pyth response")
 
-        eth_price_obj = eth_feed.get("price", {})
-        eth_publish_time = eth_price_obj.get("publish_time", 0)
+        base_price_obj = base_feed.get("price", {})
+        base_publish_time = base_price_obj.get("publish_time", 0)
         current_time = int(time.time())
 
-        if (current_time - eth_publish_time) > self.staleness_threshold:
-            age = current_time - eth_publish_time
-            raise ValueError(f"ETH/USD price is stale (age: {age}s)")
+        if (current_time - base_publish_time) > self.staleness_threshold:
+            age = current_time - base_publish_time
+            raise ValueError(f"{base_symbol}/USD price is stale (age: {age}s)")
 
-        eth_usd_price = self._parse_price_to_18_decimals(eth_price_obj)
-        self._check_confidence(eth_price_obj, eth_usd_price, "ETH/USD")
-        logger.debug(f" ETH/USD price: ${eth_usd_price / 10**18:.2f}")
+        base_usd_price = self._parse_price_to_18_decimals(base_price_obj)
+        self._check_confidence(base_price_obj, base_usd_price, f"{base_symbol}/USD")
+        logger.debug(" %s/USD price: $%.6f", base_symbol, base_usd_price / 10**18)
 
-        for asset_address, symbol in asset_symbol_map.items():
-            feed_id = PYTH_PRICE_FEED_IDS.get(f"{symbol}/USD")
-            if not feed_id:
-                continue
-
-            asset_feed = next(
-                (f for f in parsed_feeds if f.get("id") == feed_id.removeprefix("0x")),
-                None,
-            )
+        for canonical, (original_address, symbol, feed_id) in assets_to_fetch.items():
+            feed_key = feed_id.removeprefix("0x")
+            asset_feed = feeds_by_id.get(feed_key)
             if not asset_feed:
-                logger.warning(f" Price feed for {symbol}/USD not found")
+                logger.warning(" Price feed for %s/USD not found", symbol)
                 continue
 
-            asset_price_obj = asset_feed.get("price", {})
-            asset_publish_time = asset_price_obj.get("publish_time", 0)
-
-            if (current_time - asset_publish_time) > self.staleness_threshold:
+            price_obj = asset_feed.get("price", {})
+            publish_time = price_obj.get("publish_time", 0)
+            if (current_time - publish_time) > self.staleness_threshold:
                 logger.warning(
-                    f" {symbol}/USD price is stale (age: {current_time - asset_publish_time}s), skipping"
+                    " %s/USD price is stale (age: %ss), skipping",
+                    symbol,
+                    current_time - publish_time,
                 )
                 continue
 
-            pyth_asset_usd = self._parse_price_to_18_decimals(asset_price_obj)
-            self._check_confidence(asset_price_obj, pyth_asset_usd, f"{symbol}/USD")
+            usd_price = self._parse_price_to_18_decimals(price_obj)
+            self._check_confidence(price_obj, usd_price, f"{symbol}/USD")
 
-            asset_eth_price = (pyth_asset_usd * 10**18) // eth_usd_price
-            prices_accumulator.prices[asset_address] = asset_eth_price
+            asset_price = (usd_price * 10**18) // base_usd_price
+            prices_accumulator.prices[original_address] = asset_price
             logger.debug(
-                f" {symbol}: ${pyth_asset_usd / 10**18:.6f} = {asset_eth_price} wei"
+                " %s: $%.6f = %s %s",
+                symbol,
+                usd_price / 10**18,
+                asset_price,
+                base_symbol,
             )
 
         self.validate_prices(prices_accumulator)
@@ -194,3 +298,6 @@ class PythAdapter(BasePriceAdapter):
                 f" {symbol} confidence ratio too high: {conf_ratio:.4f} "
                 f"(max: {self.max_confidence_ratio})"
             )
+
+    def _symbol_for(self, address: str) -> str | None:
+        return self._address_to_symbol.get(self._canonical_address(address))

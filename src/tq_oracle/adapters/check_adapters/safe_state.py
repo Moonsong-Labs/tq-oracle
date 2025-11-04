@@ -29,7 +29,6 @@ class SafeStateAdapter(BaseCheckAdapter):
         Returns:
             CheckResult indicating if Safe state allows publishing
         """
-        # Skip checks if no Safe address configured
         if not self._config.safe_address:
             logger.info("No Safe address configured, skipping Safe state checks")
             return CheckResult(

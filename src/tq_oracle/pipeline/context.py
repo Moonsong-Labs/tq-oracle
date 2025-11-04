@@ -13,6 +13,7 @@ from ..report import OracleReport
 class PipelineContext:
     state: AppState
     vault_address: str
+    base_asset: str | None = None
     aggregated: AggregatedAssets | None = None
     price_data: PriceData | None = None
     total_assets: int | None = None
@@ -34,6 +35,14 @@ class PipelineContext:
                 "Price data has not been set. Ensure price_assets() is called before accessing this property."
             )
         return self.price_data
+
+    @property
+    def base_asset_required(self) -> str:
+        if self.base_asset is None:
+            raise RuntimeError(
+                "Base asset has not been set. Ensure it is populated during preflight or asset collection."
+            )
+        return self.base_asset
 
     @property
     def total_assets_required(self) -> int:
