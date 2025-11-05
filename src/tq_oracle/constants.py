@@ -52,15 +52,6 @@ PRICE_FEED_WSTETH_ETH_BASE = "0x43a5C292A453A3bF3606fa856197f09D7B74251a"
 # https://docs.pyth.network/price-feeds/core/price-feeds/price-feed-ids
 PYTH_PRICE_FEED_IDS: dict[str, str] = {}
 
-USDC_HL_MAINNET = "0xb88339CB7199b77E23DB6E890353E22632Ba630f"
-USDC_HL_TESTNET = "0x2B3370eE501B4a559b57D449569354196457D8Ab"
-
-HL_MAINNET_API_URL = "https://api.hyperliquid.xyz"
-HL_TESTNET_API_URL = "https://api.hyperliquid-testnet.xyz"
-
-HL_PROD_EVM_RPC = "https://rpc.hyperliquid.xyz/evm"
-HL_TEST_EVM_RPC = "https://rpc.hyperliquid-testnet.xyz/evm"
-
 DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
 DEFAULT_SEPOLIA_RPC_URL = "https://sepolia.drpc.org"
 DEFAULT_BASE_RPC_URL = "https://mainnet.base.org"
@@ -73,22 +64,11 @@ BASE_ORACLE_HELPER = "0x9bB327889402AC19BF2D164eA79CcfE46c16a37B"
 TOKEN_MESSENGER_V2_PROD = "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"
 TOKEN_MESSENGER_V2_TEST = "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
 
-CCTP_FINALITY_THRESHOLD_INSTANT = 1000  # ~8 seconds
-CCTP_FINALITY_THRESHOLD_SLOW = 2000  # ~15 minutes
-
-CCTP_LOOKBACK_BLOCKS = 80
-CCTP_RATE_LIMITED_LOOKBACK_BLOCKS = 80  # 24 hours
 RPC_RATE_LIMIT_DELAY = (
     5  # Delay in seconds between RPC calls to avoid rate limits with get_logs()
 )
-HL_BLOCK_TIME = 1  # Hyperliquid block time in seconds
 L1_BLOCK_TIME = 12  # Ethereum L1 block time in seconds
 
 # Retry Configuration for Post-Checks
 MAX_RETRY_ATTEMPTS = 5
 RETRY_DELAY_SECONDS = 120  # 2 minutes
-
-
-# Maximum allowed staleness (in seconds) for Hyperliquid portfolio values.
-# Reject portfolio values older than this threshold.
-HL_MAX_PORTFOLIO_STALENESS_SECONDS = 120  # 2 minutes

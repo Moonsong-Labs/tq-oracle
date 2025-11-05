@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 try:
     import tomllib  # py311+
@@ -31,10 +31,6 @@ class Network(str, Enum):
     BASE = "base"
 
 
-HyperliquidEnv = Literal["mainnet", "testnet"]
-CCTPEnv = Literal["mainnet", "testnet"]
-
-
 class OracleSettings(BaseSettings):
     """Single source of truth for configuration. Values may come from:
     - CLI (init kwargs)
@@ -47,10 +43,6 @@ class OracleSettings(BaseSettings):
     # --- global toggles ---
     dry_run: bool = True
 
-    # --- environment selection ---
-    hyperliquid_env: HyperliquidEnv = "mainnet"
-    cctp_env: CCTPEnv = "mainnet"
-
     # --- core addresses / endpoints ---
     vault_address: str | None = None
     oracle_helper_address: str | None = None
@@ -58,17 +50,6 @@ class OracleSettings(BaseSettings):
     eth_mainnet_rpc: str | None = None  # Needed for when vault is not on mainnet
     network: Network = Network.MAINNET
     block_number: int | None = None
-
-    # --- hyperliquid ---
-    hl_subvault_address: str | None = None
-    hl_rpc: str | None = None
-    hl_block_number: int | None = None
-    l1_subvault_address: str | None = None
-
-    # --- computed/derived values (set by validator) ---
-    hyperliquid_api_url: str | None = None
-    hyperliquid_usdc_address: str | None = None
-    cctp_token_messenger_address: str | None = None
 
     # --- safe / signing ---
     safe_address: str | None = None
@@ -138,45 +119,6 @@ class OracleSettings(BaseSettings):
         This centralizes all environment selection logic in one place,
         removing the need for if/else checks throughout the codebase.
         """
-        from .constants import (
-            HL_MAINNET_API_URL,
-            HL_PROD_EVM_RPC,
-            HL_TEST_EVM_RPC,
-            HL_TESTNET_API_URL,
-            TOKEN_MESSENGER_V2_PROD,
-            TOKEN_MESSENGER_V2_TEST,
-            USDC_HL_MAINNET,
-            USDC_HL_TESTNET,
-        )
-
-        if self.hyperliquid_api_url is None:
-            self.hyperliquid_api_url = (
-                HL_TESTNET_API_URL
-                if self.hyperliquid_env == "testnet"
-                else HL_MAINNET_API_URL
-            )
-
-        if self.hl_rpc is None:
-            self.hl_rpc = (
-                HL_TEST_EVM_RPC
-                if self.hyperliquid_env == "testnet"
-                else HL_PROD_EVM_RPC
-            )
-
-        if self.hyperliquid_usdc_address is None:
-            self.hyperliquid_usdc_address = (
-                USDC_HL_TESTNET
-                if self.hyperliquid_env == "testnet"
-                else USDC_HL_MAINNET
-            )
-
-        if self.cctp_token_messenger_address is None:
-            self.cctp_token_messenger_address = (
-                TOKEN_MESSENGER_V2_TEST
-                if self.cctp_env == "testnet"
-                else TOKEN_MESSENGER_V2_PROD
-            )
-
         return self
 
     @classmethod
@@ -270,25 +212,11 @@ class OracleSettings(BaseSettings):
         return self.block_number
 
     @property
-    def hl_block_number_required(self) -> int:
-        """Get hl_block_number, raising ValueError if not set."""
-        if self.hl_block_number is None:
-            raise ValueError("hl_block_number must be configured")
-        return self.hl_block_number
-
-    @property
     def vault_rpc_required(self) -> str:
         """Get vault_rpc, raising ValueError if not set."""
         if self.vault_rpc is None:
             raise ValueError("vault_rpc must be configured")
         return self.vault_rpc
-
-    @property
-    def hl_rpc_required(self) -> str:
-        """Get hl_rpc, raising ValueError if not set."""
-        if self.hl_rpc is None:
-            raise ValueError("hl_rpc must be configured")
-        return self.hl_rpc
 
     @property
     def chain_id(self) -> int:

@@ -587,22 +587,6 @@ wheels = [
 ]
 
 [[package]]
-name = "hyperliquid-python-sdk"
-version = "0.19.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "eth-account" },
-    { name = "eth-utils" },
-    { name = "msgpack" },
-    { name = "requests" },
-    { name = "websocket-client" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/32/fa/98b1281324c6988d75131bd153d82d7182dcb97b382312252eece4eafe9e/hyperliquid_python_sdk-0.19.0.tar.gz", hash = "sha256:1eb181c4f0f86ede56ad2111ddf5a25635dbd697cf44dae274e87c6c04b97e18", size = 24710, upload-time = "2025-09-11T02:01:09.833Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/94/ea445013267347df0da6f41e7bafcbb66f0d7ac8a673f961169b288a5329/hyperliquid_python_sdk-0.19.0-py3-none-any.whl", hash = "sha256:9d02526da98ed2a8c7ae957d6188b1a5285d393056fbb7b57b1dbe38c7773850", size = 24062, upload-time = "2025-09-11T02:01:08.619Z" },
-]
-
-[[package]]
 name = "idna"
 version = "3.10"
 source = { registry = "https://pypi.org/simple" }
@@ -1380,7 +1364,6 @@ source = { editable = "." }
 dependencies = [
     { name = "backoff" },
     { name = "dotenv" },
-    { name = "hyperliquid-python-sdk" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "requests" },
@@ -1402,7 +1385,6 @@ dev = [
 requires-dist = [
     { name = "backoff", specifier = ">=2.2.1" },
     { name = "dotenv", specifier = ">=0.9.9" },
-    { name = "hyperliquid-python-sdk", specifier = ">=0.19.0" },
     { name = "pydantic", specifier = ">=2.6" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "requests", specifier = ">=2.32.5" },

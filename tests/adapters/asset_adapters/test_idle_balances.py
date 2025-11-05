@@ -3,7 +3,7 @@ import pytest
 from tq_oracle.adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from tq_oracle.adapters.asset_adapters.base import AssetData
 from tq_oracle.settings import OracleSettings
-from tq_oracle.constants import ETH_ASSET, USDC_HL_MAINNET, HL_PROD_EVM_RPC
+from tq_oracle.constants import ETH_ASSET
 
 
 @pytest.fixture
@@ -13,12 +13,7 @@ def config():
         oracle_helper_address="0xOracleHelper",
         vault_rpc="https://eth.drpc.org",
         block_number=23690139,
-        l1_subvault_address=None,
         safe_address=None,
-        hl_rpc=None,
-        hl_subvault_address=None,
-        hyperliquid_env="mainnet",
-        cctp_env="mainnet",
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
@@ -112,90 +107,3 @@ async def test_fetch_eth_balance_integration(config):
     assert eth_asset.asset_address == ETH_ASSET
     assert isinstance(eth_asset.amount, int)
     assert eth_asset.amount >= 0
-
-
-@pytest.fixture
-def hl_config():
-    return OracleSettings(
-        vault_address="0x277C6A642564A91ff78b008022D65683cEE5CCC5",
-        oracle_helper_address="0xOracleHelper",
-        vault_rpc="https://eth.drpc.org",
-        block_number=23690139,
-        hl_block_number=780072257,
-        l1_subvault_address=None,
-        safe_address=None,
-        hl_rpc=HL_PROD_EVM_RPC,
-        hl_subvault_address="0x90c983DC732e65DB6177638f0125914787b8Cb78",
-        hyperliquid_env="mainnet",
-        cctp_env="mainnet",
-        dry_run=False,
-        private_key=None,
-        safe_txn_srvc_api_key=None,
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_fetch_asset_balance_hyperevm_integration(hl_config):
-    adapter = IdleBalancesAdapter(hl_config, chain="hyperliquid")
-
-    hl_subvault_address = "0x90c983DC732e65DB6177638f0125914787b8Cb78"
-
-    assert adapter.w3 is not None
-    usdc_hl_asset = await adapter._fetch_asset_balance(
-        adapter.w3, hl_subvault_address, USDC_HL_MAINNET
-    )
-    assert isinstance(usdc_hl_asset, AssetData)
-    assert usdc_hl_asset.asset_address == USDC_HL_MAINNET
-    assert isinstance(usdc_hl_asset.amount, int)
-    assert usdc_hl_asset.amount >= 0
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_fetch_assets_integration(hl_config):
-    adapter = IdleBalancesAdapter(hl_config)
-
-    assets = await adapter.fetch_all_assets()
-
-    expected_asset_addresses = {
-        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-        "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
-        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-        "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-        "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
-    }
-
-    assert len(assets) == 30
-
-    for asset in assets:
-        assert isinstance(asset, AssetData)
-        assert asset.asset_address in expected_asset_addresses
-        assert isinstance(asset.amount, int)
-        assert asset.amount >= 0
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_fetch_assets_without_hl_integration(config):
-    adapter = IdleBalancesAdapter(config)
-
-    assets = await adapter.fetch_all_assets()
-
-    expected_asset_addresses = {
-        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-        "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
-        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-        "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-        "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
-    }
-
-    assert len(assets) == 30
-
-    for asset in assets:
-        assert isinstance(asset, AssetData)
-        assert asset.asset_address in expected_asset_addresses
-        assert isinstance(asset.amount, int)
-        assert asset.amount >= 0

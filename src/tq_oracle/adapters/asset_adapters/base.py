@@ -2,16 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 
 from ...settings import OracleSettings
-
-
-class AdapterChain(Enum):
-    """Enum indicating which blockchain/RPC an adapter uses."""
-
-    VAULT_CHAIN = "vault_chain"  # Main vault network (uses vault_rpc)
-    HYPERLIQUID = "hyperliquid"  # Hyperliquid chain (uses hl_rpc)
 
 
 @dataclass
@@ -25,15 +17,13 @@ class AssetData:
 class BaseAssetAdapter(ABC):
     """Abstract base class for asset adapters."""
 
-    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
+    def __init__(self, config: OracleSettings):
         """Initialize the adapter with configuration.
 
         Args:
             config: Oracle configuration
-            chain: Which chain to operate on - "vault_chain" or "hyperliquid"
         """
         self.config = config
-        self._chain = chain
 
     @property
     @abstractmethod
@@ -42,10 +32,9 @@ class BaseAssetAdapter(ABC):
         ...
 
     @property
-    @abstractmethod
-    def chain(self) -> AdapterChain:
+    def chain(self) -> str:
         """Return which chain this adapter operates on."""
-        ...
+        return "vault_chain"
 
     @abstractmethod
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:

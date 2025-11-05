@@ -100,8 +100,6 @@ async def run_report(state: AppState, vault_address: str) -> None:
         "Starting report",
         extra={
             "vault": vault_address,
-            "hyperliquid_env": s.hyperliquid_env,
-            "cctp_env": s.cctp_env,
             "dry_run": s.dry_run,
         },
     )
