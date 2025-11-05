@@ -2,11 +2,7 @@
 # This file demonstrates a comprehensive configuration example, including basic settings, RPC endpoints, logging, adapters, rate limiting, and pre-checks.
 
 vault_address = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
-hyperliquid_env = "mainnet"  # Options: mainnet, testnet
-cctp_env = "mainnet"         # Options: mainnet, testnet
-
 vault_rpc = "https://ethereum-rpc.publicnode.com"
-hl_rpc = "https://api.hyperliquid.xyz/evm"
 
 dry_run = true
 log_level = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -14,16 +10,14 @@ log_level = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 # Configure additional adapters per subvault
 # By default, idle_balances adapter runs on ALL subvaults on the vault chain
 
-# Example 1: Hyperliquid subvault with portfolio + idle USDC check
+# Example: Additional idle_balances reporting for a specific subvault
 [[subvault_adapters]]
 subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
-chain = "hyperliquid"  # This subvault is on Hyperliquid chain
-additional_adapters = ["hyperliquid", "idle_balances"]
-# hyperliquid adapter: Fetch HL portfolio value
-# idle_balances adapter: Check USDC not yet sent to hypercore (uses chain="hyperliquid")
+chain = "vault_chain"
+additional_adapters = ["idle_balances"]
+# idle_balances adapter: Check USDC not yet sent to hypercore
 skip_idle_balances = false  # Still run default vault_chain idle_balances
 skip_subvault_existence_check = false  # Validate this subvault exists in the vault contract
-
 
 # RPC rate limiting (optional)
 max_calls = 3
@@ -33,5 +27,7 @@ rpc_jitter = 0.10
 
 # Pre-check configuration (optional)
 ignore_empty_vault = false
+ignore_timeout_check = true
+ignore_active_proposal_check = true
 pre_check_retries = 3
 pre_check_timeout = 12.0

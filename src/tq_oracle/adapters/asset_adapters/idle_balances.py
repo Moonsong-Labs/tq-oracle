@@ -15,34 +15,27 @@ from ...abi import (
 )
 from ...logger import get_logger
 from ...settings import OracleSettings
-from .base import AdapterChain, AssetData, BaseAssetAdapter
+from .base import AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
 
 
 class IdleBalancesAdapter(BaseAssetAdapter):
-    """Adapter for querying Idle Balances assets from L1 or Hyperliquid chain."""
+    """Adapter for querying idle balances on the vault chain."""
 
     eth_address: str
     usdc_address: str
 
-    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
+    def __init__(self, config: OracleSettings):
         """Initialize the adapter.
 
         Args:
             config: Oracle configuration
-            chain: Which chain to query - "vault_chain" or "hyperliquid"
         """
-        super().__init__(config, chain=chain)
+        super().__init__(config)
 
-        if chain == "hyperliquid":
-            if not config.hl_rpc:
-                raise ValueError("hl_rpc must be configured to use hyperliquid chain")
-            self.w3 = Web3(Web3.HTTPProvider(config.hl_rpc))
-            self.block_number = config.hl_block_number_required
-        else:
-            self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
-            self.block_number = config.block_number_required
+        self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc_required))
+        self.block_number = config.block_number_required
 
         assets = config.assets
         logger.debug(f"Assets available: {assets}")
@@ -77,12 +70,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         return "idle_balances"
 
     @property
-    def chain(self) -> AdapterChain:
-        return (
-            AdapterChain.HYPERLIQUID
-            if self._chain == "hyperliquid"
-            else AdapterChain.VAULT_CHAIN
-        )
+    def chain(self) -> str:
+        return "vault_chain"
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch idle balances for the given subvault on the configured chain.
@@ -93,24 +82,6 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         Returns:
             List of AssetData objects containing asset addresses and balances
         """
-        if self._chain == "hyperliquid":
-            logger.debug(
-                "Fetching HL USDC idle balance for subvault %s",
-                subvault_address,
-            )
-            if self.config.hyperliquid_usdc_address is None:
-                raise ValueError("hyperliquid_usdc_address must be set in config")
-            usdc_address = self.config.hyperliquid_usdc_address
-            usdc_asset = await self._fetch_asset_balance(
-                self.w3, subvault_address, usdc_address
-            )
-            # For reporting purposes, we translate the Hyperliquid USDC address to the canonical L1 USDC address.
-            # This ensures consistency in asset reporting across chains.
-            usdc_asset = AssetData(
-                asset_address=self.usdc_address, amount=usdc_asset.amount
-            )
-            return [usdc_asset]
-
         supported_assets = await self._fetch_supported_assets()
 
         logger.debug(
@@ -142,8 +113,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         subvault_addresses = await self._fetch_subvault_addresses()
         vault_addresses = [self.config.vault_address_required] + subvault_addresses
         logger.info(
-            "Fetching %s idle balances for main vault + %d subvaults",
-            self._chain,
+            "Fetching vault-chain idle balances for main vault + %d subvaults",
             len(subvault_addresses),
         )
 
