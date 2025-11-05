@@ -33,7 +33,6 @@ async def run_pre_checks(
 
     This runs adapter-based checks including:
     - Safe state validation (already published, pending vote)
-    - CCTP bridge in-flight detection
     - Other adapter checks
     """
     logger.info("Running pre-checks...")

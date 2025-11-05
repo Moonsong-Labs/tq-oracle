@@ -133,7 +133,6 @@ async def collect_assets(ctx: PipelineContext) -> None:
                 return config
         return {
             "subvault_address": subvault_address,
-            "chain": "vault_chain",
             "additional_adapters": [],
             "skip_idle_balances": False,
         }
@@ -145,7 +144,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
     )
 
     if should_run_default_idle_balances:
-        idle_vault_adapter = IdleBalancesAdapter(s, chain="vault_chain")
+        idle_vault_adapter = IdleBalancesAdapter(s)
         asset_fetch_tasks.append(
             ("idle_balances_vault_chain", idle_vault_adapter.fetch_all_assets())
         )
@@ -156,15 +155,13 @@ async def collect_assets(ctx: PipelineContext) -> None:
         subvault_addr: str, adapter_name: str
     ) -> tuple[str, Any, str] | None:
         """Create an adapter instance for the given subvault and adapter name."""
-        sv_config = get_subvault_config(subvault_addr)
         adapter_class = get_adapter_class(adapter_name)
-        adapter = adapter_class(s, chain=sv_config.get("chain", "vault_chain"))
+        adapter = adapter_class(s)
 
         log.debug(
-            "Subvault %s → additional adapter: %s (chain: %s)",
+            "Subvault %s → additional adapter: %s",
             subvault_addr,
             adapter_name,
-            sv_config.get("chain", "vault_chain"),
         )
         return (subvault_addr, adapter, adapter_name)
 

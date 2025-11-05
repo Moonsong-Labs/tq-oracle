@@ -43,7 +43,6 @@ class OracleSettings(BaseSettings):
     # --- global toggles ---
     dry_run: bool = True
 
-
     # --- core addresses / endpoints ---
     vault_address: str | None = None
     oracle_helper_address: str | None = None
