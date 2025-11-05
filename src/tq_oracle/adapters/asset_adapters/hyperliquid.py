@@ -1,18 +1,33 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
+import importlib.util
 import math
 import time
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
-from hyperliquid.info import Info
-
-from ...constants import HL_MAX_PORTFOLIO_STALENESS_SECONDS
+from ...constants import (
+    HL_MAINNET_API_URL,
+    HL_MAX_PORTFOLIO_STALENESS_SECONDS,
+    HL_TESTNET_API_URL,
+    USDC_HL_MAINNET,
+    USDC_HL_TESTNET,
+)
 from ...logger import get_logger
 from ...settings import OracleSettings
 from .base import AdapterChain, AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
+
+module_spec = importlib.util.find_spec("hyperliquid.info")
+if module_spec is not None:
+    Info = getattr(importlib.import_module("hyperliquid.info"), "Info", None)
+else:  # pragma: no cover - dependency optional
+    Info = None
+
+HyperliquidEnv = Literal["mainnet", "testnet"]
+HyperliquidInfo = Any
 
 
 class HyperliquidAdapter(BaseAssetAdapter):
@@ -27,6 +42,7 @@ class HyperliquidAdapter(BaseAssetAdapter):
 
     usdc_address: str
     api_url: str
+    _environment: str
 
     def __init__(self, config: OracleSettings, chain: str = "hyperliquid"):
         """Initialize the Hyperliquid adapter.
@@ -36,15 +52,37 @@ class HyperliquidAdapter(BaseAssetAdapter):
             chain: Which chain to operate on (defaults to "hyperliquid")
         """
         super().__init__(config, chain=chain)
+        info_cls = Info
+        if info_cls is None:
+            raise RuntimeError(
+                "Hyperliquid integration requires hyperliquid-python-sdk. Install the dependency before enabling support."
+            )
+        self._info_cls = info_cls
+
+        resolved_env: HyperliquidEnv = (
+            getattr(config, "hyperliquid_env", None) or "mainnet"
+        )
+        self._environment: HyperliquidEnv = resolved_env
+
         assets = config.assets
         usdc_address = assets["USDC"]
         if usdc_address is None:
             raise ValueError("USDC address is required for Hyperliquid adapter")
         self.usdc_address = usdc_address
-
-        if config.hyperliquid_api_url is None:
-            raise ValueError("hyperliquid_api_url must be set in config")
-        self.api_url = config.hyperliquid_api_url
+        resolved_api_url = getattr(config, "hyperliquid_api_url", None)
+        if resolved_api_url is None:
+            resolved_api_url = (
+                HL_TESTNET_API_URL
+                if self._environment == "testnet"
+                else HL_MAINNET_API_URL
+            )
+        self.api_url = resolved_api_url
+        resolved_hl_usdc = getattr(config, "hyperliquid_usdc_address", None)
+        if resolved_hl_usdc is None:
+            resolved_hl_usdc = (
+                USDC_HL_TESTNET if self._environment == "testnet" else USDC_HL_MAINNET
+            )
+        self._hl_usdc_address = resolved_hl_usdc
 
     @property
     def adapter_name(self) -> str:
@@ -74,16 +112,20 @@ class HyperliquidAdapter(BaseAssetAdapter):
                 is stale (older than HL_MAX_PORTFOLIO_STALENESS_SECONDS).
         """
         # Use config's hl_subvault_address if set, otherwise fall back to passed address
-        address_to_query = self.config.hl_subvault_address or subvault_address
+        hl_subvault_address = getattr(self.config, "hl_subvault_address", None)
+        address_to_query = hl_subvault_address or subvault_address
 
         logger.info(
             "Fetching Hyperliquid assets for %s (env=%s)",
             address_to_query,
-            self.config.hyperliquid_env,
+            self._environment,
         )
         logger.debug("Using API URL: %s", self.api_url)
 
-        info = await asyncio.to_thread(Info, base_url=self.api_url, skip_ws=True)
+        info_cls = getattr(self, "_info_cls", None)
+        if info_cls is None:
+            raise RuntimeError("Hyperliquid integration is disabled.")
+        info = await asyncio.to_thread(info_cls, base_url=self.api_url, skip_ws=True)
 
         try:
             logger.debug("Calling portfolio API to fetch latest NAV data...")

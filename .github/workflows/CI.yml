@@ -62,8 +62,8 @@ jobs:
       - *uv-sync
       - name: Run CLI with help flag
         run: uv run tq-oracle --help
-  
-  unittest:
+
+  unit-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,3 +73,28 @@ jobs:
       - name: Run unit tests with pytest
         run: uv run pytest
 
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - *uv-install
+      - *uv-python
+      - *uv-sync
+      - name: Run unit tests with pytest
+        run: uv run pytest --run-integration
+
+  live-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - *uv-install
+      - *uv-python
+      - *uv-sync
+      - name: Run against eth test vault
+        run: |
+          uv run tq-oracle --network mainnet \
+                           --ignore-empty-vault \
+                           --ignore-timeout-check \
+                           --ignore-active-proposal-check \
+                           --vault-rpc ${{ secrets.ETH_RPC }} \
+                             0xDbC81B33A23375A90c8Ba4039d5738CB6f56fE8d

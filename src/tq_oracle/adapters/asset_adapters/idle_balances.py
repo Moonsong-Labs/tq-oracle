@@ -36,12 +36,20 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         super().__init__(config, chain=chain)
 
         if chain == "hyperliquid":
-            if not config.hl_rpc:
-                raise ValueError("hl_rpc must be configured to use hyperliquid chain")
-            self.w3 = Web3(Web3.HTTPProvider(config.hl_rpc))
-            self.block_number = config.hl_block_number_required
+            hl_rpc = getattr(config, "hl_rpc", None)
+            if not hl_rpc:
+                raise RuntimeError(
+                    "Hyperliquid RPC is not configured. Re-enable Hyperliquid support before using this adapter."
+                )
+            self.w3 = Web3(Web3.HTTPProvider(hl_rpc))
+            hl_block_number = getattr(config, "hl_block_number", None)
+            if hl_block_number is None:
+                raise RuntimeError(
+                    "Hyperliquid block number is not configured. Re-enable Hyperliquid support before using this adapter."
+                )
+            self.block_number = hl_block_number
         else:
-            self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
+            self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc_required))
             self.block_number = config.block_number_required
 
         assets = config.assets
@@ -98,9 +106,14 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 "Fetching HL USDC idle balance for subvault %s",
                 subvault_address,
             )
-            if self.config.hyperliquid_usdc_address is None:
-                raise ValueError("hyperliquid_usdc_address must be set in config")
-            usdc_address = self.config.hyperliquid_usdc_address
+            hyperliquid_usdc_address = getattr(
+                self.config, "hyperliquid_usdc_address", None
+            )
+            if hyperliquid_usdc_address is None:
+                raise RuntimeError(
+                    "Hyperliquid USDC address is not configured. Re-enable Hyperliquid support before using this adapter."
+                )
+            usdc_address = hyperliquid_usdc_address
             usdc_asset = await self._fetch_asset_balance(
                 self.w3, subvault_address, usdc_address
             )

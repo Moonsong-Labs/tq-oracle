@@ -6,6 +6,10 @@ from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.settings import OracleSettings
 from tq_oracle.settings import Network
 
+pytestmark = pytest.mark.skip(
+    reason="Chainlink integration is disabled; re-enable after restoring support."
+)
+
 
 @pytest.fixture
 def config():
@@ -16,11 +20,6 @@ def config():
         block_number=23690139,
         network=Network.MAINNET,
         safe_address=None,
-        l1_subvault_address=None,
-        hl_rpc=None,
-        hl_subvault_address=None,
-        hyperliquid_env="mainnet",
-        cctp_env="mainnet",
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,

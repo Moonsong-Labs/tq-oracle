@@ -12,6 +12,10 @@ from tq_oracle.constants import (
 )
 from tq_oracle.settings import Network
 
+pytestmark = pytest.mark.skip(
+    reason="Hyperliquid integration is disabled; re-enable after restoring support."
+)
+
 
 @pytest.fixture
 def mainnet_config():

@@ -33,7 +33,7 @@ The CLI entry point uses Typer for command-line interface management. It:
 **Key Configuration:**
 
 - Network selection (mainnet, sepolia, base)
-- RPC endpoints (L1 and Hyperliquid)
+- RPC endpoints for vault network
 - Oracle and OracleHelper contract addresses
 - Safe multi-sig configuration
 - Dry-run vs production mode
@@ -55,7 +55,6 @@ The pipeline is the core orchestrator that sequences all oracle operations:
 Runs validation checks before processing TVL data to prevent race conditions and ensure data integrity:
 
 - **Safe State Check** (`check_adapters/safe_state.py`): TODO: Ensures no duplicate or pending reports
-- **CCTP Bridge Check** (`check_adapters/cctp_bridge.py`): Detects in-flight USDC transfers between L1 and Hyperliquid
 - **Timeout Check** (`check_adapters/timeout_check.py`): Verifies sufficient time has passed since last report
 - **Active Proposal Check** (`check_adapters/active_submit_report_proposal_check.py`): Checks for existing pending proposals
 
@@ -73,7 +72,6 @@ Discovers and aggregates asset holdings from multiple sources:
 **Supported Adapters** (`adapters/asset_adapters/`):
 
 - `IdleBalancesAdapter`: Checks for assets sat dormant in subvault
-- `HyperliquidAdapter`: Fetches portfolio value from Hyperliquid DEX
 
 #### 2.3 Pricing & Validation (`pipeline/pricing.py`)
 
@@ -172,7 +170,7 @@ sequenceDiagram
 ### Data Flow
 
 1. **Off-Chain Aggregation**:
-   - TQ Oracle queries multiple data sources (Hyperliquid API, L1 contracts, DEXs)
+   - TQ Oracle queries multiple data sources (vault chain contracts, DEXs, optional integrations)
    - Aggregates asset amounts across all subvaults
    - Fetches market prices from various sources
 
@@ -198,7 +196,8 @@ TQ Oracle uses a three-tier configuration system with precedence:
 
 - `vault_address`: Target vault to report on
 - `oracle_helper_address`: OracleHelper contract for price normalization
-- `vault_rpc` / `hl_rpc`: RPC endpoints for different chains (vault network and Hyperliquid)
+- `vault_rpc`: RPC endpoint for the vault network
+- `hl_rpc` (optional/disabled): Hyperliquid RPC endpoint reserved for future use
 - `safe_address`: Gnosis Safe for multi-sig submission
 - `private_key`: Signer key for proposing Safe transactions
 - `subvault_adapters`: Per-subvault adapter configuration
@@ -208,7 +207,7 @@ TQ Oracle uses a three-tier configuration system with precedence:
 Allows fine-grained control over which adapters run for each subvault via TOML configuration:
 
 - Specify target subvault address
-- Define which chain the subvault operates on (L1 or Hyperliquid)
+- Define which chain the subvault operates on (typically L1; Hyperliquid support requires re-enabling the integration)
 - List additional adapters to run for this subvault
 - Option to skip default idle balances check
 - Option to skip subvault existence validation

@@ -111,13 +111,15 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
         l1_w3 = None
         hl_w3 = None
         try:
-            if not self._config.l1_subvault_address:
+            l1_subvault_address = getattr(self._config, "l1_subvault_address", None)
+            if not l1_subvault_address:
                 return CheckResult(
                     passed=True,
                     message="Skipping CCTP bridge checks - L1 subvault address not configured",
                     retry_recommended=False,
                 )
-            if not self._config.hl_subvault_address:
+            hl_subvault_address = getattr(self._config, "hl_subvault_address", None)
+            if not hl_subvault_address:
                 return CheckResult(
                     passed=True,
                     message="Skipping CCTP bridge checks - HL subvault address not configured",
@@ -125,23 +127,26 @@ class CCTPBridgeAdapter(BaseCheckAdapter):
                 )
             logger.debug(f"Connecting to vault-chain RPC: {self._config.vault_rpc}")
             l1_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.vault_rpc))
-            logger.debug(f"Connecting to HL RPC: {self._config.hl_rpc}")
-            hl_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(self._config.hl_rpc))
+            hl_rpc = getattr(self._config, "hl_rpc", None)
+            if not hl_rpc:
+                return CheckResult(
+                    passed=True,
+                    message="Skipping CCTP bridge checks - Hyperliquid RPC not configured",
+                    retry_recommended=False,
+                )
+            logger.debug(f"Connecting to HL RPC: {hl_rpc}")
+            hl_w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(hl_rpc))
 
-            if self._config.cctp_token_messenger_address is None:
+            messenger_addr = getattr(self._config, "cctp_token_messenger_address", None)
+            if messenger_addr is None:
                 raise ValueError("cctp_token_messenger_address must be set in config")
-            messenger_addr = self._config.cctp_token_messenger_address
 
             abi_dir = Path(tq_oracle.__file__).parent / "abis"
             messenger_abi = load_abi(abi_dir / "TokenMessengerV2.json")
 
             messenger_checksum = l1_w3.to_checksum_address(messenger_addr)
-            l1_subvault_checksum = l1_w3.to_checksum_address(
-                self._config.l1_subvault_address
-            )
-            hl_subvault_checksum = hl_w3.to_checksum_address(
-                self._config.hl_subvault_address
-            )
+            l1_subvault_checksum = l1_w3.to_checksum_address(l1_subvault_address)
+            hl_subvault_checksum = hl_w3.to_checksum_address(hl_subvault_address)
 
             l1_messenger = l1_w3.eth.contract(
                 address=messenger_checksum, abi=messenger_abi

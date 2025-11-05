@@ -76,13 +76,8 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
         oracle_helper_address=oracle_helper,
         vault_rpc=provider,
         block_number=23690139,
-        l1_subvault_address=None,
         safe_address=None,
         safe_txn_srvc_api_key=None,
-        hl_rpc=None,
-        hl_subvault_address=None,
-        hyperliquid_env="mainnet",
-        cctp_env="mainnet",
         dry_run=True,
         private_key=None,
     )

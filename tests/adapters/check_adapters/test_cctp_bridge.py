@@ -24,6 +24,10 @@ MINT_RECIPIENT_BYTES32 = (
 RECIPIENT_ADDRESS = "0x8888888888888888888888888888888888888888"
 DEPOSITOR_ADDRESS = "0x1111111111111111111111111111111111111111"
 
+pytestmark = pytest.mark.skip(
+    reason="Hyperliquid integration is disabled; re-enable after restoring support."
+)
+
 
 @pytest.fixture
 def mock_w3():
@@ -339,7 +343,10 @@ def test_messenger_addresses_testnet():
         private_key=None,
         safe_address=None,
     )
-    assert testnet_config.cctp_token_messenger_address == TOKEN_MESSENGER_V2_TEST
+    assert (
+        # pyrefly: ignore
+        testnet_config.cctp_token_messenger_address == TOKEN_MESSENGER_V2_TEST
+    )
 
 
 @pytest.mark.asyncio

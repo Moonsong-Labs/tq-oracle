@@ -154,7 +154,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
     # 2. Add additional adapters per subvault
     def create_adapter_task(
         subvault_addr: str, adapter_name: str
-    ) -> tuple[str, Any, str]:
+    ) -> tuple[str, Any, str] | None:
         """Create an adapter instance for the given subvault and adapter name."""
         sv_config = get_subvault_config(subvault_addr)
         adapter_class = get_adapter_class(adapter_name)
@@ -179,13 +179,14 @@ async def collect_assets(ctx: PipelineContext) -> None:
                     sv_config["subvault_address"],
                 )
 
-    adapter_tasks: list[tuple[str, Any, str]] = [
-        create_adapter_task(subvault_addr, adapter_name)
-        for subvault_addr in subvaults_to_process
+    adapter_tasks: list[tuple[str, Any, str]] = []
+    for subvault_addr in subvaults_to_process:
         for adapter_name in get_subvault_config(subvault_addr).get(
             "additional_adapters", []
-        )
-    ]
+        ):
+            maybe_task = create_adapter_task(subvault_addr, adapter_name)
+            if maybe_task is not None:
+                adapter_tasks.append(maybe_task)
 
     log.info(
         "Fetching assets: %d adapter tasks + %d additional per-subvault tasks...",
