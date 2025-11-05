@@ -70,8 +70,7 @@ jobs:
       - *uv-install
       - *uv-python
       - *uv-sync
-      - name: Run unit tests with pytest
-        run: uv run pytest
+      - run: uv run pytest
 
   integration-test:
     runs-on: ubuntu-latest
@@ -80,8 +79,7 @@ jobs:
       - *uv-install
       - *uv-python
       - *uv-sync
-      - name: Run unit tests with pytest
-        run: uv run pytest --run-integration
+      - run: uv run pytest --run-integration
 
   live-run:
     runs-on: ubuntu-latest
