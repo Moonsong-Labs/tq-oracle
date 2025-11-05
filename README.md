@@ -73,6 +73,7 @@ All configuration options can be set via CLI arguments, environment variables, o
 | `--ignore-empty-vault/--require-nonempty-vault` | `TQ_ORACLE_IGNORE_EMPTY_VAULT` | `ignore_empty_vault` | `false` | Skip failure when vault holds zero assets |
 | `--ignore-timeout-check/--enforce-timeout-check/--enforce-timeout-check` | `TQ_ORACLE_IGNORE_TIMEOUT_CHECK` | `ignore_timeout_check` | `false` | Skip minimum interval guard between reports |
 | `--ignore-active-proposal-check/--enforce-active-proposal-check/--enforce-active-proposal-check` | `TQ_ORACLE_IGNORE_ACTIVE_PROPOSAL_CHECK` | `ignore_active_proposal_check` | `false` | Skip duplicate active proposal guard |
+| `--log-level` | `TQ_ORACLE_LOG_LEVEL` | `log_level` | `"INFO"` | Override logging verbosity (`TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
 | `--show-config` | - | - | `false` | Dump effective configuration (with secrets redacted) and exit |
 
 #### TOML-Only Options (Not available via CLI)
@@ -139,6 +140,12 @@ tq-oracle --network sepolia 0xYourVaultAddress
 
 ```bash
 tq-oracle --show-config
+```
+
+**Increase verbosity for debugging:**
+
+```bash
+tq-oracle --log-level DEBUG
 ```
 
 **Common Usage Patterns:**

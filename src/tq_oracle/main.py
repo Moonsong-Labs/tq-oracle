@@ -121,6 +121,13 @@ def report(
             help="Skip guard preventing duplicate active proposals.",
         ),
     ] = None,
+    log_level: Annotated[
+        str | None,
+        typer.Option(
+            "--log-level",
+            help="Override logging verbosity (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL).",
+        ),
+    ] = None,
     show_config: Annotated[
         bool,
         typer.Option(
@@ -152,6 +159,8 @@ def report(
         init_kwargs["ignore_timeout_check"] = ignore_timeout_check
     if ignore_active_proposal_check is not None:
         init_kwargs["ignore_active_proposal_check"] = ignore_active_proposal_check
+    if log_level is not None:
+        init_kwargs["log_level"] = log_level.upper()
 
     settings = OracleSettings(**init_kwargs)
 

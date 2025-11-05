@@ -96,5 +96,6 @@ jobs:
                            --ignore-empty-vault \
                            --ignore-timeout-check \
                            --ignore-active-proposal-check \
+                           --log-level debug \
                            --vault-rpc ${{ secrets.ETH_RPC }} \
                              0xDbC81B33A23375A90c8Ba4039d5738CB6f56fE8d
