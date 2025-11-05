@@ -11,6 +11,7 @@ from ...abi import (
     load_stakewise_os_token_controller_abi,
     load_stakewise_vault_abi,
 )
+from ...constants import STAKEWISE_ADDRESSES
 from ...logger import get_logger
 from ...settings import OracleSettings
 from .base import AssetData, BaseAssetAdapter
@@ -21,7 +22,7 @@ logger = get_logger(__name__)
 class StakeWiseAdapter(BaseAssetAdapter):
     """Adapter for StakeWise vault positions (staking + boost)."""
 
-    def __init__(self, config: OracleSettings):
+    def __init__(self, config: OracleSettings, *, vault_address: str | None = None):
         super().__init__(config)
 
         rpc_url = config.vault_rpc_required
@@ -29,22 +30,55 @@ class StakeWiseAdapter(BaseAssetAdapter):
         if not self.w3.is_connected():
             raise ConnectionError(f"Failed to connect to RPC: {rpc_url}")
 
-        vault_address = config.stakewise_vault_address or config.vault_address_required
-        controller_address = config.stakewise_os_token_vault_controller
-        strategy_address = config.stakewise_leverage_strategy_address
-        debt_asset = config.stakewise_debt_asset
-        os_token_address = config.stakewise_os_token_address
+        stakewise_defaults = STAKEWISE_ADDRESSES.get(config.network.value)
+        network_assets = config.assets
 
-        if (
-            not controller_address
-            or not strategy_address
-            or not debt_asset
-            or not os_token_address
-        ):
+        vault_address = (
+            vault_address
+            or config.stakewise_vault_address
+            or (stakewise_defaults.get("vault") if stakewise_defaults else None)
+        )
+
+        controller_address = config.stakewise_os_token_vault_controller or (
+            stakewise_defaults["controller"] if stakewise_defaults else None
+        )
+        strategy_address = config.stakewise_leverage_strategy_address or (
+            stakewise_defaults["leverage_strategy"] if stakewise_defaults else None
+        )
+        debt_asset = (
+            config.stakewise_debt_asset
+            or (stakewise_defaults["debt_asset"] if stakewise_defaults else None)
+            or (network_assets.get("WETH") if network_assets else None)
+        )
+        os_token_address = config.stakewise_os_token_address or (
+            stakewise_defaults["os_token"] if stakewise_defaults else None
+        )
+
+        missing_fields = []
+        if not vault_address:
+            missing_fields.append("stakewise_vault_address")
+        if not controller_address:
+            missing_fields.append("stakewise_os_token_vault_controller")
+        if not strategy_address:
+            missing_fields.append("stakewise_leverage_strategy_address")
+        if not debt_asset:
+            missing_fields.append("stakewise_debt_asset")
+        if not os_token_address:
+            missing_fields.append("stakewise_os_token_address")
+
+        if missing_fields:
             raise ValueError(
-                "stakewise_os_token_vault_controller, stakewise_leverage_strategy_address, "
-                "stakewise_debt_asset, and stakewise_os_token_address must be configured"
+                "Missing StakeWise configuration values: "
+                f"{', '.join(missing_fields)}. Provide them via configuration or"
+                f" ensure defaults exist for network '{config.network.value}'."
             )
+
+        # Narrow Optional types for attributes after validation above.
+        assert isinstance(vault_address, str)
+        assert isinstance(controller_address, str)
+        assert isinstance(strategy_address, str)
+        assert isinstance(debt_asset, str)
+        assert isinstance(os_token_address, str)
 
         self.block_identifier = config.block_number_required
         eth_asset = config.assets["ETH"]

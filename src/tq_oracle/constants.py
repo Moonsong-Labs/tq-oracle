@@ -1,6 +1,6 @@
 """Blockchain contract address constants."""
 
-from typing import Optional, TypedDict
+from typing import Optional, TypedDict, cast
 
 
 class NetworkAssets(TypedDict):
@@ -10,6 +10,16 @@ class NetworkAssets(TypedDict):
     ETH: Optional[str]
     WETH: Optional[str]
     WSTETH: Optional[str]
+
+
+class StakewiseAddresses(TypedDict):
+    """Hard-coded StakeWise contract addresses per network."""
+
+    os_token: str
+    controller: str
+    leverage_strategy: str
+    debt_asset: str
+    vault: str
 
 
 ETH_ASSET = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
@@ -59,6 +69,18 @@ DEFAULT_BASE_RPC_URL = "https://mainnet.base.org"
 MAINNET_ORACLE_HELPER = "0x000000005F543c38d5ea6D0bF10A50974Eb55E35"
 SEPOLIA_ORACLE_HELPER = "0x65464fe20562C22B2802B4094d3E042E18b5dfC2"
 BASE_ORACLE_HELPER = "0x9bB327889402AC19BF2D164eA79CcfE46c16a37B"
+
+STAKEWISE_MAINNET_ADDRESSES: StakewiseAddresses = {
+    "os_token": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
+    "controller": "0x2A261e60FB14586B474C208b1B7AC6D0f5000306",
+    "leverage_strategy": "0x7575BC9E5168f27B97F9028905A2Adf91d2fF53d",
+    "debt_asset": cast(str, ETH_MAINNET_ASSETS["WETH"]),
+    "vault": "0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08",
+}
+
+STAKEWISE_ADDRESSES: dict[str, StakewiseAddresses] = {
+    "mainnet": STAKEWISE_MAINNET_ADDRESSES,
+}
 
 
 TOKEN_MESSENGER_V2_PROD = "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"

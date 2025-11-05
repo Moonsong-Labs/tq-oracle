@@ -138,11 +138,39 @@ class OracleSettings(BaseSettings):
             def __init__(self, settings_cls: type[BaseSettings], path: Path | None):
                 super().__init__(settings_cls)
                 self._path = path
+                self._root_keys = {
+                    name
+                    for name in settings_cls.model_fields.keys()
+                    if not name.startswith("_")
+                    and name not in {"subvault_adapters", "using_default_rpc"}
+                }
 
             def get_field_value(
                 self, field: Any, field_name: str
             ) -> tuple[Any, str, bool]:
                 return None, "", False
+
+            def _promote_root_keys(self, body: dict[str, Any]) -> None:
+                """Promote misplaced root-level settings from subvault adapters."""
+                adapters = body.get("subvault_adapters")
+                if not isinstance(adapters, list):
+                    return
+
+                cleaned_adapters: list[Any] = []
+                for adapter in adapters:
+                    if not isinstance(adapter, dict):
+                        cleaned_adapters.append(adapter)
+                        continue
+
+                    cleaned_entry: dict[str, Any] = {}
+                    for key, value in adapter.items():
+                        if key in self._root_keys:
+                            body.setdefault(key, value)
+                        else:
+                            cleaned_entry[key] = value
+                    cleaned_adapters.append(cleaned_entry)
+
+                body["subvault_adapters"] = cleaned_adapters
 
             def __call__(self) -> dict[str, Any]:
                 if not self._path:
@@ -164,6 +192,8 @@ class OracleSettings(BaseSettings):
                 body = data.get("tq_oracle", data)
                 if not isinstance(body, dict):
                     return {}
+
+                self._promote_root_keys(body)
 
                 # Check for secrets in config file
                 secret_fields = {"private_key", "safe_txn_srvc_api_key"}
