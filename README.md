@@ -102,9 +102,6 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 **Available Asset Adapters:**
 
 - `idle_balances` - Checks for idle USDC balances not yet deployed
-- `hyperliquid` *(disabled)* - See the restore checklist before re-enabling
-
-
 
 See `tq-oracle-example.toml` for complete configuration examples.
 
