@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import random
+
 import backoff
 from web3 import Web3
-from web3.exceptions import ProviderConnectionError
+from web3.contract import Contract
+from web3.exceptions import ContractLogicError, ProviderConnectionError
 
 from ...abi import (
+    load_erc20_abi,
     load_stakewise_leverage_strategy_abi,
     load_stakewise_os_token_controller_abi,
     load_stakewise_vault_abi,
@@ -104,6 +107,11 @@ class StakeWiseAdapter(BaseAssetAdapter):
             address=self.strategy_address, abi=strategy_abi
         )
 
+        erc20_abi = load_erc20_abi()
+        self.os_token_contract: Contract = self.w3.eth.contract(
+            address=self.w3.to_checksum_address(self.os_token_address), abi=erc20_abi
+        )
+
         self._rpc_sem = asyncio.Semaphore(getattr(config, "max_calls", 5))
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
         self._rpc_jitter = getattr(config, "rpc_jitter", 0.10)
@@ -155,6 +163,15 @@ class StakeWiseAdapter(BaseAssetAdapter):
             block_identifier=self.block_identifier,
         )
 
+    async def _token_balance(self, contract: Contract, account: str) -> int:
+        balance_fn = getattr(getattr(contract, "functions", None), "balanceOf", None)
+        if balance_fn is None:
+            return 0
+        return await self._rpc(
+            balance_fn(account).call,
+            block_identifier=self.block_identifier,
+        )
+
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         user = self.w3.to_checksum_address(subvault_address)
 
@@ -170,8 +187,9 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         proxy_assets = 0
         proxy_os_token_assets = 0
+        proxy_os_token_shares = 0
         borrowed_assets = 0
-        supplied_os_token_assets = 0
+        supplied_os_token_shares = 0
 
         if proxy_address and int(proxy_address, 16) != 0:
             proxy = self.w3.to_checksum_address(proxy_address)
@@ -181,39 +199,65 @@ class StakeWiseAdapter(BaseAssetAdapter):
             proxy_os_token_shares = await self._os_token_shares(proxy)
             proxy_os_token_assets = await self._os_token_assets(proxy_os_token_shares)
 
-            borrowed_assets, supplied_os_token_shares = await self._rpc(
-                self.strategy.functions.getBorrowState(proxy).call,
-                block_identifier=self.block_identifier,
-            )
-            supplied_os_token_assets = await self._os_token_assets(
-                supplied_os_token_shares
-            )
+            try:
+                borrowed_assets, supplied_os_token_shares = await self._rpc(
+                    self.strategy.functions.getBorrowState(proxy).call,
+                    block_identifier=self.block_identifier,
+                )
+            except (ContractLogicError, ValueError):  # pragma: no cover - defensive
+                borrowed_assets, supplied_os_token_shares = 0, 0
 
         total_eth = user_assets + proxy_assets
-        total_os_token = user_os_token_assets + proxy_os_token_assets
+
+        # osToken accounting: treat minted positions as debt and track actual holdings.
+        user_os_token_balance = await self._token_balance(self.os_token_contract, user)
+        proxy_os_token_balance = 0
+        if proxy_address and int(proxy_address, 16) != 0:
+            proxy_os_token_balance = await self._token_balance(
+                self.os_token_contract, proxy
+            )
+
+        held_os_token_shares = (
+            user_os_token_balance
+            + proxy_os_token_balance
+            + supplied_os_token_shares
+        )
+        held_os_token_assets = await self._os_token_assets(held_os_token_shares)
+
+        total_minted_os_token_shares = user_os_token_shares + proxy_os_token_shares
+        minted_os_token_assets = await self._os_token_assets(total_minted_os_token_shares)
 
         assets: list[AssetData] = []
         if total_eth:
             assets.append(
                 AssetData(asset_address=self.eth_asset, amount=int(total_eth))
             )
-        if total_os_token:
+        if held_os_token_assets:
             assets.append(
                 AssetData(
-                    asset_address=self.os_token_address, amount=int(total_os_token)
+                    asset_address=self.os_token_address, amount=int(held_os_token_assets)
+                )
+            )
+        if minted_os_token_assets:
+            assets.append(
+                AssetData(
+                    asset_address=self.os_token_address,
+                    amount=-int(minted_os_token_assets),
                 )
             )
         if borrowed_assets:
             assets.append(
-                AssetData(asset_address=self.debt_asset, amount=int(borrowed_assets))
+                AssetData(
+                    asset_address=self.debt_asset, amount=-int(borrowed_assets)
+                )
             )
         logger.debug(
-            "StakeWise summary for %s — eth=%d, osToken=%d, borrowed=%d, supplied_osToken=%d",
+            "StakeWise summary for %s — eth=%d, held_osToken=%d, minted_osToken=%d, borrowed=%d",
             user,
             total_eth,
-            total_os_token,
+            held_os_token_assets,
+            minted_os_token_assets,
             borrowed_assets,
-            supplied_os_token_assets,
         )
 
         return assets

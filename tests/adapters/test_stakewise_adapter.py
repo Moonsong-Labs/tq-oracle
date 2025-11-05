@@ -90,13 +90,19 @@ async def test_stakewise_adapter_collects_balances(monkeypatch):
 
     assets = await adapter.fetch_assets(user)
 
-    assert len(assets) == 3
+    assert len(assets) == 4
     eth_asset = next(a for a in assets if a.asset_address == adapter.eth_asset)
-    os_token_asset = next(
+    os_token_assets = [
         a for a in assets if a.asset_address == adapter.os_token_address
-    )
+    ]
     debt_asset = next(a for a in assets if a.asset_address == adapter.debt_asset)
 
     assert eth_asset.amount == 60  # (10 + 20) * 2
-    assert os_token_asset.amount == 36  # (5 + 7) * 3
-    assert debt_asset.amount == 11
+    # Held osToken (supplied shares only in test): 7 * 3 = 21
+    held_entry = next(a for a in os_token_assets if a.amount > 0)
+    assert held_entry.amount == 21
+    # Minted osToken debt: (5 + 7) * 3 = 36, recorded as liability
+    debt_entry = next(a for a in os_token_assets if a.amount < 0)
+    assert debt_entry.amount == -36
+    # Borrowed assets are treated as liabilities
+    assert debt_asset.amount == -11
