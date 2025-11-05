@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import random
-
 import backoff
 from web3 import Web3
 from web3.exceptions import ProviderConnectionError
@@ -14,7 +13,7 @@ from ...abi import (
 )
 from ...logger import get_logger
 from ...settings import OracleSettings
-from .base import AdapterChain, AssetData, BaseAssetAdapter
+from .base import AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
 
@@ -22,8 +21,8 @@ logger = get_logger(__name__)
 class StakeWiseAdapter(BaseAssetAdapter):
     """Adapter for StakeWise vault positions (staking + boost)."""
 
-    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
-        super().__init__(config, chain=chain)
+    def __init__(self, config: OracleSettings):
+        super().__init__(config)
 
         rpc_url = config.vault_rpc_required
         self.w3 = Web3(Web3.HTTPProvider(rpc_url))
@@ -78,10 +77,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
     @property
     def adapter_name(self) -> str:
         return "stakewise"
-
-    @property
-    def chain(self) -> AdapterChain:
-        return AdapterChain.VAULT_CHAIN
 
     @backoff.on_exception(
         backoff.expo,

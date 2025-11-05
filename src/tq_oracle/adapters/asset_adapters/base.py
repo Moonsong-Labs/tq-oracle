@@ -31,11 +31,6 @@ class BaseAssetAdapter(ABC):
         """Return the name of this adapter."""
         ...
 
-    @property
-    def chain(self) -> str:
-        """Return which chain this adapter operates on."""
-        return "vault_chain"
-
     @abstractmethod
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch asset data for the given subvault."""
