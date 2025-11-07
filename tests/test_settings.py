@@ -55,3 +55,25 @@ def test_promotes_root_flags_from_subvault_block(tmp_path, monkeypatch):
             "additional_adapters": ["idle_balances"],
         }
     ]
+
+
+def test_idle_balances_extra_tokens_loaded(tmp_path, monkeypatch):
+    """Ensure idle balance extra token addresses load from config."""
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        dedent(
+            """
+            [idle_balances]
+            extra_tokens = { osETH = "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38" }
+            """
+        ).strip()
+    )
+
+    monkeypatch.setenv("TQ_ORACLE_CONFIG", str(config_path))
+
+    settings = OracleSettings()
+
+    assert settings.idle_balances.extra_tokens == {
+        "osETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
+    }

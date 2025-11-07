@@ -10,6 +10,10 @@ log_level = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 # Configure additional adapters per subvault
 # By default, idle_balances adapter runs on ALL subvaults on the vault chain
 
+# Optional: Provide additional token contracts for idle balance reporting
+[idle_balances]
+extra_tokens = { osETH = "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38" }
+
 # Example: Additional idle_balances reporting for a specific subvault
 [[subvault_adapters]]
 subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"

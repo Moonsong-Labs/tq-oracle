@@ -48,6 +48,32 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             raise ValueError("USDC address is required for IdleBalances adapter")
         self.usdc_address = usdc_address
 
+        self._additional_assets: list[str] = []
+        self._additional_asset_lookup: set[str] = set()
+        self._additional_assets_by_symbol: dict[str, str] = {}
+        extra_tokens = getattr(config.idle_balances, "extra_tokens", {})
+        for symbol, address in extra_tokens.items():
+            if not address:
+                logger.warning(
+                    "idle_balances.extra_tokens entry for '%s' is empty; skipping",
+                    symbol,
+                )
+                continue
+            try:
+                checksum_address = self.w3.to_checksum_address(address)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid address configured for idle_balances.extra_tokens['{symbol}']: {address}"
+                ) from exc
+            self._additional_assets.append(checksum_address)
+            self._additional_asset_lookup.add(checksum_address.lower())
+            self._additional_assets_by_symbol[symbol] = checksum_address
+        if self._additional_assets:
+            logger.debug(
+                "Idle balances additional tokens configured: %s",
+                self._additional_assets_by_symbol,
+            )
+
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
         self._rpc_jitter = getattr(self.config, "rpc_jitter", 0.10)  # seconds
@@ -87,7 +113,12 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         )
 
         asset_tasks = [
-            self._fetch_asset_balance(self.w3, subvault_address, asset_addr)
+            self._fetch_asset_balance(
+                self.w3,
+                subvault_address,
+                asset_addr,
+                asset_addr.lower() in self._additional_asset_lookup,
+            )
             for asset_addr in supported_assets
         ]
 
@@ -196,7 +227,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         oracle_address = get_oracle_address_from_vault(
             self.config.vault_address_required, self.config.vault_rpc_required
         )
-        return await self._fetch_contract_list(
+        raw_assets = await self._fetch_contract_list(
             contract_address=oracle_address,
             abi=oracle_abi,
             count_function="supportedAssets",
@@ -204,8 +235,41 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             item_type="supported asset",
         )
 
+        base_assets: list[str] = []
+        for asset in raw_assets:
+            try:
+                checksum = self.w3.to_checksum_address(asset)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Skipping unsupported asset address %r from oracle contract",
+                    asset,
+                )
+                continue
+            base_assets.append(checksum)
+        return self._merge_supported_assets(base_assets)
+
+    def _merge_supported_assets(self, base_assets: list[str]) -> list[str]:
+        """Merge contract supported assets with configured additional assets."""
+        combined: list[str] = []
+        seen: set[str] = set()
+
+        for address in [*base_assets, *self._additional_assets]:
+            if not isinstance(address, str):
+                continue
+            normalized = address.lower()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            combined.append(address)
+
+        return combined
+
     async def _fetch_asset_balance(
-        self, w3: Web3, subvault_address: str, asset_address: str
+        self,
+        w3: Web3,
+        subvault_address: str,
+        asset_address: str,
+        tvl_only: bool = False,
     ) -> AssetData:
         """Fetch the balance of an asset for the given subvault."""
         checksum_subvault_address = w3.to_checksum_address(subvault_address)
@@ -227,4 +291,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 block_identifier=self.block_number,
             )
 
-        return AssetData(asset_address=asset_address, amount=balance)
+        return AssetData(
+            asset_address=asset_address,
+            amount=balance,
+            tvl_only=tvl_only,
+        )

@@ -107,3 +107,47 @@ async def test_fetch_eth_balance_integration(config):
     assert eth_asset.asset_address == ETH_ASSET
     assert isinstance(eth_asset.amount, int)
     assert eth_asset.amount >= 0
+
+
+def test_merge_supported_assets_includes_configured_tokens(config):
+    config.idle_balances.extra_tokens = {
+        "osETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
+    }
+    adapter = IdleBalancesAdapter(config)
+
+    base_asset = adapter.w3.to_checksum_address(
+        "0x0000000000000000000000000000000000000001"
+    )
+    merged = adapter._merge_supported_assets([base_asset])
+
+    assert merged[0] == base_asset
+    assert any(
+        addr.lower() == "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38"
+        for addr in merged
+    )
+
+
+@pytest.mark.asyncio
+async def test_fetch_assets_marks_extra_tokens_tvl_only(config, monkeypatch):
+    config.idle_balances.extra_tokens = {
+        "osETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
+    }
+    adapter = IdleBalancesAdapter(config)
+
+    extra_token = next(iter(adapter._additional_assets))
+    base_token = adapter.eth_address
+
+    async def fake_fetch_supported_assets():
+        return [base_token, extra_token]
+
+    async def fake_fetch_asset_balance(_w3, _subvault, asset_address, tvl_only=False):
+        return AssetData(asset_address=asset_address, amount=1, tvl_only=tvl_only)
+
+    monkeypatch.setattr(adapter, "_fetch_supported_assets", fake_fetch_supported_assets)
+    monkeypatch.setattr(adapter, "_fetch_asset_balance", fake_fetch_asset_balance)
+
+    assets = await adapter.fetch_assets("0xSubvault")
+
+    report_flags = {asset.asset_address: asset.tvl_only for asset in assets}
+    assert report_flags[extra_token] is True
+    assert report_flags[base_token] is False

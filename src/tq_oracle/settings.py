@@ -13,7 +13,14 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
 from dotenv import load_dotenv
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -29,6 +36,14 @@ class Network(str, Enum):
     MAINNET = "mainnet"
     SEPOLIA = "sepolia"
     BASE = "base"
+
+
+class IdleBalancesSettings(BaseModel):
+    """Configuration options for idle balance collection."""
+
+    extra_tokens: dict[str, str] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class OracleSettings(BaseSettings):
@@ -83,8 +98,9 @@ class OracleSettings(BaseSettings):
     # --- logging ---
     log_level: str = "INFO"
 
-    # --- subvault adapters (from config file only) ---
+    # --- adapters (from config file only) ---
     subvault_adapters: list[dict[str, Any]] = []
+    idle_balances: IdleBalancesSettings = Field(default_factory=IdleBalancesSettings)
 
     # --- stakewise ---
     stakewise_vault_address: str | None = None

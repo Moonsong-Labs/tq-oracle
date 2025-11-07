@@ -12,6 +12,7 @@ class AssetData:
 
     asset_address: str
     amount: int  # in native units
+    tvl_only: bool = False
 
 
 class BaseAssetAdapter(ABC):

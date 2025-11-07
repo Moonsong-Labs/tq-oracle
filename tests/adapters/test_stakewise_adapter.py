@@ -84,25 +84,35 @@ async def test_stakewise_adapter_collects_balances(monkeypatch):
             functions=SimpleNamespace(
                 getStrategyProxy=lambda *_: _Call(proxy),
                 getBorrowState=lambda *_: _Call((11, 7)),
+                getVaultState=lambda *_: _Call((40, 12)),
+                isStrategyProxyExiting=lambda *_: _Call(True),
+                getProxyExitState=lambda *_: _Call((5, 4)),
             )
         ),
     )
 
     assets = await adapter.fetch_assets(user)
 
-    assert len(assets) == 4
-    eth_asset = next(a for a in assets if a.asset_address == adapter.eth_asset)
-    os_token_assets = [
-        a for a in assets if a.asset_address == adapter.os_token_address
-    ]
-    debt_asset = next(a for a in assets if a.asset_address == adapter.debt_asset)
+    eth_amount = sum(
+        asset.amount for asset in assets if asset.asset_address == adapter.eth_asset
+    )
+    os_amount = sum(
+        asset.amount
+        for asset in assets
+        if asset.asset_address == adapter.os_token_address
+    )
 
-    assert eth_asset.amount == 60  # (10 + 20) * 2
-    # Held osToken (supplied shares only in test): 7 * 3 = 21
-    held_entry = next(a for a in os_token_assets if a.amount > 0)
-    assert held_entry.amount == 21
-    # Minted osToken debt: (5 + 7) * 3 = 36, recorded as liability
-    debt_entry = next(a for a in os_token_assets if a.amount < 0)
-    assert debt_entry.amount == -36
-    # Borrowed assets are treated as liabilities
-    assert debt_asset.amount == -11
+    # (20 + 40 + 5) - 11 = 54 net ETH exposure
+    assert eth_amount == 54
+    # (21 + 12) - 17 shares = 16 net osETH (assets - liabilities in shares)
+    assert os_amount == 16
+
+    # Ensure liabilities are represented with negative entries
+    assert any(
+        asset.amount < 0 and asset.asset_address == adapter.eth_asset
+        for asset in assets
+    )
+    assert any(
+        asset.amount < 0 and asset.asset_address == adapter.os_token_address
+        for asset in assets
+    )

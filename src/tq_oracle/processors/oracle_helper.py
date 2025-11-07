@@ -32,6 +32,7 @@ async def derive_final_prices(
     config: OracleSettings,
     total_assets: int,
     price_data: PriceData,
+    excluded_assets: set[str] | None = None,
 ) -> FinalPrices:
     """Derive final prices via OracleHelper contract.
 
@@ -50,6 +51,13 @@ async def derive_final_prices(
 
     vault = Web3.to_checksum_address(config.vault_address)
     asset_prices = encode_asset_prices(price_data).asset_prices
+    if excluded_assets:
+        excluded_lower = {addr.lower() for addr in excluded_assets}
+        asset_prices = [
+            (addr, price)
+            for addr, price in asset_prices
+            if addr.lower() not in excluded_lower
+        ]
     block_number = config.block_number_required
 
     try:
