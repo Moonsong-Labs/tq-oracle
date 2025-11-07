@@ -21,6 +21,7 @@ STAKEWISE_OS_TOKEN_CONTROLLER_ABI_PATH = (
     ABIS_DIR / "StakeWiseOsTokenVaultController.json"
 )
 STAKEWISE_LEVERAGE_STRATEGY_ABI_PATH = ABIS_DIR / "StakeWiseLeverageStrategy.json"
+STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH = ABIS_DIR / "StakeWiseOsTokenVaultEscrow.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -91,6 +92,11 @@ def load_stakewise_os_token_controller_abi() -> list[dict]:
 def load_stakewise_leverage_strategy_abi() -> list[dict]:
     """Load the StakeWise leverage strategy ABI."""
     return load_abi(STAKEWISE_LEVERAGE_STRATEGY_ABI_PATH)
+
+
+def load_stakewise_os_token_vault_escrow_abi() -> list[dict]:
+    """Load the StakeWise osToken vault escrow ABI."""
+    return load_abi(STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH)
 
 
 def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumAddress:

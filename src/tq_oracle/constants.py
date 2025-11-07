@@ -18,6 +18,7 @@ class StakewiseAddresses(TypedDict):
     os_token: str
     controller: str
     leverage_strategy: str
+    os_token_vault_escrow: str
     debt_asset: str
     vault: str
 
@@ -74,6 +75,7 @@ STAKEWISE_MAINNET_ADDRESSES: StakewiseAddresses = {
     "os_token": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
     "controller": "0x2A261e60FB14586B474C208b1B7AC6D0f5000306",
     "leverage_strategy": "0x7575BC9E5168f27B97F9028905A2Adf91d2fF53d",
+    "os_token_vault_escrow": "0x09e84205DF7c68907e619D07aFD90143c5763605",
     "debt_asset": cast(str, ETH_MAINNET_ASSETS["WETH"]),
     "vault": "0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08",
 }

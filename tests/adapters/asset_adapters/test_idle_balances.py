@@ -122,8 +122,7 @@ def test_merge_supported_assets_includes_configured_tokens(config):
 
     assert merged[0] == base_asset
     assert any(
-        addr.lower() == "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38"
-        for addr in merged
+        addr.lower() == "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38" for addr in merged
     )
 
 

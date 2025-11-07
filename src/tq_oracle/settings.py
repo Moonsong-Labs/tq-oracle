@@ -108,6 +108,8 @@ class OracleSettings(BaseSettings):
     stakewise_os_token_vault_controller: str | None = None
     stakewise_os_token_address: str | None = None
     stakewise_debt_asset: str | None = None
+    stakewise_os_token_vault_escrow: str | None = None
+    stakewise_leverage_strategy_deploy_block: int | None = None
 
     # --- runtime computed values ---
     using_default_rpc: bool = False

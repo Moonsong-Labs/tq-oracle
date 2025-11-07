@@ -3,7 +3,10 @@ from typing import Any, cast
 
 import pytest
 
-from tq_oracle.adapters.asset_adapters.stakewise import StakeWiseAdapter
+from tq_oracle.adapters.asset_adapters.stakewise import (
+    ExitExposure,
+    StakeWiseAdapter,
+)
 from tq_oracle.settings import OracleSettings
 
 
@@ -25,6 +28,10 @@ async def test_stakewise_adapter_collects_balances(monkeypatch):
         @staticmethod
         def to_checksum_address(value: str) -> str:  # pragma: no cover - trivial
             return value
+
+        @staticmethod
+        def keccak(*_args, **_kwargs):  # pragma: no cover - trivial
+            return b"\x00" * 32
 
     monkeypatch.setattr(
         "tq_oracle.adapters.asset_adapters.stakewise.Web3",
@@ -50,25 +57,13 @@ async def test_stakewise_adapter_collects_balances(monkeypatch):
     shares_map = {user: 10, proxy: 20}
     os_token_shares_map = {user: 5, proxy: 7}
 
-    async def fake_vault_shares(self, account):
-        return shares_map.get(account, 0)
-
-    async def fake_vault_assets(self, shares):
-        return shares * 2
-
-    async def fake_os_token_shares(self, account):
-        return os_token_shares_map.get(account, 0)
-
-    async def fake_os_token_assets(self, shares):
-        return shares * 3
+    async def fake_exit_exposure(self, user_address, proxy_address):
+        return ExitExposure(eth=5, os_token_shares=4)
 
     async def direct_rpc(self, fn, *args, **kwargs):
         return fn(*args, **kwargs)
 
-    adapter._vault_shares = fake_vault_shares.__get__(adapter, StakeWiseAdapter)
-    adapter._vault_assets = fake_vault_assets.__get__(adapter, StakeWiseAdapter)
-    adapter._os_token_shares = fake_os_token_shares.__get__(adapter, StakeWiseAdapter)
-    adapter._os_token_assets = fake_os_token_assets.__get__(adapter, StakeWiseAdapter)
+    adapter._get_exit_exposure = fake_exit_exposure.__get__(adapter, StakeWiseAdapter)
     adapter._rpc = direct_rpc.__get__(adapter, StakeWiseAdapter)
 
     class _Call:
@@ -78,6 +73,22 @@ async def test_stakewise_adapter_collects_balances(monkeypatch):
         def call(self, *args, **kwargs):
             return self._result
 
+    adapter.vault = cast(
+        Any,
+        SimpleNamespace(
+            functions=SimpleNamespace(
+                getShares=lambda account: _Call(shares_map.get(account, 0)),
+                convertToAssets=lambda shares: _Call(shares * 2),
+                osTokenPositions=lambda account: _Call(
+                    os_token_shares_map.get(account, 0)
+                ),
+            )
+        ),
+    )
+    adapter.os_token_contract = cast(
+        Any,
+        SimpleNamespace(functions=SimpleNamespace(balanceOf=lambda account: _Call(0))),
+    )
     adapter.strategy = cast(
         Any,
         SimpleNamespace(
@@ -85,8 +96,6 @@ async def test_stakewise_adapter_collects_balances(monkeypatch):
                 getStrategyProxy=lambda *_: _Call(proxy),
                 getBorrowState=lambda *_: _Call((11, 7)),
                 getVaultState=lambda *_: _Call((40, 12)),
-                isStrategyProxyExiting=lambda *_: _Call(True),
-                getProxyExitState=lambda *_: _Call((5, 4)),
             )
         ),
     )
@@ -104,8 +113,8 @@ async def test_stakewise_adapter_collects_balances(monkeypatch):
 
     # (20 + 40 + 5) - 11 = 54 net ETH exposure
     assert eth_amount == 54
-    # (21 + 12) - 17 shares = 16 net osETH (assets - liabilities in shares)
-    assert os_amount == 16
+    # (7 supplied + 4 exit + 0 loose) - (17 minted + 4 exit) = -10 net osETH shares
+    assert os_amount == -10
 
     # Ensure liabilities are represented with negative entries
     assert any(
