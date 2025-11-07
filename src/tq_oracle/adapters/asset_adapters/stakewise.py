@@ -120,10 +120,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self._is_strategy_proxy_exiting_fn = getattr(
             self.strategy.functions, "isStrategyProxyExiting", None
         )
-        self._exit_event_topic = self.w3.keccak(
-            text="ExitQueueEntered(address,address,uint256,uint256,uint256,uint256)"
-        )
-        self._vault_topic = self._address_topic(self.vault_address)
         self._exit_log_chunk = 200
         self._strategy_deploy_block = (
             strategy_deploy_block
@@ -228,16 +224,12 @@ class StakeWiseAdapter(BaseAssetAdapter):
         checksum = self.w3.to_checksum_address(address)
         return self.w3.eth.contract(address=checksum, abi=list(abi))
 
-    @staticmethod
-    def _address_topic(address: str) -> str:
-        return "0x" + address.lower().removeprefix("0x").zfill(64)
-
     async def _fetch_latest_exit_position(self, user: str) -> ExitQueuePosition | None:
         cached = self._exit_position_cache.get(user)
         if cached:
             return cached
 
-        user_topic = self._address_topic(user)
+        exit_event = self.strategy.events.ExitQueueEntered()
         to_block = self.block_identifier
         min_block = self._strategy_deploy_block
 
@@ -249,18 +241,16 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 from_block,
                 to_block,
             )
-            params = {
-                "address": self.strategy_address,
-                "fromBlock": from_block,
-                "toBlock": to_block,
-                "topics": [
-                    self._exit_event_topic,
-                    self._vault_topic,
-                    user_topic,
-                ],
-            }
             try:
-                logs = await self._rpc(self.w3.eth.get_logs, params)
+                logs = await self._rpc(
+                    exit_event.get_logs,
+                    fromBlock=from_block,
+                    toBlock=to_block,
+                    argument_filters={
+                        "vault": self.vault_address,
+                        "user": user,
+                    },
+                )
             except ValueError as exc:  # pragma: no cover - provider variance
                 logger.warning(
                     "StakeWise exit log query failed — user=%s chunk=[%d,%d] err=%s",
@@ -277,8 +267,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
                     logs,
                     key=lambda entry: (entry["blockNumber"], entry["logIndex"]),
                 )
-                processed = self.strategy.events.ExitQueueEntered().process_log(latest)
-                args = processed["args"]
+                args = latest["args"]
                 position = ExitQueuePosition(
                     ticket=int(args["positionTicket"]),
                     timestamp=int(args["timestamp"]),
