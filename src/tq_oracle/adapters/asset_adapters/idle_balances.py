@@ -48,51 +48,37 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             raise ValueError("USDC address is required for IdleBalances adapter")
         self.usdc_address = usdc_address
 
-        self._additional_assets: list[str] = []
-        self._additional_asset_lookup: set[str] = set()
-        self._additional_assets_by_symbol: dict[str, str] = {}
         idle_cfg = config.adapters.idle_balances
-        extra_tokens = idle_cfg.extra_tokens
-        for symbol, address in extra_tokens.items():
-            if not address:
-                logger.warning(
-                    "idle_balances.extra_tokens entry for '%s' is empty; skipping",
-                    symbol,
-                )
-                continue
-            try:
-                checksum_address = self.w3.to_checksum_address(address)
-            except ValueError as exc:
-                raise ValueError(
-                    f"Invalid address configured for idle_balances.extra_tokens['{symbol}']: {address}"
-                ) from exc
-            self._additional_assets.append(checksum_address)
-            self._additional_asset_lookup.add(checksum_address.lower())
-            self._additional_assets_by_symbol[symbol] = checksum_address
+
+        self._additional_assets_by_symbol: dict[str, str] = {
+            symbol: self.w3.to_checksum_address(address)
+            for symbol, address in idle_cfg.extra_tokens.items()
+            if address
+        }
+        self._additional_assets: list[str] = list(
+            self._additional_assets_by_symbol.values()
+        )
+        self._additional_asset_lookup: set[str] = {
+            addr.lower() for addr in self._additional_assets
+        }
         if self._additional_assets:
             logger.debug(
                 "Idle balances additional tokens configured: %s",
                 self._additional_assets_by_symbol,
             )
 
-        self._extra_addresses: list[str] = []
-        self._extra_addresses_lookup: set[str] = set()
-        for address in idle_cfg.extra_addresses:
-            if not address:
-                logger.warning(
-                    "idle_balances.extra_addresses contains an empty entry; skipping"
-                )
-                continue
-            try:
-                checksum = self.w3.to_checksum_address(address)
-            except ValueError as exc:
-                raise ValueError(
-                    f"Invalid address configured in idle_balances.extra_addresses: {address}"
-                ) from exc
-            if checksum.lower() in self._extra_addresses_lookup:
-                continue
-            self._extra_addresses.append(checksum)
-            self._extra_addresses_lookup.add(checksum.lower())
+        extra_address_candidates = [
+            self.w3.to_checksum_address(address)
+            for address in idle_cfg.extra_addresses
+            if address
+        ]
+
+        deduped_addresses: dict[str, str] = {}
+        for checksum in extra_address_candidates:
+            deduped_addresses.setdefault(checksum.lower(), checksum)
+
+        self._extra_addresses = list(deduped_addresses.values())
+        self._extra_addresses_lookup = set(deduped_addresses.keys())
         if self._extra_addresses:
             logger.debug(
                 "Idle balances extra addresses configured: %s",
