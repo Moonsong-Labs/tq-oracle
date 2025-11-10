@@ -31,7 +31,7 @@ async def run_price_validations(
         PriceValidationError: If any price validation fails
 
     This runs price validator checks including:
-    - Chainlink price deviation validation
+    - Pyth price deviation validation
     - Other price validators as they are added
     """
     logger.info("Running price validations...")

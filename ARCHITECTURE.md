@@ -49,7 +49,7 @@ flowchart TD
 - Results are combined asynchronously and folded into `AggregatedAssets` via `processors/asset_aggregator.py`.
 
 ### Pricing & Validation (`pipeline/pricing.py`, `adapters/price_adapters/*`, `adapters/price_validators/pyth.py`)
-- Price adapters are instantiated from `PRICE_ADAPTERS` (currently `CowSwapAdapter` for general assets and `ETHAdapter` for ETH/WETH; `ChainlinkAdapter` is available but not in the default list).
+- Price adapters are instantiated from `PRICE_ADAPTERS` (currently `CowSwapAdapter` for general assets and `ETHAdapter` for ETH/WETH;).
 - Each adapter updates a shared `PriceData` accumulator keyed by asset address (base asset must already be known).
 - `run_price_validations()` invokes validators from `PRICE_VALIDATORS`. The active `PythValidator` re-fetches prices through the Pyth Hermes API, compares deviations against configurable warning/failure tolerances, and can be disabled via `pyth_enabled=False`.
 - `processors/total_assets.calculate_total_assets()` multiplies balances by prices (18-decimal math) and raises if any asset lacks a quote.
