@@ -174,13 +174,8 @@ Before processing TVL data, TQ Oracle runs automated pre-flight validation check
 
 - **Safe State Validation**: Ensures no duplicate or pending reports exist
 - **Check Retry Logic**: Automatically retries failed checks with exponential backoff when recommended
-- **CCTP Bridge Detection** *(disabled)*: Re-enable via the checklist when cross-chain monitoring is required
 
 These checks prevent race conditions and ensure accurate TVL snapshots by detecting ongoing cross-chain transfers that could affect asset balances. You can bypass individual guards when needed via the CLI flags `--ignore-empty-vault`, `--ignore-timeout-check/--enforce-timeout-check`, and `--ignore-active-proposal-check/--enforce-active-proposal-check`.
-
-### Testing CCTP Bridge Detection
-
-A standalone test script is available in `scripts/check_cctp_inflight.py` and can be used once the CCTP integration is re-enabled.
 
 ## Adding New Adapters
 
@@ -235,5 +230,3 @@ Validators respect tolerance thresholds configured in `settings.py`:
 ## External Links
 
 - `flexible-vaults` [repo](https://github.com/mellow-finance/flexible-vaults)
-- `cctp-v2` [contracts](https://github.com/circlefin/evm-cctp-contracts/tree/master/src/v2)
-- DeBridge [contracts](https://github.com/debridge-finance/dln-contracts/tree/main/contracts/DLN)
