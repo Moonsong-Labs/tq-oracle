@@ -57,14 +57,21 @@ class AccountState:
 class ExitExposure:
     staked_eth: int = 0
     eth_in_queue: int = 0
-    eth_ready: int = 0
+    eth_claimable: int = 0
     os_shares_liability: int = 0
     escrow_os_shares: int = 0
     ticket_count: int = 0
 
     @property
     def eth_collateral(self) -> int:
-        return self.staked_eth + self.eth_in_queue + self.eth_ready
+        return self.staked_eth + self.eth_in_queue + self.eth_claimable
+
+
+@dataclass(frozen=True, slots=True)
+class StakewiseVaultContext:
+    address: str
+    contract: Contract
+    exit_events: list[ContractEvent]
 
 
 class StakeWiseAdapter(BaseAssetAdapter):
@@ -74,13 +81,14 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self,
         config: OracleSettings,
         *,
-        vault_address: str | None = None,
+        stakewise_vault_address: str | None = None,
+        stakewise_vault_addresses: list[str] | None = None,
     ):
         super().__init__(config)
 
         self.w3 = self._build_web3(config.vault_rpc_required)
 
-        resolved = self._resolve_addresses(config, vault_address)
+        resolved = self._resolve_addresses(config, stakewise_vault_address)
 
         self.block_identifier = config.block_number_required
         self.eth_asset = self._resolve_eth_asset(config)
@@ -88,11 +96,14 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self.os_token_vault_escrow_address = self.w3.to_checksum_address(
             resolved.os_token_vault_escrow
         )
-        self.vault_address = self.w3.to_checksum_address(resolved.vault)
+        resolved_vaults = stakewise_vault_addresses or [stakewise_vault_address or resolved.vault]
+        if not resolved_vaults:
+            raise ValueError("StakeWise adapter requires at least one vault address")
 
-        self.vault = self._build_contract(
-            self.vault_address, load_stakewise_vault_abi()
-        )
+        self.vault_contexts: list[StakewiseVaultContext] = [
+            self._build_vault_context(address) for address in resolved_vaults
+        ]
+        self.vault_address = self.vault_contexts[0].address
         self.os_token_vault_escrow: Contract = self._build_contract(
             self.os_token_vault_escrow_address,
             load_stakewise_os_token_vault_escrow_abi(),
@@ -105,12 +116,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
         self._rpc_jitter = getattr(config, "rpc_jitter", 0.10)
         self._block_timestamp_cache: dict[int, int] = {}
-
-        # Vault versions emit either ExitQueueEntered or V2ExitQueueEntered.
-        self._exit_events: list[ContractEvent] = [self.vault.events.ExitQueueEntered()]
-        v2_event = getattr(self.vault.events, "V2ExitQueueEntered", None)
-        if callable(v2_event):
-            self._exit_events.append(cast(ContractEvent, v2_event()))
 
     @property
     def adapter_name(self) -> str:
@@ -139,18 +144,44 @@ class StakeWiseAdapter(BaseAssetAdapter):
             self.block_identifier,
         )
 
-        user_state = await self._fetch_account_state(user)
-        tickets = await self._scan_exit_queue_tickets(user)
-        exposure = await self._compute_exit_exposure(user_state, tickets)
+        total_staked = 0
+        total_queue = 0
+        total_claimable = 0
+        total_os_liabilities = 0
+        total_escrow_shares = 0
+        total_tickets = 0
 
-        assets: list[AssetData] = []
-        self._append_asset(assets, self.eth_asset, exposure.eth_collateral)
-        if exposure.os_shares_liability:
-            self._append_asset(
-                assets, self.os_token_address, -exposure.os_shares_liability
+        for context in self.vault_contexts:
+            user_state = await self._fetch_account_state(context.contract, user)
+            tickets = await self._scan_exit_queue_tickets(context, user)
+            exposure = await self._compute_exit_exposure(
+                context, user_state, tickets
             )
 
-        self._log_summary(user, exposure)
+            total_staked += exposure.staked_eth
+            total_queue += exposure.eth_in_queue
+            total_claimable += exposure.eth_claimable
+            total_os_liabilities += exposure.os_shares_liability
+            total_escrow_shares += exposure.escrow_os_shares
+            total_tickets += exposure.ticket_count
+
+        aggregated = ExitExposure(
+            staked_eth=total_staked,
+            eth_in_queue=total_queue,
+            eth_claimable=total_claimable,
+            os_shares_liability=total_os_liabilities,
+            escrow_os_shares=total_escrow_shares,
+            ticket_count=total_tickets,
+        )
+
+        assets: list[AssetData] = []
+        self._append_asset(assets, self.eth_asset, aggregated.eth_collateral)
+        if aggregated.os_shares_liability:
+            self._append_asset(
+                assets, self.os_token_address, -aggregated.os_shares_liability
+            )
+
+        self._log_summary(user, aggregated)
         return assets
 
     @staticmethod
@@ -198,14 +229,28 @@ class StakeWiseAdapter(BaseAssetAdapter):
         checksum = self.w3.to_checksum_address(address)
         return self.w3.eth.contract(address=checksum, abi=list(abi))
 
-    async def _fetch_account_state(self, account: str) -> AccountState:
+    def _build_vault_context(self, address: str) -> StakewiseVaultContext:
+        contract = self._build_contract(address, load_stakewise_vault_abi())
+        exit_events: list[ContractEvent] = [contract.events.ExitQueueEntered()]
+        v2_event = getattr(contract.events, "V2ExitQueueEntered", None)
+        if callable(v2_event):
+            exit_events.append(cast(ContractEvent, v2_event()))
+        return StakewiseVaultContext(
+            address=self.w3.to_checksum_address(address),
+            contract=contract,
+            exit_events=exit_events,
+        )
+
+    async def _fetch_account_state(
+        self, vault_contract: Contract, account: str
+    ) -> AccountState:
         shares, os_shares = await asyncio.gather(
             self._rpc(
-                self.vault.functions.getShares(account).call,
+                vault_contract.functions.getShares(account).call,
                 block_identifier=self.block_identifier,
             ),
             self._rpc(
-                self.vault.functions.osTokenPositions(account).call,
+                vault_contract.functions.osTokenPositions(account).call,
                 block_identifier=self.block_identifier,
             ),
         )
@@ -213,26 +258,28 @@ class StakeWiseAdapter(BaseAssetAdapter):
             0
             if not shares
             else await self._rpc(
-                self.vault.functions.convertToAssets(shares).call,
+                vault_contract.functions.convertToAssets(shares).call,
                 block_identifier=self.block_identifier,
             )
         )
         return AccountState(assets=int(assets), os_shares=int(os_shares))
 
-    async def _scan_exit_queue_tickets(self, user: str) -> list[ExitQueueTicket]:
-        if not self._exit_events:
+    async def _scan_exit_queue_tickets(
+        self, context: StakewiseVaultContext, user: str
+    ) -> list[ExitQueueTicket]:
+        if not context.exit_events:
             return []
 
         tickets: dict[int, ExitQueueTicket] = {}
         min_block = self._resolve_min_block()
 
         iterations = 0
-
+        logger.info(f"StakeWise exit queue scan start for {context.address}, this might take some time...")
         for from_block, to_block in self._block_ranges(
             self.block_identifier, min_block
         ):
             iterations += 1
-            for event in self._exit_events:
+            for event in context.exit_events:
                 logs = await self._get_exit_logs(event, user, from_block, to_block)
                 for log in logs:
                     args = log["args"]
@@ -264,7 +311,8 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         ordered = sorted(tickets.values(), key=lambda t: (t.block_number, t.log_index))
         logger.info(
-            "StakeWise exit queue scan completed — user=%s tickets=%d iterations=%d",
+            "StakeWise exit queue scan completed — vault=%s user=%s tickets=%d iterations=%d",
+            context.address,
             user,
             len(ordered),
             iterations,
@@ -308,62 +356,70 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
     async def _compute_exit_exposure(
         self,
+        context: StakewiseVaultContext,
         user_state: AccountState,
         tickets: list[ExitQueueTicket],
     ) -> ExitExposure:
         eth_in_queue = 0
-        eth_ready = 0
+        eth_claimable = 0
         escrow_os_shares = 0
 
         for ticket in tickets:
             ticket_assets = ticket.assets_hint
             if ticket_assets is None:
                 ticket_assets = await self._rpc(
-                    self.vault.functions.convertToAssets(ticket.shares).call,
+                    context.contract.functions.convertToAssets(ticket.shares).call,
                     block_identifier=self.block_identifier,
                 )
                 ticket_assets = int(ticket_assets)
 
             if ticket.receiver == self.os_token_vault_escrow_address:
-                escrow_state = await self._fetch_escrow_state(ticket.ticket)
+                escrow_state = await self._fetch_escrow_state(
+                    context.address, ticket.ticket
+                )
                 if escrow_state is None:
                     continue
                 os_shares, exited_assets = escrow_state
                 escrow_os_shares += os_shares
-                eth_ready += exited_assets
+                eth_claimable += exited_assets
                 continue
 
-            exit_queue_index = await self._fetch_exit_queue_index(ticket.ticket)
+            exit_queue_index = await self._fetch_exit_queue_index(
+                context.contract, ticket.ticket
+            )
             if exit_queue_index is None or exit_queue_index < 0:
-                eth_ready += ticket_assets
+                eth_in_queue += ticket_assets
                 continue
 
             exited_assets = min(
                 ticket_assets,
                 await self._calculate_exited_assets(
+                    context.contract,
                     ticket.receiver,
                     ticket.ticket,
                     ticket.timestamp,
                     exit_queue_index,
                 ),
             )
-            eth_ready += exited_assets
+            eth_claimable += exited_assets
             eth_in_queue += ticket_assets - exited_assets
 
         os_liabilities = user_state.os_shares + escrow_os_shares
         return ExitExposure(
             staked_eth=user_state.assets,
             eth_in_queue=eth_in_queue,
-            eth_ready=eth_ready,
+            eth_claimable=eth_claimable,
             os_shares_liability=os_liabilities,
             escrow_os_shares=escrow_os_shares,
             ticket_count=len(tickets),
         )
 
-    async def _fetch_exit_queue_index(self, ticket: int) -> int | None:
+    async def _fetch_exit_queue_index(
+        self, vault_contract: Contract, ticket: int
+    ) -> int | None:
         try:
             index = await self._rpc(
-                self.vault.functions.getExitQueueIndex(ticket).call,
+                vault_contract.functions.getExitQueueIndex(ticket).call,
                 block_identifier=self.block_identifier,
             )
         except (ContractLogicError, ValueError):  # pragma: no cover - defensive
@@ -375,11 +431,16 @@ class StakeWiseAdapter(BaseAssetAdapter):
         return int(index)
 
     async def _calculate_exited_assets(
-        self, receiver: str, ticket: int, timestamp: int, exit_queue_index: int
+        self,
+        vault_contract: Contract,
+        receiver: str,
+        ticket: int,
+        timestamp: int,
+        exit_queue_index: int,
     ) -> int:
         try:
             _, _, exit_assets = await self._rpc(
-                self.vault.functions.calculateExitedAssets(
+                vault_contract.functions.calculateExitedAssets(
                     receiver,
                     ticket,
                     timestamp,
@@ -397,11 +458,13 @@ class StakeWiseAdapter(BaseAssetAdapter):
             )
             return 0
 
-    async def _fetch_escrow_state(self, ticket: int) -> tuple[int, int] | None:
+    async def _fetch_escrow_state(
+        self, vault_address: str, ticket: int
+    ) -> tuple[int, int] | None:
         try:
             owner, exited_assets, os_token_shares = await self._rpc(
                 self.os_token_vault_escrow.functions.getPosition(
-                    self.vault_address, ticket
+                    vault_address, ticket
                 ).call,
                 block_identifier=self.block_identifier,
             )
@@ -449,12 +512,12 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
     def _log_summary(self, user: str, exposure: ExitExposure) -> None:
         logger.debug(
-            "StakeWise summary for %s — eth_collateral=%d (staked=%d, queue=%d, ready=%d), os_liabilities=%d (escrow_shares=%d) tickets=%d",
+            "StakeWise summary for %s — eth_collateral=%d (staked=%d, queue=%d, claimable=%d), os_liabilities=%d (escrow_shares=%d) tickets=%d",
             user,
             exposure.eth_collateral,
             exposure.staked_eth,
             exposure.eth_in_queue,
-            exposure.eth_ready,
+            exposure.eth_claimable,
             exposure.os_shares_liability,
             exposure.escrow_os_shares,
             exposure.ticket_count,

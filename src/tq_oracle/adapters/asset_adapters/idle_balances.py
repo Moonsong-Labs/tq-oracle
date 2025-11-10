@@ -74,6 +74,30 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 self._additional_assets_by_symbol,
             )
 
+        self._extra_addresses: list[str] = []
+        self._extra_addresses_lookup: set[str] = set()
+        for address in getattr(config.idle_balances, "extra_addresses", []):
+            if not address:
+                logger.warning(
+                    "idle_balances.extra_addresses contains an empty entry; skipping"
+                )
+                continue
+            try:
+                checksum = self.w3.to_checksum_address(address)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid address configured in idle_balances.extra_addresses: {address}"
+                ) from exc
+            if checksum.lower() in self._extra_addresses_lookup:
+                continue
+            self._extra_addresses.append(checksum)
+            self._extra_addresses_lookup.add(checksum.lower())
+        if self._extra_addresses:
+            logger.debug(
+                "Idle balances extra addresses configured: %s",
+                self._extra_addresses,
+            )
+
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
         self._rpc_jitter = getattr(self.config, "rpc_jitter", 0.10)  # seconds
@@ -139,9 +163,16 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """
         subvault_addresses = await self._fetch_subvault_addresses()
         vault_addresses = [self.config.vault_address_required] + subvault_addresses
+        seen_addresses = {addr.lower() for addr in vault_addresses}
+        for extra_address in self._extra_addresses:
+            normalized = extra_address.lower()
+            if normalized not in seen_addresses:
+                vault_addresses.append(extra_address)
+                seen_addresses.add(normalized)
         logger.info(
-            "Fetching vault-chain idle balances for main vault + %d subvaults",
+            "Fetching vault-chain idle balances for main vault + %d subvaults + %d extra addresses",
             len(subvault_addresses),
+            len(vault_addresses) - 1 - len(subvault_addresses),
         )
 
         asset_results = await asyncio.gather(

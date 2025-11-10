@@ -150,3 +150,35 @@ async def test_fetch_assets_marks_extra_tokens_tvl_only(config, monkeypatch):
     report_flags = {asset.asset_address: asset.tvl_only for asset in assets}
     assert report_flags[extra_token] is True
     assert report_flags[base_token] is False
+
+
+@pytest.mark.asyncio
+async def test_fetch_all_assets_includes_extra_addresses(config, monkeypatch):
+    extra_address = "0x0000000000000000000000000000000000000009"
+    config.idle_balances.extra_addresses = [extra_address]
+    adapter = IdleBalancesAdapter(config)
+
+    async def fake_fetch_subvault_addresses():
+        return ["0x00000000000000000000000000000000000000AA"]
+
+    recorded: list[str] = []
+
+    async def fake_fetch_assets(address):
+        recorded.append(adapter.w3.to_checksum_address(address))
+        return [AssetData(asset_address="0xToken", amount=1)]
+
+    monkeypatch.setattr(
+        adapter,
+        "_fetch_subvault_addresses",
+        fake_fetch_subvault_addresses,
+    )
+    monkeypatch.setattr(adapter, "fetch_assets", fake_fetch_assets)
+
+    await adapter.fetch_all_assets()
+
+    expected = {
+        adapter.w3.to_checksum_address(config.vault_address_required),
+        adapter.w3.to_checksum_address("0x00000000000000000000000000000000000000AA"),
+        adapter.w3.to_checksum_address(extra_address),
+    }
+    assert set(recorded) == expected

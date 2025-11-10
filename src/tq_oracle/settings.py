@@ -42,6 +42,7 @@ class IdleBalancesSettings(BaseModel):
     """Configuration options for idle balance collection."""
 
     extra_tokens: dict[str, str] = Field(default_factory=dict)
+    extra_addresses: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
 

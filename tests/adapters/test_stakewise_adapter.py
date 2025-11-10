@@ -8,6 +8,7 @@ from web3.contract import Contract
 from tq_oracle.adapters.asset_adapters.stakewise import (
     ExitQueueTicket,
     StakeWiseAdapter,
+    StakewiseVaultContext,
 )
 from tq_oracle.settings import OracleSettings
 
@@ -85,7 +86,7 @@ def _build_adapter(dummy_web3) -> StakeWiseAdapter:
 async def test_stakewise_adapter_no_exit_queue(dummy_web3):
     adapter = _build_adapter(dummy_web3)
 
-    async def no_tickets(_self, _user):
+    async def no_tickets(_self, _context, _user):
         return []
 
     adapter._scan_exit_queue_tickets = no_tickets.__get__(adapter, StakeWiseAdapter)
@@ -98,7 +99,7 @@ async def test_stakewise_adapter_no_exit_queue(dummy_web3):
     shares_map = {"0xuser": 10}
     os_token_shares_map = {"0xuser": 4}
 
-    adapter.vault = cast(
+    dummy_contract = cast(
         Contract,
         SimpleNamespace(
             functions=SimpleNamespace(
@@ -107,9 +108,14 @@ async def test_stakewise_adapter_no_exit_queue(dummy_web3):
                 osTokenPositions=lambda account: _Call(
                     os_token_shares_map.get(account, 0)
                 ),
-            )
+            ),
+            events=DummyEvents(),
         ),
     )
+    adapter.vault_contexts = [
+        StakewiseVaultContext(address="0xvault", contract=dummy_contract, exit_events=[])
+    ]
+    adapter.vault_address = "0xvault"
 
     assets = await adapter.fetch_assets("0xuser")
 
@@ -127,7 +133,7 @@ async def test_stakewise_adapter_no_exit_queue(dummy_web3):
 async def test_stakewise_adapter_exit_queue_direct_receiver(dummy_web3):
     adapter = _build_adapter(dummy_web3)
 
-    async def tickets(_self, _user):
+    async def tickets(_self, _context, _user):
         return [
             ExitQueueTicket(
                 ticket=1,
@@ -146,12 +152,12 @@ async def test_stakewise_adapter_exit_queue_direct_receiver(dummy_web3):
 
     adapter._rpc = direct_rpc.__get__(adapter, StakeWiseAdapter)
 
-    async def fake_index(self, ticket):
+    async def fake_index(self, _contract, ticket):
         return 7
 
     adapter._fetch_exit_queue_index = fake_index.__get__(adapter, StakeWiseAdapter)
 
-    async def fake_exited(self, receiver, ticket, timestamp, index):
+    async def fake_exited(self, _contract, receiver, ticket, timestamp, index):
         return 4
 
     adapter._calculate_exited_assets = fake_exited.__get__(adapter, StakeWiseAdapter)
@@ -159,7 +165,7 @@ async def test_stakewise_adapter_exit_queue_direct_receiver(dummy_web3):
     shares_map = {"0xuser": 10}
     os_token_shares_map = {"0xuser": 4}
 
-    adapter.vault = cast(
+    dummy_contract = cast(
         Contract,
         SimpleNamespace(
             functions=SimpleNamespace(
@@ -168,9 +174,14 @@ async def test_stakewise_adapter_exit_queue_direct_receiver(dummy_web3):
                 osTokenPositions=lambda account: _Call(
                     os_token_shares_map.get(account, 0)
                 ),
-            )
+            ),
+            events=DummyEvents(),
         ),
     )
+    adapter.vault_contexts = [
+        StakewiseVaultContext(address="0xvault", contract=dummy_contract, exit_events=[])
+    ]
+    adapter.vault_address = "0xvault"
 
     assets = await adapter.fetch_assets("0xuser")
 
@@ -199,7 +210,7 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
         assets_hint=15,
     )
 
-    async def tickets(_self, _user):
+    async def tickets(_self, _context, _user):
         return [escrow_ticket]
 
     adapter._scan_exit_queue_tickets = tickets.__get__(adapter, StakeWiseAdapter)
@@ -209,7 +220,7 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
 
     adapter._rpc = direct_rpc.__get__(adapter, StakeWiseAdapter)
 
-    async def fake_escrow(self, ticket):
+    async def fake_escrow(self, _vault_address, ticket):
         return (8, 6)
 
     adapter._fetch_escrow_state = fake_escrow.__get__(adapter, StakeWiseAdapter)
@@ -217,7 +228,7 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
     shares_map = {"0xuser": 10}
     os_token_shares_map = {"0xuser": 4}
 
-    adapter.vault = cast(
+    dummy_contract = cast(
         Contract,
         SimpleNamespace(
             functions=SimpleNamespace(
@@ -226,9 +237,14 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
                 osTokenPositions=lambda account: _Call(
                     os_token_shares_map.get(account, 0)
                 ),
-            )
+            ),
+            events=DummyEvents(),
         ),
     )
+    adapter.vault_contexts = [
+        StakewiseVaultContext(address="0xvault", contract=dummy_contract, exit_events=[])
+    ]
+    adapter.vault_address = "0xvault"
 
     assets = await adapter.fetch_assets("0xuser")
 
