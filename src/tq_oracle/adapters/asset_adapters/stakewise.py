@@ -8,13 +8,19 @@ from typing import Iterable, Optional, cast
 import backoff
 from web3 import Web3
 from web3.contract import Contract
+from web3.contract.contract import ContractEvent
 from web3.exceptions import ContractLogicError, ProviderConnectionError
+from web3.types import EventData
 
 from ...abi import (
     load_stakewise_os_token_vault_escrow_abi,
     load_stakewise_vault_abi,
 )
-from ...constants import STAKEWISE_ADDRESSES
+from ...constants import (
+    STAKEWISE_ADDRESSES,
+    STAKEWISE_EXIT_LOG_CHUNK,
+    STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS,
+)
 from ...logger import get_logger
 from ...settings import OracleSettings
 from .base import AssetData, BaseAssetAdapter
@@ -92,18 +98,19 @@ class StakeWiseAdapter(BaseAssetAdapter):
             load_stakewise_os_token_vault_escrow_abi(),
         )
 
-        self._exit_log_chunk = 200
+        self._exit_log_chunk = STAKEWISE_EXIT_LOG_CHUNK
         self._exit_queue_start_block = config.stakewise_exit_queue_start_block or 0
+        self._exit_max_lookback_blocks = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
         self._rpc_sem = asyncio.Semaphore(getattr(config, "max_calls", 5))
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
         self._rpc_jitter = getattr(config, "rpc_jitter", 0.10)
         self._block_timestamp_cache: dict[int, int] = {}
 
         # Vault versions emit either ExitQueueEntered or V2ExitQueueEntered.
-        self._exit_events: list = [self.vault.events.ExitQueueEntered()]
+        self._exit_events: list[ContractEvent] = [self.vault.events.ExitQueueEntered()]
         v2_event = getattr(self.vault.events, "V2ExitQueueEntered", None)
         if callable(v2_event):
-            self._exit_events.append(v2_event())
+            self._exit_events.append(cast(ContractEvent, v2_event()))
 
     @property
     def adapter_name(self) -> str:
@@ -217,67 +224,65 @@ class StakeWiseAdapter(BaseAssetAdapter):
             return []
 
         tickets: dict[int, ExitQueueTicket] = {}
-        to_block = self.block_identifier
-        min_block = max(self._exit_queue_start_block, 0)
+        min_block = self._resolve_min_block()
 
-        while to_block >= min_block:
-            from_block = max(min_block, to_block - self._exit_log_chunk + 1)
-            logger.debug(
-                "StakeWise exit log scan — user=%s chunk=[%d,%d]",
-                user,
-                from_block,
-                to_block,
-            )
+        iterations = 0
+
+        for from_block, to_block in self._block_ranges(
+            self.block_identifier, min_block
+        ):
+            iterations += 1
             for event in self._exit_events:
                 logs = await self._get_exit_logs(event, user, from_block, to_block)
                 for log in logs:
                     args = log["args"]
                     ticket_id = int(args["positionTicket"])
-                    shares = int(args["shares"])
-                    receiver = self.w3.to_checksum_address(args["receiver"])
                     block_number = int(log["blockNumber"])
                     log_index = int(log["logIndex"])
-                    timestamp = await self._resolve_block_timestamp(block_number)
-                    assets_value = args.get("assets")
-                    assets_hint = (
-                        int(assets_value) if assets_value is not None else None
-                    )
 
                     existing = tickets.get(ticket_id)
-                    if existing and (
-                        existing.block_number > block_number
+                    if existing and not (
+                        block_number > existing.block_number
                         or (
-                            existing.block_number == block_number
-                            and existing.log_index >= log_index
+                            block_number == existing.block_number
+                            and log_index > existing.log_index
                         )
                     ):
                         continue
 
+                    timestamp = await self._resolve_block_timestamp(block_number)
+                    assets_value = args.get("assets")
                     tickets[ticket_id] = ExitQueueTicket(
                         ticket=ticket_id,
-                        shares=shares,
-                        receiver=receiver,
+                        shares=int(args["shares"]),
+                        receiver=self.w3.to_checksum_address(args["receiver"]),
                         block_number=block_number,
                         log_index=log_index,
                         timestamp=timestamp,
-                        assets_hint=assets_hint,
+                        assets_hint=None if assets_value is None else int(assets_value),
                     )
-            to_block = from_block - 1
 
         ordered = sorted(tickets.values(), key=lambda t: (t.block_number, t.log_index))
         logger.info(
-            "StakeWise exit queue scan completed — user=%s tickets=%d",
+            "StakeWise exit queue scan completed — user=%s tickets=%d iterations=%d",
             user,
             len(ordered),
+            iterations,
         )
         return ordered
 
-    async def _get_exit_logs(self, event, user: str, from_block: int, to_block: int):
+    async def _get_exit_logs(
+        self,
+        event: ContractEvent,
+        user: str,
+        from_block: int,
+        to_block: int,
+    ) -> list[EventData]:
         try:
             return await self._rpc(
                 event.get_logs,
-                fromBlock=from_block,
-                toBlock=to_block,
+                from_block=from_block,
+                to_block=to_block,
                 argument_filters={"owner": user},
             )
         except ValueError as exc:  # pragma: no cover - provider variance
@@ -311,13 +316,13 @@ class StakeWiseAdapter(BaseAssetAdapter):
         escrow_os_shares = 0
 
         for ticket in tickets:
-            initial_assets = ticket.assets_hint
-            if initial_assets is None:
-                initial_assets = await self._rpc(
+            ticket_assets = ticket.assets_hint
+            if ticket_assets is None:
+                ticket_assets = await self._rpc(
                     self.vault.functions.convertToAssets(ticket.shares).call,
                     block_identifier=self.block_identifier,
                 )
-            initial_assets = int(initial_assets)
+                ticket_assets = int(ticket_assets)
 
             if ticket.receiver == self.os_token_vault_escrow_address:
                 escrow_state = await self._fetch_escrow_state(ticket.ticket)
@@ -330,16 +335,20 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
             exit_queue_index = await self._fetch_exit_queue_index(ticket.ticket)
             if exit_queue_index is None or exit_queue_index < 0:
-                eth_ready += initial_assets
+                eth_ready += ticket_assets
                 continue
 
-            exited_assets = await self._calculate_exited_assets(
-                ticket.receiver, ticket.ticket, ticket.timestamp, exit_queue_index
+            exited_assets = min(
+                ticket_assets,
+                await self._calculate_exited_assets(
+                    ticket.receiver,
+                    ticket.ticket,
+                    ticket.timestamp,
+                    exit_queue_index,
+                ),
             )
-            exited_assets = min(exited_assets, initial_assets)
-            remaining = max(initial_assets - exited_assets, 0)
             eth_ready += exited_assets
-            eth_in_queue += remaining
+            eth_in_queue += ticket_assets - exited_assets
 
         os_liabilities = user_state.os_shares + escrow_os_shares
         return ExitExposure(
@@ -418,6 +427,20 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 return None
 
         return int(os_token_shares), int(exited_assets)
+
+    def _block_ranges(
+        self, start_block: int, min_block: int
+    ) -> Iterable[tuple[int, int]]:
+        to_block = start_block
+        while to_block >= min_block:
+            from_block = max(min_block, to_block - self._exit_log_chunk + 1)
+            yield from_block, to_block
+            to_block = from_block - 1
+
+    def _resolve_min_block(self) -> int:
+        lookback_floor = max(self.block_identifier - self._exit_max_lookback_blocks, 0)
+        configured_floor = max(self._exit_queue_start_block, 0)
+        return max(lookback_floor, configured_floor)
 
     @staticmethod
     def _append_asset(assets: list[AssetData], address: str, amount: int) -> None:
