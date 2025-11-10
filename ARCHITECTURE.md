@@ -2,256 +2,106 @@
 
 ## Overview
 
-TQ Oracle is a Python-based off-chain oracle system that collects Total Value Locked (TVL) data from vault protocols and submits price reports to the Mellow Finance flexible-vaults ecosystem. It acts as a trusted data feed that enables accurate TVL tracking for vaults that hold assets across multiple chains and protocols.
+TQ Oracle is a Typer-based CLI that orchestrates an off-chain pipeline for producing Total Value Locked (TVL) and price reports for Mellow flexible vaults. The tool queries vault + subvault contracts, aggregates idle balances via adapters, prices assets against on-chain/off-chain sources, calls the on-chain OracleHelper to finalize prices, and then either prints a dry-run artifact or proposes a Safe transaction containing `submitReports()` calldata.
 
-## System Architecture
+## Execution Flow
 
 ```mermaid
 flowchart TD
-    Start([TQ Oracle CLI]) --> Preflight[Pre-Flight Checks]
+    CLI([CLI & Settings]) --> Ctx[AppState + PipelineContext]
+    Ctx --> BaseAsset[Discover Base Asset]
+    BaseAsset --> Preflight[Pre-Flight Checks]
     Preflight --> Assets[Asset Collection]
-    Assets --> Pricing[Pricing & Validation]
-    Pricing --> OracleHelper[[Oracle Helper Contract]]
-    OracleHelper --> Report[Report Generation]
+    Assets --> Pricing[Pricing & Pyth Validation]
+    Pricing --> OracleHelper[[OracleHelper.getPricesD18]]
+    OracleHelper --> Report[Build OracleReport]
     Report --> Decision{Mode?}
-    Decision -->|Dry-run| Stdout[/Print to stdout/]
-    Decision -->|Production| Publish[Publish to Safe]
-    Publish --> Oracle[[Mellow Vault Oracle]]
-    Stdout --> End([Complete])
-    Oracle --> End
+    Decision -->|Dry-run| Stdout[/Print JSON + calldata/]
+    Decision -->|Broadcast| Safe[Propose Safe Tx]
+    Safe --> VaultOracle[[Mellow Vault Oracle]]
 ```
 
 ## Core Components
 
-### 1. Entry Point (`main.py`)
+### CLI & Configuration (`src/tq_oracle/main.py`, `settings.py`)
+- Typer command parses CLI flags, applies overrides, and instantiates `OracleSettings`.
+- `OracleSettings` is the single truth for configuration: CLI args > environment/`.env` > TOML (`tq-oracle.toml` or `$HOME/.config/tq-oracle/config.toml`). Secrets are rejected from TOML and wrapped in `SecretStr`.
+- Network defaults come from `constants.py` (RPC URLs, OracleHelper contracts, and canonical asset maps for Mainnet, Sepolia, Base). Missing RPC/OracleHelper values are filled automatically; block numbers are resolved via Web3 when absent.
+- The CLI enforces required params (vault address, RPC, Safe creds when `--no-dry-run`) and exposes `--show-config` for redacted inspection before dispatching to `pipeline.run_report()`.
 
-The CLI entry point uses Typer for command-line interface management. It:
-- Loads configuration from TOML files, environment variables, or CLI arguments
-- Initializes the application state (`AppState`)
-- Executes the TVL reporting pipeline as the default command
+### Pipeline Orchestration (`pipeline/run.py`)
+`run_report()` builds a `PipelineContext` and executes the pipeline sequentially:
+1. **Base asset discovery** – `_discover_base_asset()` walks Vault → FeeManager contracts on the target chain to retrieve the canonical base asset used for pricing.
+2. **Preflight** – `pipeline/preflight.py` runs adapters with backoff/retry to ensure it is safe to proceed.
+3. **Asset collection** – discovers subvaults and runs asset adapters concurrently.
+4. **Pricing & validation** – prices every aggregated asset, validates against Pyth, and derives final prices via OracleHelper.
+5. **Report + publish** – packages results and either prints or submits to a Safe.
 
-**Key Configuration:**
+### Preflight Checks (`checks/pre_checks.py`, `adapters/check_adapters/*`)
+- **Safe state**: warns/blocks if no Safe configured or if duplicate/pending oracle reports exist (`safe_state.py`, `active_submit_report_proposal_check.py`).
+- **Timeout enforcement**: queries the Oracle contract for last report timestamps and security params; can be bypassed via `--ignore-timeout-check` (`timeout_check.py`).
+- Each adapter returns a `CheckResult`, and `run_preflight()` retries failures up to `pre_check_retries` using `backoff` unless the adapter signals `retry_recommended=False`.
 
-- Network selection (mainnet, sepolia, base)
-- RPC endpoints for vault network
-- Oracle and OracleHelper contract addresses
-- Safe multi-sig configuration
-- Dry-run vs production mode
+### Asset Collection (`pipeline/assets.py`, `adapters/asset_adapters/*`)
+- Fetches subvault addresses via Vault ABI calls, validates `subvault_adapters` config entries, and optionally allows synthetic addresses when `skip_subvault_existence_check` is set.
+- Runs the default `IdleBalancesAdapter` across the vault and every subvault (unless skipped per-subvault) to gather on-chain balances for supported assets defined in `OracleSettings.assets`.
+- Additional adapters can be configured per subvault; each adapter inherits from `BaseAssetAdapter` and is registered in `ADAPTER_REGISTRY`.
+- Results are combined asynchronously and folded into `AggregatedAssets` via `processors/asset_aggregator.py`.
 
-### 2. Pipeline Orchestration (`pipeline/`)
+### Pricing & Validation (`pipeline/pricing.py`, `adapters/price_adapters/*`, `adapters/price_validators/pyth.py`)
+- Price adapters are instantiated from `PRICE_ADAPTERS` (currently `CowSwapAdapter` for general assets and `ETHAdapter` for ETH/WETH; `ChainlinkAdapter` is available but not in the default list).
+- Each adapter updates a shared `PriceData` accumulator keyed by asset address (base asset must already be known).
+- `run_price_validations()` invokes validators from `PRICE_VALIDATORS`. The active `PythValidator` re-fetches prices through the Pyth Hermes API, compares deviations against configurable warning/failure tolerances, and can be disabled via `pyth_enabled=False`.
+- `processors/total_assets.calculate_total_assets()` multiplies balances by prices (18-decimal math) and raises if any asset lacks a quote.
+- `processors/oracle_helper.derive_final_prices()` submits the total asset figure plus encoded prices to the OracleHelper contract to obtain finalized per-asset values (respecting `ignore_empty_vault`).
 
-The pipeline is the core orchestrator that sequences all oracle operations:
+### Reporting & Publishing (`report/*`)
+- `report/generator.py` converts context data into an `OracleReport` dataclass.
+- `report/encoder.py` encodes `submitReports(Report[] reports)` calldata sorted by address and forces the base asset price to zero, mirroring the Solidity helper expectations.
+- `report/publisher.py`:
+  - **Dry run**: prints JSON containing the report and calldata.
+  - **Broadcast**: builds a Safe transaction (`build_transaction`), signs it locally with `safe-eth-py`, posts to the Safe Transaction Service, and surfaces a Safe UI approval URL. Requires `safe_address`, `private_key`, and optional Tx Service API key.
 
-**Pipeline Steps** (`pipeline/run.py:run_report`):
+## Configuration Highlights
 
-1. **Preflight checks** - Validates system state before processing
-2. **Asset collection** - Gathers holdings from all subvaults
-3. **Pricing & validation** - Fetches and validates asset prices
-4. **Report generation** - Creates the oracle report
-5. **Submission** - Publishes to Safe or stdout
+Key `OracleSettings` fields:
+- `vault_address`, `vault_rpc`, `network`, `block_number`.
+- `oracle_helper_address` (default per network) and derived `oracle_address` (pulled from the vault contract).
+- Safe submission toggles: `dry_run`, `safe_address`, `private_key`, `safe_txn_srvc_api_key`.
+- Adapter behavior: `subvault_adapters`, `max_calls`, `rpc_max_concurrent_calls`, `rpc_delay/jitter`, `ignore_*` flags (empty vault, timeout, active proposal).
+- Pricing knobs: `pyth_*` settings plus warning/failure tolerances.
 
-#### 2.1 Preflight Checks (`pipeline/preflight.py`)
+### Subvault Adapter Configuration
+Each entry under `subvault_adapters` may specify:
+- `subvault_address`: Target contract (checksummed matching Vault discovery unless `skip_subvault_existence_check` is true).
+- `skip_idle_balances`: Exclude default idle balance scan for that address.
+- `additional_adapters`: Extra adapter names to run (must exist in `ADAPTER_REGISTRY`).
 
-Runs validation checks before processing TVL data to prevent race conditions and ensure data integrity:
-
-- **Safe State Check** (`check_adapters/safe_state.py`): TODO: Ensures no duplicate or pending reports
-- **Timeout Check** (`check_adapters/timeout_check.py`): Verifies sufficient time has passed since last report
-- **Active Proposal Check** (`check_adapters/active_submit_report_proposal_check.py`): Checks for existing pending proposals
-
-These checks implement automatic retry logic with exponential backoff when recommended.
-
-#### 2.2 Asset Collection (`pipeline/assets.py`)
-
-Discovers and aggregates asset holdings from multiple sources:
-
-1. **Subvault Discovery**: Queries the Vault contract to get all subvault addresses
-2. **Adapter Selection**: Determines which asset adapters to run for each subvault
-3. **Parallel Fetching**: Runs all adapters concurrently using `asyncio.gather`
-4. **Aggregation**: Combines results into `AggregatedAssets`
-
-**Supported Adapters** (`adapters/asset_adapters/`):
-
-- `IdleBalancesAdapter`: Checks for assets sat dormant in subvault
-
-#### 2.3 Pricing & Validation (`pipeline/pricing.py`)
-
-Multi-stage pricing system with validation:
-
-1. **Price Fetching**: Queries multiple price sources sequentially
-   - `CowSwapAdapter`: Primary DEX aggregator price source
-   - `ETHAdapter`: Specialized adapter for ETH-family assets (ETH, WETH)
-   - `ChainlinkAdapter`: Not used in main pipeline, only for validation
-
-2. **Price Validation** (`checks/price_validators.py`):
-   - Cross-checks prices against Chainlink oracles
-   - Warns if deviation exceeds `chainlink_price_warning_tolerance_percentage` (default 0.5%)
-   - Fails if deviation exceeds `chainlink_price_failure_tolerance_percentage` (default 1.0%)
-
-3. **Total Assets Calculation** (`processors/total_assets.py`):
-   - Multiplies asset amounts by prices
-   - Sums to get total vault TVL in base asset (ETH)
-
-4. **Final Price Derivation** (`processors/oracle_helper.py`):
-   - Calls `OracleHelper.getPricesD18()` on-chain
-   - Normalizes all prices to 18 decimals
-   - Applies vault-specific price logic
-
-### 3. Data Processors (`processors/`)
-
-Utilities for data transformation and smart contract interaction:
-
-- **`asset_aggregator.py`**: Merges asset data from multiple adapters
-- **`total_assets.py`**: Calculates TVL in base asset
-- **`oracle_helper.py`**: Interfaces with the OracleHelper contract to derive final prices
-
-### 4. Report Generation & Publishing (`report/`)
-
-#### 4.1 Report Generator (`report/generator.py`)
-
-Creates an `OracleReport` dataclass containing:
-
-- `vault_address`: The target vault contract
-- `total_assets`: Aggregated asset amounts by address
-- `final_prices`: Normalized prices in 18 decimals
-
-#### 4.2 Report Publisher (`report/publisher.py`)
-
-Handles submission based on mode:
-
-**Dry-run Mode:**
-
-- Prints JSON report to stdout
-- No blockchain interaction
-
-**Production Mode (with Safe):**
-
-1. **Transaction Building** (`safe/transaction_builder.py`):
-   - Loads `IOracle` ABI
-   - Encodes `submitReports(Report[] memory reports)` calldata
-   - Each `Report` is a tuple: `(address asset, uint224 priceD18)`
-
-2. **Safe Submission**:
-   - Fetches current Safe nonce from Transaction Service API
-   - Creates a `SafeTx` with the encoded calldata
-   - Signs with the proposer's private key (oracle must be part of the multi-sig)
-   - Posts to Safe Transaction Service
-   - Returns Safe UI URL for multi-sig approval
-
-### 5. Domain Models (`domain/`)
-
-Core data structures and type definitions used throughout the application.
-
-### 6. State Management (`state.py`)
-
-The `AppState` container holds:
-
-- `settings`: Parsed configuration (`OracleSettings`)
-- `logger`: Structured logging instance
-
-## Integration with Mellow Finance Flexible-Vaults
-
-### Report Submission Flow
+## Integration Flow with Mellow Vaults
 
 ```mermaid
 sequenceDiagram
-    participant Oracle as TQ Oracle
-    participant Safe as Gnosis Safe
-    participant Vault as Mellow Vault
+    participant CLI
+    participant Pipeline
+    participant Safe
+    participant Oracle as Mellow Oracle
 
-    Oracle->>Oracle: 1. Generate OracleReport
-    Oracle->>Oracle: 2. Encode submitReports() calldata
-    Oracle->>Safe: 3. POST signed SafeTx
-    Note over Safe: 4. Multi-sig approvals<br/>(off-chain)
-    Safe->>Vault: 5. Execute transaction<br/>submitReports(reports[])
-    Note over Vault: 6. Update prices<br/>Store in Oracle state
-    Vault-->>Safe: 7. Success
+    CLI->>Pipeline: Parse config, start run_report()
+    Pipeline->>Pipeline: Discover base asset, collect assets, price & validate
+    Pipeline->>Pipeline: OracleHelper.getPricesD18()
+    Pipeline->>CLI: Build OracleReport + calldata
+    alt Dry-run
+        CLI->>CLI: Print JSON + calldata
+    else Broadcast
+        CLI->>Safe: Propose SafeTx (submitReports)
+        Safe-->>Oracle: Execute submitReports after approvals
+    end
 ```
 
-### Data Flow
-
-1. **Off-Chain Aggregation**:
-   - TQ Oracle queries multiple data sources (vault chain contracts, DEXs, optional integrations)
-   - Aggregates asset amounts across all subvaults
-   - Fetches market prices from various sources
-
-2. **Price Normalization**:
-   - Calls `OracleHelper.getPricesD18()` to normalize prices
-   - Ensures consistency with vault's expected format
-
-3. **On-Chain Submission**:
-   - Encodes price data into `submitReports()` call
-   - Routes through Gnosis Safe for security
-   - Multi-sig signers approve the transaction
-   - Oracle contract updates its price state
-
-## Configuration System
-
-TQ Oracle uses a three-tier configuration system with precedence:
-
-1. **CLI Arguments** (highest priority)
-2. **Environment Variables** (via `.env` file)
-3. **TOML Configuration File** (via `tq-oracle.toml`)
-
-**Key Settings** (`settings.py`):
-
-- `vault_address`: Target vault to report on
-- `oracle_helper_address`: OracleHelper contract for price normalization
-- `vault_rpc`: RPC endpoint for the vault network
-- `hl_rpc` (optional/disabled): Hyperliquid RPC endpoint reserved for future use
-- `safe_address`: Gnosis Safe for multi-sig submission
-- `private_key`: Signer key for proposing Safe transactions
-- `subvault_adapters`: Per-subvault adapter configuration
-
-### Subvault Adapter Configuration
-
-Allows fine-grained control over which adapters run for each subvault via TOML configuration:
-
-- Specify target subvault address
-- Define which chain the subvault operates on (typically L1; Hyperliquid support requires re-enabling the integration)
-- List additional adapters to run for this subvault
-- Option to skip default idle balances check
-- Option to skip subvault existence validation
-
-## Checks
-
-### Price Validation
-
-Multiple layers of price validation:
-
-- Cross-reference with Chainlink oracles
-- Configurable tolerance thresholds
-- Fail-fast on anomalous prices
-
-### Pre-Flight Checks
-
-Prevents common operational issues:
-
-- Detects in-flight cross-chain transfers (CCTP)
-- Avoids duplicate submissions
-- Enforces minimum time between reports
-
 ## Extension Points
+- **Asset adapters**: Implement `BaseAssetAdapter`, register in `ADAPTER_REGISTRY`, and wire via `subvault_adapters`.
+- **Price adapters**: Implement `BasePriceAdapter` and append to `PRICE_ADAPTERS` to join the pricing chain.
+- **Price validators**: Implement `BasePriceValidator`, register in `PRICE_VALIDATORS`, and consume the shared `PriceData` accumulator.
+- **Preflight checks**: Implement `BaseCheckAdapter` and add to `CHECK_ADAPTERS` for additional safety gates.
 
-### Adding New Asset Adapters
-
-1. Create adapter class in `adapters/asset_adapters/`
-2. Inherit from `BaseAssetAdapter`
-3. Implement `fetch_assets()` method
-4. Register in `ADAPTER_REGISTRY`
-5. Configure via `subvault_adapters` in TOML
-
-See README.md "Adding New Adapters" section for detailed examples.
-
-### Adding New Price Sources
-
-1. Create adapter class in `adapters/price_adapters/`
-2. Inherit from `BasePriceAdapter`
-3. Implement `fetch_prices()` method
-4. Register in `PRICE_ADAPTERS` list
-
-### Adding New Validators
-
-1. Create validator class in `adapters/price_validators/`
-2. Inherit from `BasePriceValidator`
-3. Implement `validate_prices()` method
-4. Register in `PRICE_VALIDATORS` list
+These hooks share the same settings object, so adapters can inspect CLI/env/TOML flags without bespoke wiring.
