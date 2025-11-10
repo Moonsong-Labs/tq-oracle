@@ -64,7 +64,7 @@ def test_idle_balances_extra_tokens_loaded(tmp_path, monkeypatch):
     config_path.write_text(
         dedent(
             """
-            [idle_balances]
+            [adapters.idle_balances]
             extra_tokens = { osETH = "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38" }
             """
         ).strip()
@@ -74,6 +74,28 @@ def test_idle_balances_extra_tokens_loaded(tmp_path, monkeypatch):
 
     settings = OracleSettings()
 
-    assert settings.idle_balances.extra_tokens == {
+    assert settings.adapters.idle_balances.extra_tokens == {
         "osETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
     }
+
+
+def test_stakewise_adapter_defaults_loaded(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        dedent(
+            """
+            [adapters.stakewise]
+            stakewise_vault_addresses = ["0x1111111111111111111111111111111111111111"]
+            stakewise_exit_queue_start_block = 123
+            """
+        ).strip()
+    )
+
+    monkeypatch.setenv("TQ_ORACLE_CONFIG", str(config_path))
+
+    settings = OracleSettings()
+
+    assert settings.adapters.stakewise.stakewise_vault_addresses == [
+        "0x1111111111111111111111111111111111111111"
+    ]
+    assert settings.adapters.stakewise.stakewise_exit_queue_start_block == 123

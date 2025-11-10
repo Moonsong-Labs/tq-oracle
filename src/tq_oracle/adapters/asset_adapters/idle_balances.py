@@ -51,7 +51,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         self._additional_assets: list[str] = []
         self._additional_asset_lookup: set[str] = set()
         self._additional_assets_by_symbol: dict[str, str] = {}
-        extra_tokens = getattr(config.idle_balances, "extra_tokens", {})
+        idle_cfg = config.adapters.idle_balances
+        extra_tokens = idle_cfg.extra_tokens
         for symbol, address in extra_tokens.items():
             if not address:
                 logger.warning(
@@ -76,7 +77,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
 
         self._extra_addresses: list[str] = []
         self._extra_addresses_lookup: set[str] = set()
-        for address in getattr(config.idle_balances, "extra_addresses", []):
+        for address in idle_cfg.extra_addresses:
             if not address:
                 logger.warning(
                     "idle_balances.extra_addresses contains an empty entry; skipping"

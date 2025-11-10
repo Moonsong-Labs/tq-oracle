@@ -110,7 +110,7 @@ async def test_fetch_eth_balance_integration(config):
 
 
 def test_merge_supported_assets_includes_configured_tokens(config):
-    config.idle_balances.extra_tokens = {
+    config.adapters.idle_balances.extra_tokens = {
         "osETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
     }
     adapter = IdleBalancesAdapter(config)
@@ -128,7 +128,7 @@ def test_merge_supported_assets_includes_configured_tokens(config):
 
 @pytest.mark.asyncio
 async def test_fetch_assets_marks_extra_tokens_tvl_only(config, monkeypatch):
-    config.idle_balances.extra_tokens = {
+    config.adapters.idle_balances.extra_tokens = {
         "osETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
     }
     adapter = IdleBalancesAdapter(config)
@@ -155,7 +155,7 @@ async def test_fetch_assets_marks_extra_tokens_tvl_only(config, monkeypatch):
 @pytest.mark.asyncio
 async def test_fetch_all_assets_includes_extra_addresses(config, monkeypatch):
     extra_address = "0x0000000000000000000000000000000000000009"
-    config.idle_balances.extra_addresses = [extra_address]
+    config.adapters.idle_balances.extra_addresses = [extra_address]
     adapter = IdleBalancesAdapter(config)
 
     async def fake_fetch_subvault_addresses():

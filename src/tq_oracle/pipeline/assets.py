@@ -122,6 +122,8 @@ async def collect_assets(ctx: PipelineContext) -> None:
                 f"{', '.join(invalid_subvaults)}"
             )
 
+    adapter_defaults = s.adapters.model_dump(exclude_none=True)
+
     log.info("Setting up asset adapters...")
     asset_fetch_tasks = []
 
@@ -135,6 +137,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
             "subvault_address": subvault_address,
             "additional_adapters": [],
             "skip_idle_balances": False,
+            "adapter_overrides": {},
         }
 
     # 1. Add default vault_chain idle_balances (runs against ALL subvaults unless globally skipped)
@@ -157,27 +160,32 @@ async def collect_assets(ctx: PipelineContext) -> None:
         """Create an adapter instance for the given subvault and adapter name."""
         adapter_class = get_adapter_class(adapter_name)
 
-        adapter_kwargs: dict[str, Any] = {}
-        adapter_config = get_subvault_config(subvault_addr).get("adapter_kwargs", {})
-        if isinstance(adapter_config, dict):
-            candidate = adapter_config.get(adapter_name)
+        adapter_overrides: dict[str, Any] = {}
+        overrides_config = get_subvault_config(subvault_addr).get(
+            "adapter_overrides", {}
+        )
+        if isinstance(overrides_config, dict):
+            candidate = overrides_config.get(adapter_name)
             if candidate is None:
-                candidate = adapter_config.get(adapter_name.lower())
+                candidate = overrides_config.get(adapter_name.lower())
             if isinstance(candidate, dict):
-                adapter_kwargs = candidate
+                adapter_overrides = candidate
             elif candidate is not None:
                 log.warning(
-                    "adapter_kwargs for adapter %s on subvault %s must be a mapping; got %r",
+                    "adapter_overrides for adapter %s on subvault %s must be a mapping; got %r",
                     adapter_name,
                     subvault_addr,
                     candidate,
                 )
         else:
             log.warning(
-                "adapter_kwargs for subvault %s must be a mapping; got %r",
+                "adapter_overrides for subvault %s must be a mapping; got %r",
                 subvault_addr,
-                adapter_config,
+                overrides_config,
             )
+
+        defaults = adapter_defaults.get(adapter_name, {})
+        adapter_kwargs = {**defaults, **adapter_overrides}
 
         if adapter_kwargs:
             adapter = adapter_class(s, **adapter_kwargs)

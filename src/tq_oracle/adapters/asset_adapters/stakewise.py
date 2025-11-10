@@ -83,12 +83,18 @@ class StakeWiseAdapter(BaseAssetAdapter):
         *,
         stakewise_vault_address: str | None = None,
         stakewise_vault_addresses: list[str] | None = None,
+        stakewise_exit_queue_start_block: int | None = None,
     ):
         super().__init__(config)
 
         self.w3 = self._build_web3(config.vault_rpc_required)
 
-        resolved = self._resolve_addresses(config, stakewise_vault_address)
+        stakewise_defaults = config.adapters.stakewise
+        default_vaults = stakewise_defaults.stakewise_vault_addresses
+        fallback_single = stakewise_vault_address or (
+            default_vaults[0] if default_vaults else None
+        )
+        resolved = self._resolve_addresses(config, fallback_single)
 
         self.block_identifier = config.block_number_required
         self.eth_asset = self._resolve_eth_asset(config)
@@ -96,7 +102,9 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self.os_token_vault_escrow_address = self.w3.to_checksum_address(
             resolved.os_token_vault_escrow
         )
-        resolved_vaults = stakewise_vault_addresses or [stakewise_vault_address or resolved.vault]
+        resolved_vaults = stakewise_vault_addresses or default_vaults
+        if not resolved_vaults:
+            resolved_vaults = [stakewise_vault_address or resolved.vault]
         if not resolved_vaults:
             raise ValueError("StakeWise adapter requires at least one vault address")
 
@@ -110,7 +118,11 @@ class StakeWiseAdapter(BaseAssetAdapter):
         )
 
         self._exit_log_chunk = STAKEWISE_EXIT_LOG_CHUNK
-        self._exit_queue_start_block = config.stakewise_exit_queue_start_block or 0
+        self._exit_queue_start_block = (
+            stakewise_exit_queue_start_block
+            or stakewise_defaults.stakewise_exit_queue_start_block
+            or 0
+        )
         self._exit_max_lookback_blocks = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
         self._rpc_sem = asyncio.Semaphore(getattr(config, "max_calls", 5))
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
@@ -154,9 +166,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
         for context in self.vault_contexts:
             user_state = await self._fetch_account_state(context.contract, user)
             tickets = await self._scan_exit_queue_tickets(context, user)
-            exposure = await self._compute_exit_exposure(
-                context, user_state, tickets
-            )
+            exposure = await self._compute_exit_exposure(context, user_state, tickets)
 
             total_staked += exposure.staked_eth
             total_queue += exposure.eth_in_queue
@@ -204,9 +214,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
         defaults = STAKEWISE_ADDRESSES.get(config.network.value) or {}
 
         values = {
-            "stakewise_vault_address": override_vault
-            or config.stakewise_vault_address
-            or defaults.get("vault"),
+            "stakewise_vault_address": override_vault or defaults.get("vault"),
             "stakewise_os_token_vault_escrow": config.stakewise_os_token_vault_escrow
             or defaults.get("os_token_vault_escrow"),
             "stakewise_os_token_address": config.stakewise_os_token_address
@@ -274,7 +282,9 @@ class StakeWiseAdapter(BaseAssetAdapter):
         min_block = self._resolve_min_block()
 
         iterations = 0
-        logger.info(f"StakeWise exit queue scan start for {context.address}, this might take some time...")
+        logger.info(
+            f"StakeWise exit queue scan start for {context.address}, this might take some time..."
+        )
         for from_block, to_block in self._block_ranges(
             self.block_identifier, min_block
         ):

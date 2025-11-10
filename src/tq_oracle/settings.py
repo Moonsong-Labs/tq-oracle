@@ -38,11 +38,31 @@ class Network(str, Enum):
     BASE = "base"
 
 
-class IdleBalancesSettings(BaseModel):
+class IdleBalancesAdapterSettings(BaseModel):
     """Configuration options for idle balance collection."""
 
     extra_tokens: dict[str, str] = Field(default_factory=dict)
     extra_addresses: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class StakewiseAdapterSettings(BaseModel):
+    """Configuration options for StakeWise adapter defaults."""
+
+    stakewise_vault_addresses: list[str] = Field(default_factory=list)
+    stakewise_exit_queue_start_block: int | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class AdapterSettings(BaseModel):
+    stakewise: StakewiseAdapterSettings = Field(
+        default_factory=StakewiseAdapterSettings
+    )
+    idle_balances: IdleBalancesAdapterSettings = Field(
+        default_factory=IdleBalancesAdapterSettings
+    )
 
     model_config = ConfigDict(extra="ignore")
 
@@ -101,13 +121,11 @@ class OracleSettings(BaseSettings):
 
     # --- adapters (from config file only) ---
     subvault_adapters: list[dict[str, Any]] = []
-    idle_balances: IdleBalancesSettings = Field(default_factory=IdleBalancesSettings)
+    adapters: AdapterSettings = Field(default_factory=AdapterSettings)
 
-    # --- stakewise ---
-    stakewise_vault_address: str | None = None
+    # --- stakewise shared addresses ---
     stakewise_os_token_address: str | None = None
     stakewise_os_token_vault_escrow: str | None = None
-    stakewise_exit_queue_start_block: int | None = None
 
     # --- runtime computed values ---
     using_default_rpc: bool = False

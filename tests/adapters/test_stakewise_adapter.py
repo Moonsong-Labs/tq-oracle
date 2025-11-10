@@ -75,9 +75,15 @@ def _build_adapter(dummy_web3) -> StakeWiseAdapter:
         vault_rpc="http://localhost",
         block_number=1,
         vault_address="0x0000000000000000000000000000000000000001",
-        stakewise_vault_address="0x0000000000000000000000000000000000000002",
         stakewise_os_token_vault_escrow="0x0000000000000000000000000000000000000003",
         stakewise_os_token_address="0x0000000000000000000000000000000000000004",
+        adapters={
+            "stakewise": {
+                "stakewise_vault_addresses": [
+                    "0x0000000000000000000000000000000000000002"
+                ]
+            }
+        },
     )
     return StakeWiseAdapter(config)
 
@@ -113,7 +119,9 @@ async def test_stakewise_adapter_no_exit_queue(dummy_web3):
         ),
     )
     adapter.vault_contexts = [
-        StakewiseVaultContext(address="0xvault", contract=dummy_contract, exit_events=[])
+        StakewiseVaultContext(
+            address="0xvault", contract=dummy_contract, exit_events=[]
+        )
     ]
     adapter.vault_address = "0xvault"
 
@@ -179,7 +187,9 @@ async def test_stakewise_adapter_exit_queue_direct_receiver(dummy_web3):
         ),
     )
     adapter.vault_contexts = [
-        StakewiseVaultContext(address="0xvault", contract=dummy_contract, exit_events=[])
+        StakewiseVaultContext(
+            address="0xvault", contract=dummy_contract, exit_events=[]
+        )
     ]
     adapter.vault_address = "0xvault"
 
@@ -242,7 +252,9 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
         ),
     )
     adapter.vault_contexts = [
-        StakewiseVaultContext(address="0xvault", contract=dummy_contract, exit_events=[])
+        StakewiseVaultContext(
+            address="0xvault", contract=dummy_contract, exit_events=[]
+        )
     ]
     adapter.vault_address = "0xvault"
 
