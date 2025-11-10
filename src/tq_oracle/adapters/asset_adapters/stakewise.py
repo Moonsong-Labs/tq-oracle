@@ -392,6 +392,9 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 os_shares, exited_assets = escrow_state
                 escrow_os_shares += os_shares
                 eth_claimable += exited_assets
+                pending_queue = max(ticket_assets - exited_assets, 0)
+                if pending_queue:
+                    eth_in_queue += pending_queue
                 continue
 
             exit_queue_index = await self._fetch_exit_queue_index(

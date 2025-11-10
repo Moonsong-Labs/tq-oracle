@@ -260,9 +260,9 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
 
     assets = await adapter.fetch_assets("0xuser")
 
-    # staked=20, escrow ready=6 → collateral 26, liabilities include user (4) + escrow (8)
+    # staked=20, escrow ready=6, queue still 9 → collateral 35, liabilities include user (4) + escrow (8)
     assert any(
-        asset.asset_address == adapter.eth_asset and asset.amount == 26
+        asset.asset_address == adapter.eth_asset and asset.amount == 35
         for asset in assets
     )
     assert any(

@@ -102,7 +102,7 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 
 - `idle_balances` - Checks for idle USDC balances not yet deployed
 
-See `tq-oracle-example.toml` for complete configuration examples.
+See `tq-oracle.toml.example` for complete configuration examples.
 
 ### Usage Examples
 
@@ -179,7 +179,7 @@ These checks prevent race conditions and ensure accurate TVL snapshots by detect
 
 ### Testing CCTP Bridge Detection
 
-A standalone test script is available in `scripts/check_cctp_inflight.py` and can be used once the CCTP integration is re-enabled.
+CCTP-specific runbooks live in `docs/hyperliquid-cctp-restore-checklist.md` and should be revisited once the integration is re-enabled.
 
 ## Adding New Adapters
 

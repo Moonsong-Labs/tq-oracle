@@ -47,6 +47,19 @@ async def _fetch_subvault_addresses(state: AppState) -> list[str]:
     return list(subvault_addresses)
 
 
+def _sanitize_adapter_kwargs(values: dict[str, Any]) -> dict[str, Any]:
+    """Drop None or empty collection values from adapter kwargs."""
+
+    sanitized: dict[str, Any] = {}
+    for key, value in values.items():
+        if value is None:
+            continue
+        if isinstance(value, (list, dict)) and not value:
+            continue
+        sanitized[key] = value
+    return sanitized
+
+
 def _process_adapter_results(
     tasks_info: list[Any],
     results: tuple[BaseException | list[AssetData], ...],
@@ -122,7 +135,13 @@ async def collect_assets(ctx: PipelineContext) -> None:
                 f"{', '.join(invalid_subvaults)}"
             )
 
-    adapter_defaults = s.adapters.model_dump(exclude_none=True)
+    adapter_defaults = {
+        name.lower(): value
+        for name, value in s.adapters.model_dump(
+            exclude_none=True, exclude_defaults=True
+        ).items()
+        if isinstance(value, dict)
+    }
 
     log.info("Setting up asset adapters...")
     asset_fetch_tasks = []
@@ -184,8 +203,8 @@ async def collect_assets(ctx: PipelineContext) -> None:
                 overrides_config,
             )
 
-        defaults = adapter_defaults.get(adapter_name, {})
-        adapter_kwargs = {**defaults, **adapter_overrides}
+        defaults = adapter_defaults.get(adapter_name.lower(), {})
+        adapter_kwargs = _sanitize_adapter_kwargs({**defaults, **adapter_overrides})
 
         if adapter_kwargs:
             adapter = adapter_class(s, **adapter_kwargs)
