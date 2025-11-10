@@ -94,7 +94,6 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 **Configuration via TOML:**
 
 - Specify target subvault address
-- Define which chain the subvault operates on (typically `vault_chain`)
 - List additional adapters to run for this subvault
 - Option to skip default idle balances check
 - Option to skip subvault existence validation

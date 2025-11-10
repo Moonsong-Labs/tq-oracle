@@ -140,7 +140,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
             "adapter_overrides": {},
         }
 
-    # 1. Add default vault_chain idle_balances (runs against ALL subvaults unless globally skipped)
+    # 1. Add default idle_balances (runs against ALL subvaults unless globally skipped)
     should_run_default_idle_balances = any(
         not get_subvault_config(addr).get("skip_idle_balances", False)
         for addr in subvault_addresses
@@ -151,7 +151,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
         asset_fetch_tasks.append(
             ("idle_balances_vault_chain", idle_vault_adapter.fetch_all_assets())
         )
-        log.debug("Added default vault_chain idle_balances adapter (all subvaults)")
+        log.debug("Added default idle_balances adapter (all subvaults)")
 
     # 2. Add additional adapters per subvault
     def create_adapter_task(

@@ -20,7 +20,6 @@ stakewise_vault_addresses = ["0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08"]
 # Example: Additional idle_balances reporting for a specific subvault
 [[subvault_adapters]]
 subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
-chain = "vault_chain"
 additional_adapters = ["idle_balances"]
 skip_idle_balances = false  # Still run default vault_chain idle_balances
 skip_subvault_existence_check = false  # Validate this subvault exists in the vault contract
