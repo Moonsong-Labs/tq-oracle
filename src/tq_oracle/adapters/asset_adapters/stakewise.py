@@ -3,14 +3,17 @@ from __future__ import annotations
 import asyncio
 import random
 from dataclasses import dataclass
-from typing import Iterable, Optional, cast
+from typing import Any, Iterable, Optional, Sequence, TypedDict, cast
 
 import backoff
+import requests
 from web3 import Web3
 from web3.contract import Contract
 from web3.contract.contract import ContractEvent
 from web3.exceptions import ContractLogicError, ProviderConnectionError
 from web3.types import EventData
+
+from eth_typing import HexStr
 
 from ...abi import (
     load_stakewise_os_token_vault_escrow_abi,
@@ -27,6 +30,9 @@ from .base import AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+STAKEWISE_EXIT_LOG_CHUNK = 1000
+
+ETHERSCAN_DEFAULT_API_URL = "https://api.etherscan.io/v2/api"
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +40,26 @@ class StakeWiseAddressesResolved:
     vault: str
     os_token_vault_escrow: str
     os_token: str
+
+
+class EtherscanLogsResult(TypedDict, total=False):
+    address: str
+    topics: list[str]
+    data: str
+    blockNumber: str
+    blockHash: str
+    timeStamp: str
+    gasPrice: str
+    gasUsed: str
+    logIndex: str
+    transactionHash: str
+    transactionIndex: str
+
+
+class EtherscanLogsResponse(TypedDict):
+    status: str
+    message: str
+    result: list[EtherscanLogsResult] | str
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +109,8 @@ class StakeWiseAdapter(BaseAssetAdapter):
         *,
         stakewise_vault_address: str | None = None,
         stakewise_vault_addresses: list[str] | None = None,
-        stakewise_exit_queue_start_block: int | None = None,
+        etherscan_api_key: str | None = None,
+        etherscan_page_size: int | None = None,
     ):
         super().__init__(config)
 
@@ -95,6 +122,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
             default_vaults[0] if default_vaults else None
         )
         resolved = self._resolve_addresses(config, fallback_single)
+        self._etherscan_chain_id = config.chain_id
 
         self.block_identifier = config.block_number_required
         self.eth_asset = self._resolve_eth_asset(config)
@@ -117,17 +145,21 @@ class StakeWiseAdapter(BaseAssetAdapter):
             load_stakewise_os_token_vault_escrow_abi(),
         )
 
-        self._exit_log_chunk = STAKEWISE_EXIT_LOG_CHUNK
-        self._exit_queue_start_block = (
-            stakewise_exit_queue_start_block
-            or stakewise_defaults.stakewise_exit_queue_start_block
-            or 0
-        )
-        self._exit_max_lookback_blocks = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
         self._rpc_sem = asyncio.Semaphore(getattr(config, "max_calls", 5))
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
         self._rpc_jitter = getattr(config, "rpc_jitter", 0.10)
         self._block_timestamp_cache: dict[int, int] = {}
+        self._etherscan_session = requests.Session()
+        (
+            self._etherscan_api_url,
+            self._etherscan_api_key,
+            self._etherscan_page_size,
+        ) = self._resolve_etherscan_config(
+            stakewise_defaults,
+            STAKEWISE_EXIT_LOG_CHUNK,
+            api_key_override=etherscan_api_key,
+            page_size_override=etherscan_page_size,
+        )
 
     @property
     def adapter_name(self) -> str:
@@ -249,6 +281,27 @@ class StakeWiseAdapter(BaseAssetAdapter):
             exit_events=exit_events,
         )
 
+    def _resolve_etherscan_config(
+        self,
+        defaults,
+        chunk_size: int,
+        *,
+        api_key_override: str | None = None,
+        page_size_override: int | None = None,
+    ) -> tuple[str | None, str | None, int]:
+        api_key = api_key_override or getattr(defaults, "etherscan_api_key", None)
+        if not api_key:
+            return None, None, 0
+
+        if page_size_override is not None:
+            page_size = page_size_override
+        else:
+            page_size = (
+                getattr(defaults, "etherscan_page_size", chunk_size) or chunk_size
+            )
+
+        return ETHERSCAN_DEFAULT_API_URL, api_key, max(1, page_size)
+
     async def _fetch_account_state(
         self, vault_contract: Contract, account: str
     ) -> AccountState:
@@ -280,22 +333,43 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         tickets: dict[int, ExitQueueTicket] = {}
         min_block = self._resolve_min_block()
-
-        iterations = 0
+        to_block = self.block_identifier
         logger.info(
             f"StakeWise exit queue scan start for {context.address}, this might take some time..."
         )
-        for from_block, to_block in self._block_ranges(
-            self.block_identifier, min_block
-        ):
-            iterations += 1
-            for event in context.exit_events:
-                logs = await self._get_exit_logs(event, user, from_block, to_block)
+
+        seen_logs: set[tuple[str, int]] = set()
+        for event in context.exit_events:
+            for filter_field in ("owner", "receiver"):
+                if not self._event_supports_filter(event, filter_field):
+                    continue
+                logs = await self._get_exit_logs(
+                    context,
+                    event,
+                    filter_field,
+                    user,
+                    min_block,
+                    to_block,
+                )
                 for log in logs:
+                    log_index = int(log["logIndex"])
+                    tx_value = log.get("transactionHash")
+                    if isinstance(tx_value, (bytes, bytearray)):
+                        tx_hash_str = bytes(tx_value).hex()
+                    elif hasattr(tx_value, "hex") and callable(tx_value.hex):
+                        tx_hash_str = tx_value.hex()
+                    else:
+                        tx_hash_str = str(tx_value)
+                    if not tx_hash_str or tx_hash_str == "None":
+                        tx_hash_str = f"{log.get('blockNumber')}:{log_index}"
+                    log_key: tuple[str, int] = (tx_hash_str, log_index)
+                    if log_key in seen_logs:
+                        continue
+                    seen_logs.add(log_key)
+
                     args = log["args"]
                     ticket_id = int(args["positionTicket"])
                     block_number = int(log["blockNumber"])
-                    log_index = int(log["logIndex"])
 
                     existing = tickets.get(ticket_id)
                     if existing and not (
@@ -325,35 +399,269 @@ class StakeWiseAdapter(BaseAssetAdapter):
             context.address,
             user,
             len(ordered),
-            iterations,
+            1,
         )
         return ordered
 
+    @staticmethod
+    def _event_supports_filter(event: ContractEvent, field_name: str) -> bool:
+        abi = getattr(event, "abi", None)
+        if not abi:
+            return False
+        for arg in abi.get("inputs", []):
+            if arg.get("name") == field_name and arg.get("indexed"):
+                return True
+        return False
+
     async def _get_exit_logs(
         self,
+        context: StakewiseVaultContext,
         event: ContractEvent,
-        user: str,
+        filter_field: str,
+        filter_value: str,
         from_block: int,
         to_block: int,
     ) -> list[EventData]:
+        if self._etherscan_api_url:
+            logs = await self._etherscan_fetch_logs(
+                event=event,
+                contract_address=context.address,
+                filter_field=filter_field,
+                filter_value=filter_value,
+                from_block=from_block,
+                to_block=to_block,
+            )
+            if logs is not None:
+                return logs
+
         try:
             return await self._rpc(
                 event.get_logs,
                 from_block=from_block,
                 to_block=to_block,
-                argument_filters={"owner": user},
+                argument_filters={filter_field: filter_value},
             )
         except ValueError as exc:  # pragma: no cover - provider variance
             event_name = getattr(event, "abi", {}).get("name", "unknown")
             logger.warning(
-                "StakeWise exit log query failed — event=%s user=%s chunk=[%d,%d] err=%s",
+                "StakeWise exit log query failed — event=%s filter=%s value=%s chunk=[%d,%d] err=%s",
                 event_name,
-                user,
+                filter_field,
+                filter_value,
                 from_block,
                 to_block,
                 exc,
             )
             return []
+
+    async def _etherscan_fetch_logs(
+        self,
+        *,
+        event: ContractEvent,
+        contract_address: str,
+        filter_field: str,
+        filter_value: str,
+        from_block: int,
+        to_block: int,
+    ) -> list[EventData] | None:
+        if not self._etherscan_api_url:
+            return None
+
+        abi = getattr(event, "abi", None)
+        if not abi:
+            return None
+
+        topic_values = self._resolve_etherscan_topics(
+            event, {filter_field: filter_value}
+        )
+        if not topic_values or not topic_values[0]:
+            return None
+        logs: list[EventData] = []
+        page = 1
+        logger.debug(
+            "StakeWise Etherscan log query start — contract=%s event=%s filter=%s value=%s",
+            contract_address,
+            event.event_name,
+            filter_field,
+            filter_value,
+        )
+        while True:
+            payload = await asyncio.to_thread(
+                self._etherscan_call,
+                contract_address,
+                topic_values,
+                from_block,
+                to_block,
+                page,
+            )
+            if payload is None:
+                return None
+
+            if payload.get("status") == "1":
+                logger.debug(payload.get("result"))
+
+            status = payload.get("status", "").strip()
+            message = payload.get("message", "").strip().lower()
+            result = payload.get("result")
+
+            if status != "1":
+                if isinstance(result, str) and result.lower() == "no records found":
+                    break
+                if message == "no records found":
+                    break
+                event_name = getattr(event, "abi", {}).get("name", "unknown")
+                logger.warning(
+                    "StakeWise Etherscan log query failed — event=%s filter=%s value=%s chunk=[%d,%d] message=%s",
+                    event_name,
+                    filter_field,
+                    filter_value,
+                    from_block,
+                    to_block,
+                    payload.get("message"),
+                )
+                return None
+
+            if not isinstance(result, list):
+                logger.warning(f"Unexpected Etherscan logs result: {result}")
+                return None
+
+            for raw_log in result:
+                decoded = self._process_etherscan_log(event, raw_log)
+                logger.debug(f"Etherscan decoded log: {decoded}")
+                if decoded is not None:
+                    logs.append(decoded)
+
+            if len(result) < self._etherscan_page_size:
+                break
+            page += 1
+
+        logger.debug(f"Etherscan log query completed, total logs: {len(logs)}")
+        return logs
+
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.RequestException, ValueError),
+        max_time=30,
+        jitter=backoff.full_jitter,
+    )
+    def _etherscan_call(
+        self,
+        contract_address: str,
+        topics: Sequence[str | None],
+        from_block: int,
+        to_block: int,
+        page: int,
+    ) -> EtherscanLogsResponse | None:
+        if not self._etherscan_api_url:
+            return None
+
+        params: dict[str, Any] = {
+            "module": "logs",
+            "action": "getLogs",
+            "address": contract_address,
+            "fromBlock": str(from_block),
+            "toBlock": str(to_block),
+            "page": page,
+            "offset": max(1, self._etherscan_page_size),
+            "sort": "asc",
+        }
+        if self._etherscan_chain_id is not None:
+            params["chainid"] = str(self._etherscan_chain_id)
+        topic0 = topics[0] if len(topics) > 0 else None
+        topic1 = topics[1] if len(topics) > 1 else None
+        topic2 = topics[2] if len(topics) > 2 else None
+        if topic0:
+            params["topic0"] = topic0
+        if topic1:
+            params["topic1"] = topic1
+            params["topic0_1_opr"] = "and"
+        if topic2:
+            params["topic2"] = topic2
+            params["topic0_2_opr"] = "and"
+        if self._etherscan_api_key:
+            params["apikey"] = self._etherscan_api_key
+
+        response = self._etherscan_session.get(
+            self._etherscan_api_url,
+            params=params,
+            timeout=15,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Unexpected Etherscan payload")
+        return cast(EtherscanLogsResponse, payload)
+
+    def _resolve_etherscan_topics(
+        self,
+        event: ContractEvent,
+        argument_filters: dict[str, str],
+    ) -> list[str | None]:
+        try:
+            params = event._get_event_filter_params(event.abi, argument_filters)
+        except Exception:
+            return []
+
+        topics = params.get("topics") or []
+        resolved: list[str | None] = []
+        for index in range(len(topics)):
+            resolved.append(self._extract_topic(topics, index))
+        return resolved
+
+    @staticmethod
+    def _extract_topic(topics: Sequence[Any], index: int) -> str | None:
+        if len(topics) <= index:
+            return None
+
+        value = topics[index]
+        if isinstance(value, list):
+            value = value[0] if value else None
+        if value is None:
+            return None
+        if isinstance(value, (bytes, bytearray)):
+            if isinstance(value, bytearray):
+                value = bytes(value)
+            return Web3.to_hex(value)
+        if isinstance(value, str):
+            return value
+        return Web3.to_hex(value)
+
+    def _process_etherscan_log(
+        self,
+        event: ContractEvent,
+        raw_log: EtherscanLogsResult,
+    ) -> EventData | None:
+        try:
+            formatted = self._format_etherscan_log(raw_log)
+            # logger.debug(f"Processed log {formatted}")
+            return event.process_log(formatted)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _format_etherscan_log(raw_log: EtherscanLogsResult) -> dict[str, Any]:
+        def to_int(value: str | None) -> int:
+            if not value:
+                return 0
+            return Web3.to_int(hexstr=HexStr(value))
+
+        data_hex = raw_log.get("data") or "0x"
+        block_hash_hex = raw_log.get("blockHash") or "0x0"
+        tx_hash_hex = raw_log.get("transactionHash") or "0x0"
+        topics_hex = raw_log.get("topics", []) or []
+
+        return {
+            "address": raw_log.get("address"),
+            "blockHash": block_hash_hex,
+            "blockNumber": to_int(raw_log.get("blockNumber")),
+            "data": data_hex,
+            "logIndex": to_int(raw_log.get("logIndex")),
+            "topics": [
+                Web3.to_bytes(hexstr=HexStr(topic)) for topic in topics_hex if topic
+            ],
+            "transactionHash": tx_hash_hex,
+            "transactionIndex": to_int(raw_log.get("transactionIndex")),
+        }
 
     async def _resolve_block_timestamp(self, block_number: int) -> int:
         cached = self._block_timestamp_cache.get(block_number)
@@ -504,19 +812,9 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         return int(os_token_shares), int(exited_assets)
 
-    def _block_ranges(
-        self, start_block: int, min_block: int
-    ) -> Iterable[tuple[int, int]]:
-        to_block = start_block
-        while to_block >= min_block:
-            from_block = max(min_block, to_block - self._exit_log_chunk + 1)
-            yield from_block, to_block
-            to_block = from_block - 1
-
     def _resolve_min_block(self) -> int:
-        lookback_floor = max(self.block_identifier - self._exit_max_lookback_blocks, 0)
-        configured_floor = max(self._exit_queue_start_block, 0)
-        return max(lookback_floor, configured_floor)
+        """Always start from block 0 so every historical event is scanned."""
+        return 0
 
     @staticmethod
     def _append_asset(assets: list[AssetData], address: str, amount: int) -> None:
