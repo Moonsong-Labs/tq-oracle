@@ -107,13 +107,17 @@ async def send_to_safe(
         if config.safe_txn_srvc_api_key
         else None
     )
-    tx_service = TransactionServiceApi(network, ethereum_client, api_key=api_key)
+    tx_service = TransactionServiceApi(
+        network, ethereum_client, api_key=api_key, request_timeout=10
+    )
 
     safe_checksum = Web3.to_checksum_address(config.safe_address)
 
     safe_api_url = f"{tx_service.base_url}/api/v1/safes/{safe_checksum}/"
     logger.debug("Fetching Safe info from: %s", safe_api_url)
-    safe_info_response = await asyncio.to_thread(requests.get, safe_api_url)
+    safe_info_response = await asyncio.to_thread(
+        requests.get, safe_api_url, timeout=10.0
+    )
     safe_info_response.raise_for_status()
     safe_info_data = safe_info_response.json()
     nonce = int(safe_info_data.get("nonce", 0))
