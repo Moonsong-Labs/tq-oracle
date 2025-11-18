@@ -108,7 +108,7 @@ class CowSwapAdapter(BasePriceAdapter):
         """
         url = f"{self.api_base_url}/token/{token_address}/native_price"
         logger.debug(f"Calling {url}")
-        response = await asyncio.to_thread(requests.get, url)
+        response = await asyncio.to_thread(requests.get, url, timeout=10.0)
         response.raise_for_status()
         data = response.json()
         return float(data["price"])
