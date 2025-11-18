@@ -16,9 +16,6 @@ extra_tokens = { osETH = "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38" }
 
 [adapters.stakewise]
 stakewise_vault_addresses = ["0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08"]
-# Optional: configure Etherscan-compatible log scanning for exit queue queries
-etherscan_api_key = "YOUR-ETHERSCAN-KEY"
-etherscan_page_size = 1000
 
 # Example: Additional idle_balances reporting for a specific subvault
 [[subvault_adapters]]

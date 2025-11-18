@@ -52,8 +52,6 @@ class StakewiseAdapterSettings(BaseModel):
 
     stakewise_vault_addresses: list[str] = Field(default_factory=list)
     stakewise_exit_queue_start_block: int | None = None
-    etherscan_api_key: str | None = None
-    etherscan_page_size: int = 1_000
 
     model_config = ConfigDict(extra="ignore")
 
