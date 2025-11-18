@@ -43,14 +43,20 @@ class PythAdapter(BasePriceAdapter):
             return address.lower()
 
     def _scale_to_18(self, value: int, expo: int) -> int:
-        """Scale an integer `value * 10**expo` to 18-decimal fixed point."""
+        """Scale an integer `value * 10**expo` to 18-decimal fixed point.
+
+        Raises:
+            ValueError: If value is negative or scaled result exceeds uint224 max.
+        """
         if value < 0:
             raise ValueError(f"Price value must be non-negative, got {value}")
-        MAX_UINT256 = 2**256 - 1
+        MAX_UINT224 = 2**224 - 1
         shift = 18 + expo
         scaled = value * (10**shift) if shift >= 0 else value // (10**-shift)
-        if scaled > MAX_UINT256:
-            raise ValueError(f"Scaled value {scaled} exceeds uint256 max")
+        if scaled > MAX_UINT224:
+            raise ValueError(
+                f"Scaled value {scaled} exceeds uint224 max ({MAX_UINT224})"
+            )
         return scaled
 
     async def _http_get(self, url: str, *, params: dict | None = None):
