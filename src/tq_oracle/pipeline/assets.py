@@ -120,6 +120,20 @@ async def collect_assets(ctx: PipelineContext) -> None:
         cfg["subvault_address"].lower(): cfg for cfg in s.subvault_adapters
     }
 
+    dangerous_configs = [
+        cfg
+        for cfg in s.subvault_adapters
+        if cfg.get("skip_subvault_existence_check", False)
+    ]
+    if dangerous_configs and not s.allow_dangerous:
+        addresses = [cfg["subvault_address"] for cfg in dangerous_configs]
+        raise ValueError(
+            f"Configuration uses 'skip_subvault_existence_check' for subvault(s): "
+            f"{', '.join(addresses)}. This is a dangerous operation that bypasses "
+            f"subvault existence validation. You must explicitly allow this by "
+            f"passing the --allow-dangerous CLI flag."
+        )
+
     # Validate subvault_adapters config references existing subvaults
     if s.subvault_adapters:
         normalized_subvault_addrs = {addr.lower() for addr in subvault_addresses}

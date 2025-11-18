@@ -96,6 +96,7 @@ class OracleSettings(BaseSettings):
     ignore_empty_vault: bool = False
     ignore_timeout_check: bool = False
     ignore_active_proposal_check: bool = False
+    allow_dangerous: bool = False
     pre_check_retries: int = 3
     pre_check_timeout: float = 12.0
 
