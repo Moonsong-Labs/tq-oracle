@@ -12,6 +12,14 @@ class NetworkAssets(TypedDict):
     WSTETH: Optional[str]
 
 
+class StakewiseAddresses(TypedDict):
+    """Hard-coded StakeWise contract addresses per network."""
+
+    os_token: str
+    os_token_vault_escrow: str
+    vault: str
+
+
 ETH_ASSET = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 
 ETH_MAINNET_ASSETS: NetworkAssets = {
@@ -41,13 +49,6 @@ BASE_ASSETS: NetworkAssets = {
     "WSTETH": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
 }
 
-# Chainlink Price Feeds
-PRICE_FEED_USDC_ETH = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
-PRICE_FEED_USDT_ETH = "0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46"
-PRICE_FEED_USDS_USD = "0xfF30586cD0F29eD462364C7e81375FC0C71219b1"
-PRICE_FEED_ETH_USD = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-PRICE_FEED_WSTETH_ETH_BASE = "0x43a5C292A453A3bF3606fa856197f09D7B74251a"
-
 # Hardcoded overrides, if required
 # https://docs.pyth.network/price-feeds/core/price-feeds/price-feed-ids
 PYTH_PRICE_FEED_IDS: dict[str, str] = {}
@@ -60,6 +61,19 @@ MAINNET_ORACLE_HELPER = "0x000000005F543c38d5ea6D0bF10A50974Eb55E35"
 SEPOLIA_ORACLE_HELPER = "0x65464fe20562C22B2802B4094d3E042E18b5dfC2"
 BASE_ORACLE_HELPER = "0x9bB327889402AC19BF2D164eA79CcfE46c16a37B"
 
+STAKEWISE_MAINNET_ADDRESSES: StakewiseAddresses = {
+    "os_token": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
+    "os_token_vault_escrow": "0x09e84205DF7c68907e619D07aFD90143c5763605",
+    "vault": "0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08",
+}
+
+STAKEWISE_ADDRESSES: dict[str, StakewiseAddresses] = {
+    "mainnet": STAKEWISE_MAINNET_ADDRESSES,
+}
+
+
+STAKEWISE_EXIT_LOG_CHUNK = 1_000
+STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS = 28_800  # ~4 days on 12s blocks
 
 TOKEN_MESSENGER_V2_PROD = "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"
 TOKEN_MESSENGER_V2_TEST = "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"

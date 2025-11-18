@@ -51,7 +51,13 @@ async def price_assets(ctx: PipelineContext) -> None:
     log.debug("Total assets in base asset: %d", total_assets)
 
     log.info("Deriving final prices via OracleHelper...")
-    final_prices = await derive_final_prices(s, total_assets, price_data)
+    excluded_for_oracle = getattr(aggregated, "tvl_only_assets", set())
+    final_prices = await derive_final_prices(
+        s,
+        total_assets,
+        price_data,
+        excluded_assets=excluded_for_oracle,
+    )
 
     ctx.price_data = price_data
     ctx.total_assets = total_assets

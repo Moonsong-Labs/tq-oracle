@@ -10,14 +10,26 @@ log_level = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 # Configure additional adapters per subvault
 # By default, idle_balances adapter runs on ALL subvaults on the vault chain
 
+# Global adapter defaults
+[adapters.idle_balances]
+extra_tokens = { osETH = "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38" }
+
+[adapters.stakewise]
+stakewise_vault_addresses = ["0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08"]
+
 # Example: Additional idle_balances reporting for a specific subvault
 [[subvault_adapters]]
 subvault_address = "0xb764428a29EAEbe8e2301F5924746F818b331F5A"
-chain = "vault_chain"
 additional_adapters = ["idle_balances"]
-# idle_balances adapter: Check USDC not yet sent to hypercore
 skip_idle_balances = false  # Still run default vault_chain idle_balances
 skip_subvault_existence_check = false  # Validate this subvault exists in the vault contract
+
+# Example: StakeWise adapter with per-subvault override
+[[subvault_adapters]]
+subvault_address = "0x9663ca24Ef69Ee379B4a18981858F65CB804Cc2D"
+additional_adapters = ["stakewise"]
+skip_subvault_existence_check = true
+adapter_overrides = { stakewise = { stakewise_vault_addresses = ["0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08"] } }
 
 # RPC rate limiting (optional)
 max_calls = 3

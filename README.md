@@ -94,7 +94,6 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 **Configuration via TOML:**
 
 - Specify target subvault address
-- Define which chain the subvault operates on (typically `vault_chain`)
 - List additional adapters to run for this subvault
 - Option to skip default idle balances check
 - Option to skip subvault existence validation
@@ -103,7 +102,7 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 
 - `idle_balances` - Checks for idle USDC balances not yet deployed
 
-See `tq-oracle-example.toml` for complete configuration examples.
+See `tq-oracle.toml.example` for complete configuration examples.
 
 ### Usage Examples
 
@@ -194,14 +193,12 @@ The adapter name in the registry is used in the `[[subvault_adapters]]` configur
 
 ### Price Adapters
 
-Price adapters fetch USD prices for assets from price oracles (e.g., Chainlink, Pyth).
+Price adapters fetch USD prices for assets from price oracles (e.g., Pyth).
 
 1. **Create adapter file** in `src/tq_oracle/adapters/price_adapters/` implementing `BasePriceAdapter`
 2. **Register adapter** in `src/tq_oracle/adapters/price_adapters/__init__.py`'s `PRICE_ADAPTERS` list
 3. **Implement async `fetch_prices()` method** to query oracle and return price data
 4. **Write unit tests** in `tests/adapters/price_adapters/`
-
-> **Note:** `ChainlinkAdapter` is exported for use in price validators but not used directly in the main pricing pipeline.
 
 ### Price Validators
 

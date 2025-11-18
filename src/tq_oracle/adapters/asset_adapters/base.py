@@ -12,6 +12,7 @@ class AssetData:
 
     asset_address: str
     amount: int  # in native units
+    tvl_only: bool = False
 
 
 class BaseAssetAdapter(ABC):
@@ -30,11 +31,6 @@ class BaseAssetAdapter(ABC):
     def adapter_name(self) -> str:
         """Return the name of this adapter."""
         ...
-
-    @property
-    def chain(self) -> str:
-        """Return which chain this adapter operates on."""
-        return "vault_chain"
 
     @abstractmethod
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:

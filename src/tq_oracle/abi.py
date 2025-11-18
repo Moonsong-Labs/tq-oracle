@@ -16,6 +16,8 @@ ERC20_ABI_PATH = ABIS_DIR / "ERC20.json"
 GNOSIS_SAFE_ABI_PATH = ABIS_DIR / "SafeL2.json"
 WSTETH_ABI_PATH = ABIS_DIR / "WstETH.json"
 FEE_MANAGER_ABI_PATH = ABIS_DIR / "FeeManager.json"
+STAKEWISE_VAULT_ABI_PATH = ABIS_DIR / "StakeWiseVault.json"
+STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH = ABIS_DIR / "StakeWiseOsTokenVaultEscrow.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -71,6 +73,16 @@ def load_erc20_abi() -> list[dict]:
 def load_wsteth_abi() -> list[dict]:
     """Load the WstETH ABI."""
     return load_abi(WSTETH_ABI_PATH)
+
+
+def load_stakewise_vault_abi() -> list[dict]:
+    """Load the StakeWise vault ABI."""
+    return load_abi(STAKEWISE_VAULT_ABI_PATH)
+
+
+def load_stakewise_os_token_vault_escrow_abi() -> list[dict]:
+    """Load the StakeWise osToken vault escrow ABI."""
+    return load_abi(STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH)
 
 
 def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumAddress:

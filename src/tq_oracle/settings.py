@@ -13,7 +13,14 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
 from dotenv import load_dotenv
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -29,6 +36,35 @@ class Network(str, Enum):
     MAINNET = "mainnet"
     SEPOLIA = "sepolia"
     BASE = "base"
+
+
+class IdleBalancesAdapterSettings(BaseModel):
+    """Configuration options for idle balance collection."""
+
+    extra_tokens: dict[str, str] = Field(default_factory=dict)
+    extra_addresses: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class StakewiseAdapterSettings(BaseModel):
+    """Configuration options for StakeWise adapter defaults."""
+
+    stakewise_vault_addresses: list[str] = Field(default_factory=list)
+    stakewise_exit_queue_start_block: int | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class AdapterSettings(BaseModel):
+    stakewise: StakewiseAdapterSettings = Field(
+        default_factory=StakewiseAdapterSettings
+    )
+    idle_balances: IdleBalancesAdapterSettings = Field(
+        default_factory=IdleBalancesAdapterSettings
+    )
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class OracleSettings(BaseSettings):
@@ -83,8 +119,13 @@ class OracleSettings(BaseSettings):
     # --- logging ---
     log_level: str = "INFO"
 
-    # --- subvault adapters (from config file only) ---
+    # --- adapters (from config file only) ---
     subvault_adapters: list[dict[str, Any]] = []
+    adapters: AdapterSettings = Field(default_factory=AdapterSettings)
+
+    # --- stakewise shared addresses ---
+    stakewise_os_token_address: str | None = None
+    stakewise_os_token_vault_escrow: str | None = None
 
     # --- runtime computed values ---
     using_default_rpc: bool = False
@@ -131,11 +172,39 @@ class OracleSettings(BaseSettings):
             def __init__(self, settings_cls: type[BaseSettings], path: Path | None):
                 super().__init__(settings_cls)
                 self._path = path
+                self._root_keys = {
+                    name
+                    for name in settings_cls.model_fields.keys()
+                    if not name.startswith("_")
+                    and name not in {"subvault_adapters", "using_default_rpc"}
+                }
 
             def get_field_value(
                 self, field: Any, field_name: str
             ) -> tuple[Any, str, bool]:
                 return None, "", False
+
+            def _promote_root_keys(self, body: dict[str, Any]) -> None:
+                """Promote misplaced root-level settings from subvault adapters."""
+                adapters = body.get("subvault_adapters")
+                if not isinstance(adapters, list):
+                    return
+
+                cleaned_adapters: list[Any] = []
+                for adapter in adapters:
+                    if not isinstance(adapter, dict):
+                        cleaned_adapters.append(adapter)
+                        continue
+
+                    cleaned_entry: dict[str, Any] = {}
+                    for key, value in adapter.items():
+                        if key in self._root_keys:
+                            body.setdefault(key, value)
+                        else:
+                            cleaned_entry[key] = value
+                    cleaned_adapters.append(cleaned_entry)
+
+                body["subvault_adapters"] = cleaned_adapters
 
             def __call__(self) -> dict[str, Any]:
                 if not self._path:
@@ -157,6 +226,8 @@ class OracleSettings(BaseSettings):
                 body = data.get("tq_oracle", data)
                 if not isinstance(body, dict):
                     return {}
+
+                self._promote_root_keys(body)
 
                 # Check for secrets in config file
                 secret_fields = {"private_key", "safe_txn_srvc_api_key"}

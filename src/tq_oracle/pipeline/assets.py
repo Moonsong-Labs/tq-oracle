@@ -47,6 +47,16 @@ async def _fetch_subvault_addresses(state: AppState) -> list[str]:
     return list(subvault_addresses)
 
 
+def _sanitize_adapter_kwargs(values: dict[str, Any]) -> dict[str, Any]:
+    """Drop None or empty collection values from adapter kwargs."""
+
+    return {
+        key: value
+        for key, value in values.items()
+        if value is not None and (not isinstance(value, (list, dict)) or value)
+    }
+
+
 def _process_adapter_results(
     tasks_info: list[Any],
     results: tuple[BaseException | list[AssetData], ...],
@@ -106,14 +116,18 @@ async def collect_assets(ctx: PipelineContext) -> None:
     subvault_addresses = await _fetch_subvault_addresses(ctx.state)
     log.info("Found %d subvaults", len(subvault_addresses))
 
+    subvault_config_map = {
+        cfg["subvault_address"].lower(): cfg for cfg in s.subvault_adapters
+    }
+
     # Validate subvault_adapters config references existing subvaults
     if s.subvault_adapters:
         normalized_subvault_addrs = {addr.lower() for addr in subvault_addresses}
         invalid_subvaults = [
-            sv_config["subvault_address"]
-            for sv_config in s.subvault_adapters
-            if not sv_config.get("skip_subvault_existence_check", False)
-            and sv_config["subvault_address"].lower() not in normalized_subvault_addrs
+            cfg["subvault_address"]
+            for cfg in s.subvault_adapters
+            if not cfg.get("skip_subvault_existence_check", False)
+            and cfg["subvault_address"].lower() not in normalized_subvault_addrs
         ]
 
         if invalid_subvaults:
@@ -122,22 +136,32 @@ async def collect_assets(ctx: PipelineContext) -> None:
                 f"{', '.join(invalid_subvaults)}"
             )
 
+    adapter_defaults = {
+        name.lower(): value
+        for name, value in s.adapters.model_dump(
+            exclude_none=True, exclude_defaults=True
+        ).items()
+        if isinstance(value, dict)
+    }
+
     log.info("Setting up asset adapters...")
     asset_fetch_tasks = []
 
+    default_subvault_config = {
+        "additional_adapters": [],
+        "skip_idle_balances": False,
+        "adapter_overrides": {},
+    }
+
     def get_subvault_config(subvault_address: str) -> dict[str, Any]:
         """Get adapter configuration for a specific subvault."""
-        normalized_address = subvault_address.lower()
-        for config in s.subvault_adapters:
-            if config["subvault_address"].lower() == normalized_address:
-                return config
-        return {
+
+        return subvault_config_map.get(subvault_address.lower()) or {
+            **default_subvault_config,
             "subvault_address": subvault_address,
-            "additional_adapters": [],
-            "skip_idle_balances": False,
         }
 
-    # 1. Add default vault_chain idle_balances (runs against ALL subvaults unless globally skipped)
+    # 1. Add default idle_balances (runs against ALL subvaults unless globally skipped)
     should_run_default_idle_balances = any(
         not get_subvault_config(addr).get("skip_idle_balances", False)
         for addr in subvault_addresses
@@ -148,7 +172,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
         asset_fetch_tasks.append(
             ("idle_balances_vault_chain", idle_vault_adapter.fetch_all_assets())
         )
-        log.debug("Added default vault_chain idle_balances adapter (all subvaults)")
+        log.debug("Added default idle_balances adapter (all subvaults)")
 
     # 2. Add additional adapters per subvault
     def create_adapter_task(
@@ -156,7 +180,38 @@ async def collect_assets(ctx: PipelineContext) -> None:
     ) -> tuple[str, Any, str] | None:
         """Create an adapter instance for the given subvault and adapter name."""
         adapter_class = get_adapter_class(adapter_name)
-        adapter = adapter_class(s)
+
+        adapter_overrides: dict[str, Any] = {}
+        overrides_config = get_subvault_config(subvault_addr).get(
+            "adapter_overrides", {}
+        )
+        if isinstance(overrides_config, dict):
+            candidate = overrides_config.get(adapter_name)
+            if candidate is None:
+                candidate = overrides_config.get(adapter_name.lower())
+            if isinstance(candidate, dict):
+                adapter_overrides = candidate
+            elif candidate is not None:
+                log.warning(
+                    "adapter_overrides for adapter %s on subvault %s must be a mapping; got %r",
+                    adapter_name,
+                    subvault_addr,
+                    candidate,
+                )
+        else:
+            log.warning(
+                "adapter_overrides for subvault %s must be a mapping; got %r",
+                subvault_addr,
+                overrides_config,
+            )
+
+        defaults = adapter_defaults.get(adapter_name.lower(), {})
+        adapter_kwargs = _sanitize_adapter_kwargs({**defaults, **adapter_overrides})
+
+        if adapter_kwargs:
+            adapter = adapter_class(s, **adapter_kwargs)
+        else:
+            adapter = adapter_class(s)
 
         log.debug(
             "Subvault %s → additional adapter: %s",
@@ -165,25 +220,27 @@ async def collect_assets(ctx: PipelineContext) -> None:
         )
         return (subvault_addr, adapter, adapter_name)
 
-    subvaults_to_process = set(subvault_addresses)
+    extra_subvaults = {
+        cfg["subvault_address"]
+        for cfg in s.subvault_adapters
+        if cfg.get("skip_subvault_existence_check", False)
+    }
+    subvaults_to_process = set(subvault_addresses) | extra_subvaults
 
-    if s.subvault_adapters:
-        for sv_config in s.subvault_adapters:
-            if sv_config.get("skip_subvault_existence_check", False):
-                subvaults_to_process.add(sv_config["subvault_address"])
-                log.debug(
-                    "Including non-vault address for adapters: %s (skip_subvault_existence_check=true)",
-                    sv_config["subvault_address"],
-                )
+    for extra in extra_subvaults - set(subvault_addresses):
+        log.debug(
+            "Including non-vault address for adapters: %s (skip_subvault_existence_check=true)",
+            extra,
+        )
 
-    adapter_tasks: list[tuple[str, Any, str]] = []
-    for subvault_addr in subvaults_to_process:
+    adapter_tasks: list[tuple[str, Any, str]] = [
+        task
+        for subvault_addr in subvaults_to_process
         for adapter_name in get_subvault_config(subvault_addr).get(
             "additional_adapters", []
-        ):
-            maybe_task = create_adapter_task(subvault_addr, adapter_name)
-            if maybe_task is not None:
-                adapter_tasks.append(maybe_task)
+        )
+        if (task := create_adapter_task(subvault_addr, adapter_name)) is not None
+    ]
 
     log.info(
         "Fetching assets: %d adapter tasks + %d additional per-subvault tasks...",
