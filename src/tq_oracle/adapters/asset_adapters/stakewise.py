@@ -566,9 +566,14 @@ class StakeWiseAdapter(BaseAssetAdapter):
             chain_id = self._config.chain_id
             if chain_id is not None:
                 params["chainid"] = str(chain_id)
-        except (ValueError, ConnectionError):
-            # If we can't get chain_id, proceed without it
-            pass
+        except (ValueError, ConnectionError) as e:
+            # Chain ID requires RPC connection. If unavailable (e.g., in tests
+            # or when RPC is down), proceed without it - the API will default
+            # to mainnet behavior
+            logger.debug(
+                f"Could not fetch chain_id for Etherscan API request: {e}. "
+                "Proceeding without chainid parameter."
+            )
         topic0 = topics[0] if len(topics) > 0 else None
         topic1 = topics[1] if len(topics) > 1 else None
         topic2 = topics[2] if len(topics) > 2 else None
