@@ -102,9 +102,11 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self.os_token_vault_escrow_address = self.w3.to_checksum_address(
             resolved.os_token_vault_escrow
         )
-        resolved_vaults = stakewise_vault_addresses or default_vaults
-        if not resolved_vaults:
-            resolved_vaults = [stakewise_vault_address or resolved.vault]
+        resolved_vaults = (
+            stakewise_vault_addresses
+            or default_vaults
+            or [stakewise_vault_address or resolved.vault]
+        )
         if not resolved_vaults:
             raise ValueError("StakeWise adapter requires at least one vault address")
 
