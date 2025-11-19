@@ -46,17 +46,15 @@ class PythAdapter(BasePriceAdapter):
         """Scale an integer `value * 10**expo` to 18-decimal fixed point.
 
         Raises:
-            ValueError: If value is negative or scaled result exceeds uint224 max.
+            ValueError: If value is negative, expo is out of range |24|.
         """
         if value < 0:
             raise ValueError(f"Price value must be non-negative, got {value}")
-        MAX_UINT224 = 2**224 - 1
+        if not (-24 <= expo <= 24):
+            raise ValueError(f"Exponent {expo} out of supported range [-24, 24]")
+
         shift = 18 + expo
         scaled = value * (10**shift) if shift >= 0 else value // (10**-shift)
-        if scaled > MAX_UINT224:
-            raise ValueError(
-                f"Scaled value {scaled} exceeds uint224 max ({MAX_UINT224})"
-            )
         return scaled
 
     async def _http_get(self, url: str, *, params: dict | None = None):

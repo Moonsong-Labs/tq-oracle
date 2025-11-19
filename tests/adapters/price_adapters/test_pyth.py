@@ -36,6 +36,9 @@ class TestScaleTo18:
         with pytest.raises(ValueError, match="Price value must be non-negative"):
             adapter._scale_to_18(-12345, -8)
 
-    def test_scale_to_18_overflow_uint224(self, adapter):
-        with pytest.raises(ValueError, match="exceeds uint224 max"):
-            adapter._scale_to_18(10**70, 0)
+    def test_scale_to_18_expo_out_of_range(self, adapter):
+        with pytest.raises(ValueError, match="Exponent .* out of supported range"):
+            adapter._scale_to_18(1, 26)
+
+        with pytest.raises(ValueError, match="Exponent .* out of supported range"):
+            adapter._scale_to_18(1, -256)
