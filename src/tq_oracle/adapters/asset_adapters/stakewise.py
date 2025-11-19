@@ -89,10 +89,10 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         self.w3 = self._build_web3(config.vault_rpc_required)
 
-        stakewise_defaults = config.adapters.stakewise
-        default_vaults = stakewise_defaults.stakewise_vault_addresses
+        adapter_config = config.adapters.stakewise
+        config_vaults = adapter_config.stakewise_vault_addresses
         fallback_single = stakewise_vault_address or (
-            default_vaults[0] if default_vaults else None
+            config_vaults[0] if config_vaults else None
         )
         resolved = self._resolve_addresses(config, fallback_single)
 
@@ -102,9 +102,10 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self.os_token_vault_escrow_address = self.w3.to_checksum_address(
             resolved.os_token_vault_escrow
         )
+        # Explicit list > Adapter config > Single explicit or default
         resolved_vaults = (
             stakewise_vault_addresses
-            or default_vaults
+            or config_vaults
             or [stakewise_vault_address or resolved.vault]
         )
         if not resolved_vaults:
