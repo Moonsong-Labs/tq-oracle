@@ -123,7 +123,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self._exit_log_chunk = STAKEWISE_EXIT_LOG_CHUNK
         self._exit_queue_start_block = (
             stakewise_exit_queue_start_block
-            or stakewise_defaults.stakewise_exit_queue_start_block
+            or adapter_config.stakewise_exit_queue_start_block
             or 0
         )
         self._exit_max_lookback_blocks = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
