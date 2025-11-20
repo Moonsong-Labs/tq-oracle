@@ -7,6 +7,7 @@ from decimal import Decimal
 import backoff
 import requests
 from web3 import Web3
+from web3.exceptions import Web3Exception
 
 from ...abi import load_erc20_abi
 from ...settings import Network, OracleSettings
@@ -153,7 +154,12 @@ class CowSwapAdapter(BasePriceAdapter):
                 )
                 prices_accumulator.prices[asset_address] = price_wei_normalized
 
-            except Exception as e:
+            except (
+                requests.exceptions.RequestException,
+                requests.exceptions.HTTPError,
+                ValueError,
+                Web3Exception,
+            ) as e:
                 logger.warning(f" Failed to fetch price for {asset_address}: {e}")
                 continue
 
