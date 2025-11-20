@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from urllib.parse import urlencode
@@ -86,7 +87,16 @@ class PythAdapter(BasePriceAdapter):
             logger.error("Feed discovery failed for %s/%s: %s", symbol, quote, exc)
             return None
 
-        feeds = r.json()
+        try:
+            feeds = r.json()
+        except json.JSONDecodeError:
+            logger.debug(
+                "Invalid JSON in feed discovery response for %s/%s; skipping dynamic resolution",
+                symbol,
+                quote,
+            )
+            return None
+
         if not isinstance(feeds, list):
             logger.debug(
                 "Unexpected feed discovery payload for %s/%s; skipping dynamic resolution",
@@ -207,8 +217,27 @@ class PythAdapter(BasePriceAdapter):
 
         response = await self._http_get(url)
         response.raise_for_status()
-        parsed_feeds = response.json().get("parsed", [])
-        feeds_by_id = {feed.get("id"): feed for feed in parsed_feeds}
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON from Pyth Hermes: {e}")
+
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected dict from Pyth, got {type(data).__name__}")
+
+        if "parsed" not in data:
+            raise ValueError("Missing 'parsed' field in Pyth response")
+
+        parsed_feeds = data["parsed"]
+        if not isinstance(parsed_feeds, list):
+            raise ValueError(
+                f"Expected list for 'parsed' field, got {type(parsed_feeds).__name__}"
+            )
+
+        feeds_by_id = {
+            feed.get("id"): feed for feed in parsed_feeds if isinstance(feed, dict)
+        }
         logger.debug("Received %d price feeds", len(parsed_feeds))
 
         base_feed = feeds_by_id.get(base_feed_id.removeprefix("0x"))
