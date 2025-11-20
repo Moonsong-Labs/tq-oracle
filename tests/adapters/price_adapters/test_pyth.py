@@ -1,7 +1,6 @@
 import pytest
 import json
-from unittest.mock import Mock, AsyncMock
-from decimal import Decimal
+from unittest.mock import Mock
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.pyth import PythAdapter
 from tq_oracle.settings import OracleSettings, Network
@@ -39,48 +38,54 @@ def usdc_address(config):
     return address
 
 
+def create_mock_discovery_response(query: str):
+    """Helper to create mock discovery responses based on query."""
+    response = Mock()
+    response.raise_for_status = Mock()
+    
+    if "eth" in query:
+        response.json = Mock(return_value=[
+            {
+                "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+                "type": "derived",
+                "attributes": {"base": "ETH", "quote_currency": "USD"},
+            }
+        ])
+    elif "usdc" in query:
+        response.json = Mock(return_value=[
+            {
+                "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+                "type": "derived",
+                "attributes": {"base": "USDC", "quote_currency": "USD"},
+            }
+        ])
+    else:
+        response.json = Mock(return_value=[])
+    
+    return response
+
+
+def create_mock_http_get(price_response):
+    """Helper to create mock _http_get function."""
+    async def mock_http_get(url, **kwargs):
+        if "price_feeds" in url:
+            params = kwargs.get("params", {})
+            query = params.get("query", "")
+            return create_mock_discovery_response(query)
+        return price_response
+    
+    return mock_http_get
+
+
 @pytest.mark.asyncio
 async def test_fetch_prices_invalid_json(mocker, config, eth_address, usdc_address):
     adapter = PythAdapter(config)
-    
-    def mock_discovery_response(url, **kwargs):
-        params = kwargs.get("params", {})
-        query = params.get("query", "")
-        
-        response = Mock()
-        response.raise_for_status = Mock()
-        
-        if "eth" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
-                    "type": "derived",
-                    "attributes": {"base": "ETH", "quote_currency": "USD"},
-                }
-            ])
-        elif "usdc" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
-                    "type": "derived",
-                    "attributes": {"base": "USDC", "quote_currency": "USD"},
-                }
-            ])
-        else:
-            response.json = Mock(return_value=[])
-        
-        return response
     
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(side_effect=json.JSONDecodeError("test", "doc", 0))
     
-    async def mock_http_get(url, **kwargs):
-        if "price_feeds" in url:
-            return mock_discovery_response(url, **kwargs)
-        return mock_price_response
-    
-    mocker.patch.object(adapter, "_http_get", side_effect=mock_http_get)
+    mocker.patch.object(adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response))
     
     price_data = PriceData(base_asset=eth_address, prices={})
     
@@ -92,44 +97,11 @@ async def test_fetch_prices_invalid_json(mocker, config, eth_address, usdc_addre
 async def test_fetch_prices_non_dict_response(mocker, config, eth_address, usdc_address):
     adapter = PythAdapter(config)
     
-    def mock_discovery_response(url, **kwargs):
-        params = kwargs.get("params", {})
-        query = params.get("query", "")
-        
-        response = Mock()
-        response.raise_for_status = Mock()
-        
-        if "eth" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
-                    "type": "derived",
-                    "attributes": {"base": "ETH", "quote_currency": "USD"},
-                }
-            ])
-        elif "usdc" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
-                    "type": "derived",
-                    "attributes": {"base": "USDC", "quote_currency": "USD"},
-                }
-            ])
-        else:
-            response.json = Mock(return_value=[])
-        
-        return response
-    
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value="not a dict")
     
-    async def mock_http_get(url, **kwargs):
-        if "price_feeds" in url:
-            return mock_discovery_response(url, **kwargs)
-        return mock_price_response
-    
-    mocker.patch.object(adapter, "_http_get", side_effect=mock_http_get)
+    mocker.patch.object(adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response))
     
     price_data = PriceData(base_asset=eth_address, prices={})
     
@@ -141,44 +113,11 @@ async def test_fetch_prices_non_dict_response(mocker, config, eth_address, usdc_
 async def test_fetch_prices_missing_parsed_field(mocker, config, eth_address, usdc_address):
     adapter = PythAdapter(config)
     
-    def mock_discovery_response(url, **kwargs):
-        params = kwargs.get("params", {})
-        query = params.get("query", "")
-        
-        response = Mock()
-        response.raise_for_status = Mock()
-        
-        if "eth" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
-                    "type": "derived",
-                    "attributes": {"base": "ETH", "quote_currency": "USD"},
-                }
-            ])
-        elif "usdc" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
-                    "type": "derived",
-                    "attributes": {"base": "USDC", "quote_currency": "USD"},
-                }
-            ])
-        else:
-            response.json = Mock(return_value=[])
-        
-        return response
-    
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value={"other_field": "value"})
     
-    async def mock_http_get(url, **kwargs):
-        if "price_feeds" in url:
-            return mock_discovery_response(url, **kwargs)
-        return mock_price_response
-    
-    mocker.patch.object(adapter, "_http_get", side_effect=mock_http_get)
+    mocker.patch.object(adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response))
     
     price_data = PriceData(base_asset=eth_address, prices={})
     
@@ -190,44 +129,11 @@ async def test_fetch_prices_missing_parsed_field(mocker, config, eth_address, us
 async def test_fetch_prices_parsed_not_list(mocker, config, eth_address, usdc_address):
     adapter = PythAdapter(config)
     
-    def mock_discovery_response(url, **kwargs):
-        params = kwargs.get("params", {})
-        query = params.get("query", "")
-        
-        response = Mock()
-        response.raise_for_status = Mock()
-        
-        if "eth" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
-                    "type": "derived",
-                    "attributes": {"base": "ETH", "quote_currency": "USD"},
-                }
-            ])
-        elif "usdc" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
-                    "type": "derived",
-                    "attributes": {"base": "USDC", "quote_currency": "USD"},
-                }
-            ])
-        else:
-            response.json = Mock(return_value=[])
-        
-        return response
-    
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value={"parsed": "not a list"})
     
-    async def mock_http_get(url, **kwargs):
-        if "price_feeds" in url:
-            return mock_discovery_response(url, **kwargs)
-        return mock_price_response
-    
-    mocker.patch.object(adapter, "_http_get", side_effect=mock_http_get)
+    mocker.patch.object(adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response))
     
     price_data = PriceData(base_asset=eth_address, prices={})
     
@@ -239,44 +145,11 @@ async def test_fetch_prices_parsed_not_list(mocker, config, eth_address, usdc_ad
 async def test_fetch_prices_invalid_feed_item(mocker, config, eth_address, usdc_address):
     adapter = PythAdapter(config)
     
-    def mock_discovery_response(url, **kwargs):
-        params = kwargs.get("params", {})
-        query = params.get("query", "")
-        
-        response = Mock()
-        response.raise_for_status = Mock()
-        
-        if "eth" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
-                    "type": "derived",
-                    "attributes": {"base": "ETH", "quote_currency": "USD"},
-                }
-            ])
-        elif "usdc" in query:
-            response.json = Mock(return_value=[
-                {
-                    "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
-                    "type": "derived",
-                    "attributes": {"base": "USDC", "quote_currency": "USD"},
-                }
-            ])
-        else:
-            response.json = Mock(return_value=[])
-        
-        return response
-    
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value={"parsed": ["not a dict", "also not a dict"]})
     
-    async def mock_http_get(url, **kwargs):
-        if "price_feeds" in url:
-            return mock_discovery_response(url, **kwargs)
-        return mock_price_response
-    
-    mocker.patch.object(adapter, "_http_get", side_effect=mock_http_get)
+    mocker.patch.object(adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response))
     
     price_data = PriceData(base_asset=eth_address, prices={})
     
