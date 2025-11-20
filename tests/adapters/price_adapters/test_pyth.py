@@ -83,16 +83,16 @@ def create_mock_http_get(price_response):
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_invalid_json(config, eth_address, usdc_address, monkeypatch):
+async def test_fetch_prices_invalid_json(
+    config, eth_address, usdc_address, monkeypatch
+):
     adapter = PythAdapter(config)
 
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(side_effect=json.JSONDecodeError("test", "doc", 0))
 
-    monkeypatch.setattr(
-        adapter, "_http_get", create_mock_http_get(mock_price_response)
-    )
+    monkeypatch.setattr(adapter, "_http_get", create_mock_http_get(mock_price_response))
 
     price_data = PriceData(base_asset=eth_address, prices={})
 
@@ -110,9 +110,7 @@ async def test_fetch_prices_non_dict_response(
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value="not a dict")
 
-    monkeypatch.setattr(
-        adapter, "_http_get", create_mock_http_get(mock_price_response)
-    )
+    monkeypatch.setattr(adapter, "_http_get", create_mock_http_get(mock_price_response))
 
     price_data = PriceData(base_asset=eth_address, prices={})
 
@@ -130,9 +128,7 @@ async def test_fetch_prices_missing_parsed_field(
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value={"other_field": "value"})
 
-    monkeypatch.setattr(
-        adapter, "_http_get", create_mock_http_get(mock_price_response)
-    )
+    monkeypatch.setattr(adapter, "_http_get", create_mock_http_get(mock_price_response))
 
     price_data = PriceData(base_asset=eth_address, prices={})
 
@@ -141,16 +137,16 @@ async def test_fetch_prices_missing_parsed_field(
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_parsed_not_list(config, eth_address, usdc_address, monkeypatch):
+async def test_fetch_prices_parsed_not_list(
+    config, eth_address, usdc_address, monkeypatch
+):
     adapter = PythAdapter(config)
 
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value={"parsed": "not a list"})
 
-    monkeypatch.setattr(
-        adapter, "_http_get", create_mock_http_get(mock_price_response)
-    )
+    monkeypatch.setattr(adapter, "_http_get", create_mock_http_get(mock_price_response))
 
     price_data = PriceData(base_asset=eth_address, prices={})
 
@@ -170,9 +166,7 @@ async def test_fetch_prices_invalid_feed_item(
         return_value={"parsed": ["not a dict", "also not a dict"]}
     )
 
-    monkeypatch.setattr(
-        adapter, "_http_get", create_mock_http_get(mock_price_response)
-    )
+    monkeypatch.setattr(adapter, "_http_get", create_mock_http_get(mock_price_response))
 
     price_data = PriceData(base_asset=eth_address, prices={})
 
