@@ -87,6 +87,10 @@ def test_deviation_thresholds(validator):
     assert validator.failure_tolerance == 1.0
 
 
+async def _usdc_decimals(self, _token_address: str) -> int:
+    return 6
+
+
 @pytest.mark.asyncio
 async def test_validate_prices_disabled(config, eth_address, usdc_address):
     """Test that validation passes when Pyth is disabled."""
@@ -105,7 +109,9 @@ async def test_validate_prices_disabled(config, eth_address, usdc_address):
 
 
 @pytest.mark.asyncio
-async def test_validate_prices_with_mocked_pyth(config, eth_address, usdc_address):
+async def test_validate_prices_with_mocked_pyth(
+    config, eth_address, usdc_address, monkeypatch
+):
     """Test validation with mocked HTTP response."""
     validator = PythValidator(config)
 
@@ -143,9 +149,14 @@ async def test_validate_prices_with_mocked_pyth(config, eth_address, usdc_addres
         side_effect=_patch_requests(mock_discovery_response, mock_price_response),
     ):
         # Oracle price: USDC is ~1/3000 ETH (since ETH is $3000 and USDC is $1)
+        monkeypatch.setattr(
+            "tq_oracle.adapters.price_adapters.pyth.PythAdapter.get_token_decimals",
+            _usdc_decimals,
+        )
+
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: int((1 / 3000) * 1e18)},
+            prices={usdc_address: 333_333_333_333_333_000_000_000_000},
         )
 
         result = await validator.validate_prices(price_data)
@@ -156,7 +167,7 @@ async def test_validate_prices_with_mocked_pyth(config, eth_address, usdc_addres
 
 @pytest.mark.asyncio
 async def test_validate_prices_fails_on_excessive_deviation(
-    config, eth_address, usdc_address
+    config, eth_address, usdc_address, monkeypatch
 ):
     """Test that validation fails when price deviation exceeds threshold."""
     validator = PythValidator(config)
@@ -195,9 +206,14 @@ async def test_validate_prices_fails_on_excessive_deviation(
         side_effect=_patch_requests(mock_discovery_response, mock_price_response),
     ):
         # Oracle price: Intentionally wrong - USDC price way off
+        monkeypatch.setattr(
+            "tq_oracle.adapters.price_adapters.pyth.PythAdapter.get_token_decimals",
+            _usdc_decimals,
+        )
+
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: int((1 / 2000) * 1e18)},  # 50% deviation
+            prices={usdc_address: 500_000_000_000_000_000_000_000_000},
         )
 
         result = await validator.validate_prices(price_data)
@@ -211,7 +227,7 @@ async def test_validate_prices_fails_on_excessive_deviation(
 
 @pytest.mark.asyncio
 async def test_validate_prices_handles_stale_eth_price(
-    config, eth_address, usdc_address
+    config, eth_address, usdc_address, monkeypatch
 ):
     """Test that validation fails when ETH/USD price is stale."""
     validator = PythValidator(config)
@@ -240,9 +256,14 @@ async def test_validate_prices_handles_stale_eth_price(
         "requests.get",
         side_effect=_patch_requests(mock_discovery_response, mock_price_response),
     ):
+        monkeypatch.setattr(
+            "tq_oracle.adapters.price_adapters.pyth.PythAdapter.get_token_decimals",
+            _usdc_decimals,
+        )
+
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: int((1 / 3000) * 1e18)},
+            prices={usdc_address: 333_333_333_333_333_000_000_000_000},
         )
 
         result = await validator.validate_prices(price_data)
@@ -252,15 +273,22 @@ async def test_validate_prices_handles_stale_eth_price(
 
 
 @pytest.mark.asyncio
-async def test_validate_prices_handles_api_error(config, eth_address, usdc_address):
+async def test_validate_prices_handles_api_error(
+    config, eth_address, usdc_address, monkeypatch
+):
     """Test that validation handles API errors gracefully."""
     validator = PythValidator(config)
 
     # Mock an exception during the HTTP call
     with patch("requests.get", side_effect=Exception("API Error")):
+        monkeypatch.setattr(
+            "tq_oracle.adapters.price_adapters.pyth.PythAdapter.get_token_decimals",
+            _usdc_decimals,
+        )
+
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: int((1 / 3000) * 1e18)},
+            prices={usdc_address: 333_333_333_333_333_000_000_000_000},
         )
 
         result = await validator.validate_prices(price_data)

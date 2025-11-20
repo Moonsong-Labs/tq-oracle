@@ -6,9 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 import backoff
 import requests
-from web3 import Web3
 
-from ...abi import load_erc20_abi
 from ...settings import Network, OracleSettings
 from .base import BasePriceAdapter, PriceData
 
@@ -55,38 +53,6 @@ class CowSwapAdapter(BasePriceAdapter):
     @property
     def adapter_name(self) -> str:
         return "cow_swap"
-
-    async def get_token_decimals(self, token_address: str) -> int:
-        """Fetch token decimals from on-chain contract, with caching.
-
-        Args:
-            token_address: The token contract address
-
-        Returns:
-            Number of decimals for the token
-        """
-        if token_address in self._decimals_cache:
-            return self._decimals_cache[token_address]
-
-        w3 = Web3(Web3.HTTPProvider(self.vault_rpc))
-        erc20_abi = load_erc20_abi()
-        token_contract = w3.eth.contract(
-            address=w3.to_checksum_address(token_address),
-            abi=erc20_abi,
-        )
-
-        decimals = await asyncio.to_thread(
-            lambda: int(
-                token_contract.functions.decimals().call(
-                    block_identifier=self.block_number
-                )
-            )
-        )
-
-        self._decimals_cache[token_address] = decimals
-        logger.debug(f" Fetched decimals for {token_address}: {decimals}")
-
-        return decimals
 
     @backoff.on_exception(
         backoff.expo,
@@ -144,7 +110,6 @@ class CowSwapAdapter(BasePriceAdapter):
                 continue
 
             try:
-                token_decimals = await self.get_token_decimals(asset_address)
                 native_price = await self.fetch_native_price(asset_address)
 
                 price_wei = int(
@@ -153,7 +118,7 @@ class CowSwapAdapter(BasePriceAdapter):
                     .to_integral_value(rounding=ROUND_HALF_UP)
                 )
                 logger.debug(
-                    f" Fetched price for {asset_address}: {price_wei} (D18) per base unit (decimals: {token_decimals})"
+                    f" Fetched price for {asset_address}: {price_wei} (D18) per base unit "
                 )
                 prices_accumulator.prices[asset_address] = price_wei
 
