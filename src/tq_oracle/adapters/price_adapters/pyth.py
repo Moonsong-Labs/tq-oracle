@@ -5,6 +5,7 @@ import logging
 import time
 from urllib.parse import urlencode
 
+import backoff
 import requests
 from web3 import Web3
 
@@ -47,10 +48,23 @@ class PythAdapter(BasePriceAdapter):
         shift = 18 + expo
         return value * (10**shift) if shift >= 0 else value // (10**-shift)
 
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.exceptions.RequestException, requests.exceptions.HTTPError),
+        max_tries=5,
+        giveup=lambda e: (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code not in {429, 500, 502, 503, 504}
+        ),
+        jitter=backoff.full_jitter,
+    )
     async def _http_get(self, url: str, *, params: dict | None = None):
-        return await asyncio.to_thread(
+        response = await asyncio.to_thread(
             lambda: requests.get(url, params=params, timeout=2.0)
         )
+        response.raise_for_status()
+        return response
 
     async def _resolve_feed_id(self, symbol: str, quote: str = "USD") -> str | None:
         key = f"{symbol.upper()}/{quote.upper()}"
