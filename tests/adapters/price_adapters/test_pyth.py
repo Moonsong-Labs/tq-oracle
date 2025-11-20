@@ -83,15 +83,15 @@ def create_mock_http_get(price_response):
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_invalid_json(mocker, config, eth_address, usdc_address):
+async def test_fetch_prices_invalid_json(config, eth_address, usdc_address, monkeypatch):
     adapter = PythAdapter(config)
 
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(side_effect=json.JSONDecodeError("test", "doc", 0))
 
-    mocker.patch.object(
-        adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response)
+    monkeypatch.setattr(
+        adapter, "_http_get", create_mock_http_get(mock_price_response)
     )
 
     price_data = PriceData(base_asset=eth_address, prices={})
@@ -102,7 +102,7 @@ async def test_fetch_prices_invalid_json(mocker, config, eth_address, usdc_addre
 
 @pytest.mark.asyncio
 async def test_fetch_prices_non_dict_response(
-    mocker, config, eth_address, usdc_address
+    config, eth_address, usdc_address, monkeypatch
 ):
     adapter = PythAdapter(config)
 
@@ -110,8 +110,8 @@ async def test_fetch_prices_non_dict_response(
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value="not a dict")
 
-    mocker.patch.object(
-        adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response)
+    monkeypatch.setattr(
+        adapter, "_http_get", create_mock_http_get(mock_price_response)
     )
 
     price_data = PriceData(base_asset=eth_address, prices={})
@@ -122,7 +122,7 @@ async def test_fetch_prices_non_dict_response(
 
 @pytest.mark.asyncio
 async def test_fetch_prices_missing_parsed_field(
-    mocker, config, eth_address, usdc_address
+    config, eth_address, usdc_address, monkeypatch
 ):
     adapter = PythAdapter(config)
 
@@ -130,8 +130,8 @@ async def test_fetch_prices_missing_parsed_field(
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value={"other_field": "value"})
 
-    mocker.patch.object(
-        adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response)
+    monkeypatch.setattr(
+        adapter, "_http_get", create_mock_http_get(mock_price_response)
     )
 
     price_data = PriceData(base_asset=eth_address, prices={})
@@ -141,15 +141,15 @@ async def test_fetch_prices_missing_parsed_field(
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_parsed_not_list(mocker, config, eth_address, usdc_address):
+async def test_fetch_prices_parsed_not_list(config, eth_address, usdc_address, monkeypatch):
     adapter = PythAdapter(config)
 
     mock_price_response = Mock()
     mock_price_response.raise_for_status = Mock()
     mock_price_response.json = Mock(return_value={"parsed": "not a list"})
 
-    mocker.patch.object(
-        adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response)
+    monkeypatch.setattr(
+        adapter, "_http_get", create_mock_http_get(mock_price_response)
     )
 
     price_data = PriceData(base_asset=eth_address, prices={})
@@ -160,7 +160,7 @@ async def test_fetch_prices_parsed_not_list(mocker, config, eth_address, usdc_ad
 
 @pytest.mark.asyncio
 async def test_fetch_prices_invalid_feed_item(
-    mocker, config, eth_address, usdc_address
+    config, eth_address, usdc_address, monkeypatch
 ):
     adapter = PythAdapter(config)
 
@@ -170,8 +170,8 @@ async def test_fetch_prices_invalid_feed_item(
         return_value={"parsed": ["not a dict", "also not a dict"]}
     )
 
-    mocker.patch.object(
-        adapter, "_http_get", side_effect=create_mock_http_get(mock_price_response)
+    monkeypatch.setattr(
+        adapter, "_http_get", create_mock_http_get(mock_price_response)
     )
 
     price_data = PriceData(base_asset=eth_address, prices={})
@@ -181,14 +181,14 @@ async def test_fetch_prices_invalid_feed_item(
 
 
 @pytest.mark.asyncio
-async def test_discover_feed_invalid_json(mocker, config):
+async def test_discover_feed_invalid_json(config, monkeypatch):
     adapter = PythAdapter(config)
 
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(side_effect=json.JSONDecodeError("test", "doc", 0))
 
-    mocker.patch.object(adapter, "_http_get", return_value=mock_response)
+    monkeypatch.setattr(adapter, "_http_get", lambda *args, **kwargs: mock_response)
 
     result = await adapter._discover_feed_from_api("ETH", "USD")
 
@@ -196,14 +196,14 @@ async def test_discover_feed_invalid_json(mocker, config):
 
 
 @pytest.mark.asyncio
-async def test_discover_feed_non_list_response(mocker, config):
+async def test_discover_feed_non_list_response(config, monkeypatch):
     adapter = PythAdapter(config)
 
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(return_value={"not": "a list"})
 
-    mocker.patch.object(adapter, "_http_get", return_value=mock_response)
+    monkeypatch.setattr(adapter, "_http_get", lambda *args, **kwargs: mock_response)
 
     result = await adapter._discover_feed_from_api("ETH", "USD")
 
