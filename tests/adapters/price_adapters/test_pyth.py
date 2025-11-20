@@ -236,6 +236,55 @@ async def test_fetch_prices_parsed_not_list(mocker, config, eth_address, usdc_ad
 
 
 @pytest.mark.asyncio
+async def test_fetch_prices_invalid_feed_item(mocker, config, eth_address, usdc_address):
+    adapter = PythAdapter(config)
+    
+    def mock_discovery_response(url, **kwargs):
+        params = kwargs.get("params", {})
+        query = params.get("query", "")
+        
+        response = Mock()
+        response.raise_for_status = Mock()
+        
+        if "eth" in query:
+            response.json = Mock(return_value=[
+                {
+                    "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+                    "type": "derived",
+                    "attributes": {"base": "ETH", "quote_currency": "USD"},
+                }
+            ])
+        elif "usdc" in query:
+            response.json = Mock(return_value=[
+                {
+                    "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+                    "type": "derived",
+                    "attributes": {"base": "USDC", "quote_currency": "USD"},
+                }
+            ])
+        else:
+            response.json = Mock(return_value=[])
+        
+        return response
+    
+    mock_price_response = Mock()
+    mock_price_response.raise_for_status = Mock()
+    mock_price_response.json = Mock(return_value={"parsed": ["not a dict", "also not a dict"]})
+    
+    async def mock_http_get(url, **kwargs):
+        if "price_feeds" in url:
+            return mock_discovery_response(url, **kwargs)
+        return mock_price_response
+    
+    mocker.patch.object(adapter, "_http_get", side_effect=mock_http_get)
+    
+    price_data = PriceData(base_asset=eth_address, prices={})
+    
+    with pytest.raises(ValueError, match="Invalid feed item at index 0"):
+        await adapter.fetch_prices([usdc_address], price_data)
+
+
+@pytest.mark.asyncio
 async def test_discover_feed_invalid_json(mocker, config):
     adapter = PythAdapter(config)
     

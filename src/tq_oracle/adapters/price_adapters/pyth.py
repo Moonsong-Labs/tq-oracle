@@ -235,9 +235,13 @@ class PythAdapter(BasePriceAdapter):
                 f"Expected list for 'parsed' field, got {type(parsed_feeds).__name__}"
             )
 
-        feeds_by_id = {
-            feed.get("id"): feed for feed in parsed_feeds if isinstance(feed, dict)
-        }
+        for i, feed in enumerate(parsed_feeds):
+            if not isinstance(feed, dict):
+                raise ValueError(
+                    f"Invalid feed item at index {i}: expected dict, got {type(feed).__name__}"
+                )
+
+        feeds_by_id = {feed.get("id"): feed for feed in parsed_feeds}
         logger.debug("Received %d price feeds", len(parsed_feeds))
 
         base_feed = feeds_by_id.get(base_feed_id.removeprefix("0x"))
