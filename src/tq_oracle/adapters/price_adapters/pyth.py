@@ -26,7 +26,7 @@ class PythAdapter(BasePriceAdapter):
         self.max_confidence_ratio = config.pyth_max_confidence_ratio
 
         self._address_to_symbol: dict[str, str] = {
-            self._canonical_address(addr): sym
+            Web3.to_checksum_address(addr): sym
             for sym, addr in config.assets.items()
             if isinstance(addr, str) and addr
         }
@@ -35,12 +35,6 @@ class PythAdapter(BasePriceAdapter):
     @property
     def adapter_name(self) -> str:
         return "pyth"
-
-    def _canonical_address(self, address: str) -> str:
-        try:
-            return Web3.to_checksum_address(address)
-        except ValueError:
-            return address.lower()
 
     def _scale_to_18(self, value: int, expo: int) -> int:
         """Scale an integer `value * 10**expo` to 18-decimal fixed point."""
@@ -139,12 +133,12 @@ class PythAdapter(BasePriceAdapter):
             )
 
     def _symbol_for(self, address: str) -> str | None:
-        return self._address_to_symbol.get(self._canonical_address(address))
+        return self._address_to_symbol.get(Web3.to_checksum_address(address))
 
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
-        base_address = self._canonical_address(prices_accumulator.base_asset)
+        base_address = Web3.to_checksum_address(prices_accumulator.base_asset)
         base_symbol = self._symbol_for(base_address)
         if not base_symbol:
             raise ValueError(
@@ -159,7 +153,7 @@ class PythAdapter(BasePriceAdapter):
 
         canonical_to_original: dict[str, str] = {}
         for address in asset_addresses:
-            canonical_address = self._canonical_address(address)
+            canonical_address = Web3.to_checksum_address(address)
             if canonical_address != base_address:
                 canonical_to_original.setdefault(canonical_address, address)
 
