@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 import backoff
 import requests
@@ -132,7 +132,8 @@ class CowSwapAdapter(BasePriceAdapter):
             - Fetches native prices directly from CoW Swap API.
             - Processes all assets EXCEPT those on the skipped_assets (ETH, WETH).
             - Token decimals are fetched dynamically from on-chain and cached.
-            - CoW API returns price per 1 whole token in ETH.
+            - CoW API returns the amount of native token atoms (wei) needed per
+              single smallest token unit (base unit).
         """
         if prices_accumulator.base_asset != self.eth_address:
             raise ValueError("CowSwap adapter only supports ETH as base asset")
@@ -146,12 +147,15 @@ class CowSwapAdapter(BasePriceAdapter):
                 token_decimals = await self.get_token_decimals(asset_address)
                 native_price = await self.fetch_native_price(asset_address)
 
-                price_wei = int(Decimal(str(native_price)) * 10**18)
-                price_wei_normalized = price_wei // (10 ** (18 - token_decimals))
-                logger.debug(
-                    f" Fetched price for {asset_address}: {price_wei_normalized} wei (decimals: {token_decimals})"
+                price_wei = int(
+                    Decimal(str(native_price))
+                    .scaleb(18)
+                    .to_integral_value(rounding=ROUND_HALF_UP)
                 )
-                prices_accumulator.prices[asset_address] = price_wei_normalized
+                logger.debug(
+                    f" Fetched price for {asset_address}: {price_wei} (D18) per base unit (decimals: {token_decimals})"
+                )
+                prices_accumulator.prices[asset_address] = price_wei
 
             except Exception as e:
                 logger.warning(f" Failed to fetch price for {asset_address}: {e}")

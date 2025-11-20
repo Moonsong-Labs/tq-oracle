@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal, ROUND_HALF_UP
 
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
@@ -87,6 +88,86 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
     assert result.prices["0x111"] == 1
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_uses_native_quote_in_wei(monkeypatch, config, eth_address, usdc_address):
+    adapter = CowSwapAdapter(config)
+    wbtc_address = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+
+    async def _fake_decimals(token_address: str) -> int:
+        if token_address == usdc_address:
+            return 6
+        if token_address == wbtc_address:
+            return 8
+        raise AssertionError("unexpected token address")
+
+    async def _fake_native_price(token_address: str) -> float:
+        if token_address == usdc_address:
+            return 336732429.45504427  # wei per base unit from CoW API sample
+        if token_address == wbtc_address:
+            return 303129509051.44714  # wei per base unit from CoW API sample
+        raise AssertionError("unexpected token address")
+
+    monkeypatch.setattr(adapter, "get_token_decimals", _fake_decimals)
+    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
+
+    result = await adapter.fetch_prices(
+        [usdc_address, wbtc_address], PriceData(base_asset=eth_address, prices={})
+    )
+
+    assert result.prices[usdc_address] == 336732429455044270000000000
+    assert result.prices[wbtc_address] == 303129509051447140000000000000
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_scales_to_d18_with_round_half_up(monkeypatch, config, eth_address):
+    adapter = CowSwapAdapter(config)
+    token_address = "0xToken"
+
+    async def _fake_decimals(token_address: str) -> int:  # pragma: no cover - deterministic
+        return 6
+
+    async def _fake_native_price(token_address: str) -> float:
+        return 1.2345678901234567  # native price with fractional wei component
+
+    monkeypatch.setattr(adapter, "get_token_decimals", _fake_decimals)
+    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
+
+    result = await adapter.fetch_prices(
+        [token_address], PriceData(base_asset=eth_address, prices={})
+    )
+
+    expected = int(
+        Decimal("1.2345678901234567").scaleb(18).to_integral_value(
+            rounding=ROUND_HALF_UP
+        )
+    )
+    assert result.prices[token_address] == expected
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_does_not_rescale_by_token_decimals(monkeypatch, config, eth_address):
+    adapter = CowSwapAdapter(config)
+    token_address = "0xToken"
+
+    async def _fake_decimals(token_address: str) -> int:
+        return 6  # regression guard: decimals should not alter D18 price scaling
+
+    async def _fake_native_price(token_address: str) -> float:
+        return 1234.5  # native price in wei per smallest token unit
+
+    monkeypatch.setattr(adapter, "get_token_decimals", _fake_decimals)
+    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
+
+    result = await adapter.fetch_prices(
+        [token_address], PriceData(base_asset=eth_address, prices={})
+    )
+
+    expected = int(
+        Decimal("1234.5").scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
+    )
+    assert result.prices[token_address] == expected
 
 
 @pytest.mark.asyncio
