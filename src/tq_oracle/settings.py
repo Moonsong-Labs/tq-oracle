@@ -100,6 +100,8 @@ class OracleSettings(BaseSettings):
     pre_check_timeout: float = 12.0
 
     # --- price validation ---
+    price_validation_retries: int = 3
+    price_validation_timeout: float = 12.0
     price_warning_tolerance_percentage: float = 0.5
     price_failure_tolerance_percentage: float = 1.0
 
