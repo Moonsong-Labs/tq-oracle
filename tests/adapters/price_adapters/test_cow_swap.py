@@ -1,6 +1,6 @@
 import pytest
 import json
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 from decimal import Decimal
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
@@ -254,13 +254,13 @@ async def test_fetch_prices_preserves_precision(mocker, config, eth_address):
 async def test_fetch_native_price_invalid_json(mocker, config):
     adapter = CowSwapAdapter(config)
     test_token = "0xTestToken"
-    
+
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(side_effect=json.JSONDecodeError("test", "doc", 0))
-    
+
     mocker.patch("asyncio.to_thread", return_value=mock_response)
-    
+
     with pytest.raises(ValueError, match="Invalid JSON from CowSwap API"):
         await adapter.fetch_native_price(test_token)
 
@@ -269,13 +269,13 @@ async def test_fetch_native_price_invalid_json(mocker, config):
 async def test_fetch_native_price_non_dict_response(mocker, config):
     adapter = CowSwapAdapter(config)
     test_token = "0xTestToken"
-    
+
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(return_value="not a dict")
-    
+
     mocker.patch("asyncio.to_thread", return_value=mock_response)
-    
+
     with pytest.raises(ValueError, match="Invalid response structure"):
         await adapter.fetch_native_price(test_token)
 
@@ -284,13 +284,13 @@ async def test_fetch_native_price_non_dict_response(mocker, config):
 async def test_fetch_native_price_missing_price_field(mocker, config):
     adapter = CowSwapAdapter(config)
     test_token = "0xTestToken"
-    
+
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(return_value={"other_field": "value"})
-    
+
     mocker.patch("asyncio.to_thread", return_value=mock_response)
-    
+
     with pytest.raises(ValueError, match="Invalid response structure"):
         await adapter.fetch_native_price(test_token)
 
@@ -299,13 +299,13 @@ async def test_fetch_native_price_missing_price_field(mocker, config):
 async def test_fetch_native_price_invalid_price_value(mocker, config):
     adapter = CowSwapAdapter(config)
     test_token = "0xTestToken"
-    
+
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(return_value={"price": "not_a_number"})
-    
+
     mocker.patch("asyncio.to_thread", return_value=mock_response)
-    
+
     with pytest.raises(ValueError, match="Invalid price value"):
         await adapter.fetch_native_price(test_token)
 
@@ -314,13 +314,13 @@ async def test_fetch_native_price_invalid_price_value(mocker, config):
 async def test_fetch_native_price_valid_string_price(mocker, config):
     adapter = CowSwapAdapter(config)
     test_token = "0xTestToken"
-    
+
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(return_value={"price": "123.456"})
-    
+
     mocker.patch("asyncio.to_thread", return_value=mock_response)
-    
+
     result = await adapter.fetch_native_price(test_token)
     assert result == Decimal("123.456")
     assert isinstance(result, Decimal)
@@ -330,13 +330,13 @@ async def test_fetch_native_price_valid_string_price(mocker, config):
 async def test_fetch_native_price_valid_numeric_price(mocker, config):
     adapter = CowSwapAdapter(config)
     test_token = "0xTestToken"
-    
+
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(return_value={"price": 123.456})
-    
+
     mocker.patch("asyncio.to_thread", return_value=mock_response)
-    
+
     result = await adapter.fetch_native_price(test_token)
     assert result == Decimal("123.456")
     assert isinstance(result, Decimal)
@@ -346,16 +346,19 @@ async def test_fetch_native_price_valid_numeric_price(mocker, config):
 async def test_fetch_native_price_timeout_used(mocker, config):
     adapter = CowSwapAdapter(config)
     test_token = "0xTestToken"
-    
+
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json = Mock(return_value={"price": "100"})
-    
+
     mock_requests_get = mocker.patch("requests.get", return_value=mock_response)
-    mocker.patch("asyncio.to_thread", side_effect=lambda func, *args, **kwargs: func(*args, **kwargs))
-    
+    mocker.patch(
+        "asyncio.to_thread",
+        side_effect=lambda func, *args, **kwargs: func(*args, **kwargs),
+    )
+
     await adapter.fetch_native_price(test_token)
-    
+
     mock_requests_get.assert_called_once()
     call_args = mock_requests_get.call_args
     assert "timeout" in call_args[1]
