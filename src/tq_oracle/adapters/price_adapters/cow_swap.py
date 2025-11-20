@@ -7,7 +7,7 @@ from decimal import Decimal
 import backoff
 import requests
 from web3 import Web3
-from web3.exceptions import Web3Exception
+from web3.exceptions import BadFunctionCallOutput, ContractLogicError
 
 from ...abi import load_erc20_abi
 from ...settings import Network, OracleSettings
@@ -157,10 +157,16 @@ class CowSwapAdapter(BasePriceAdapter):
             except (
                 requests.exceptions.RequestException,
                 requests.exceptions.HTTPError,
-                ValueError,
-                Web3Exception,
             ) as e:
-                logger.warning(f" Failed to fetch price for {asset_address}: {e}")
+                logger.warning(
+                    f" Network error fetching price for {asset_address}: {e}"
+                )
+                continue
+            except ValueError as e:
+                logger.warning(f" Invalid price data for {asset_address}: {e}")
+                continue
+            except (BadFunctionCallOutput, ContractLogicError) as e:
+                logger.warning(f" Contract call failed for {asset_address}: {e}")
                 continue
 
         self.validate_prices(prices_accumulator)
