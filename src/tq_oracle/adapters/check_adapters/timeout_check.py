@@ -106,8 +106,8 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
                 block_identifier=block_number
             )
 
-            latest_block = await w3.eth.get_block("latest")
-            current_timestamp = latest_block["timestamp"]
+            block_info = await w3.eth.get_block(block_number)
+            current_timestamp = block_info["timestamp"]
 
             next_valid_time = last_report_timestamp + timeout
             can_submit = current_timestamp >= next_valid_time
