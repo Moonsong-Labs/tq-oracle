@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -66,21 +67,40 @@ class CowSwapAdapter(BasePriceAdapter):
         ),
         jitter=backoff.full_jitter,
     )
-    async def fetch_native_price(self, token_address: str) -> float:
+    async def fetch_native_price(self, token_address: str) -> Decimal:
         """Fetch native price (ETH) for a token from CoW Protocol API.
 
         Args:
             token_address: The token contract address
 
         Returns:
-            Native price in ETH
+            Native price in ETH as a Decimal to avoid float precision loss
+
+        Raises:
+            ValueError: If response is invalid or contains malformed data
+            requests.exceptions.RequestException: If request fails
         """
         url = f"{self.api_base_url}/token/{token_address}/native_price"
         logger.debug(f"Calling {url}")
         response = await asyncio.to_thread(requests.get, url, timeout=10.0)
         response.raise_for_status()
-        data = response.json()
-        return float(data["price"])
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON from CowSwap API")
+
+        if not isinstance(data, dict) or "price" not in data:
+            raise ValueError(f"Invalid response structure: {data}")
+
+        price_value = data["price"]
+
+        try:
+            price_decimal = Decimal(str(price_value))
+        except Exception as e:
+            raise ValueError(f"Invalid price value: {price_value}") from e
+
+        return price_decimal
 
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
@@ -116,7 +136,7 @@ class CowSwapAdapter(BasePriceAdapter):
                 native_price = await self.fetch_native_price(asset_address)
 
                 price_wei = int(
-                    Decimal(str(native_price))
+                    Decimal(native_price)
                     .scaleb(18)
                     .to_integral_value(rounding=ROUND_HALF_UP)
                 )

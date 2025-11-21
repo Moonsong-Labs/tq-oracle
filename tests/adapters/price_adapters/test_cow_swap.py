@@ -1,4 +1,6 @@
 import pytest
+import json
+from unittest.mock import Mock
 from decimal import Decimal, ROUND_HALF_UP
 
 from tq_oracle.adapters.price_adapters.base import PriceData
@@ -110,8 +112,14 @@ async def test_fetch_prices_uses_native_quote_in_wei(
         [usdc_address, wbtc_address], PriceData(base_asset=eth_address, prices={})
     )
 
-    assert result.prices[usdc_address] == 336732429455044270000000000
-    assert result.prices[wbtc_address] == 303129509051447140000000000000
+    expected_usdc = int(
+        Decimal(336732429.45504427).scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
+    )
+    expected_wbtc = int(
+        Decimal(303129509051.44714).scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
+    )
+    assert result.prices[usdc_address] == expected_usdc
+    assert result.prices[wbtc_address] == expected_wbtc
 
 
 @pytest.mark.asyncio
@@ -131,9 +139,7 @@ async def test_fetch_prices_scales_to_d18_with_round_half_up(
     )
 
     expected = int(
-        Decimal("1.2345678901234567")
-        .scaleb(18)
-        .to_integral_value(rounding=ROUND_HALF_UP)
+        Decimal(1.2345678901234567).scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
     )
     assert result.prices[token_address] == expected
 
@@ -154,9 +160,7 @@ async def test_fetch_prices_does_not_rescale_by_token_decimals(
         [token_address], PriceData(base_asset=eth_address, prices={})
     )
 
-    expected = int(
-        Decimal("1234.5").scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
-    )
+    expected = int(Decimal(1234.5).scaleb(18).to_integral_value(rounding=ROUND_HALF_UP))
     assert result.prices[token_address] == expected
 
 
@@ -293,3 +297,116 @@ async def test_fetch_prices_usds_not_supported_on_testnet(eth_address, usds_addr
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 0
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_preserves_precision(monkeypatch, config, eth_address):
+    adapter = CowSwapAdapter(config)
+    test_asset_address = "0xTestAsset"
+    high_precision_price_str = "12345.123456789123456789"
+
+    async def fake_fetch_native_price(_):
+        return Decimal(high_precision_price_str)
+
+    monkeypatch.setattr(adapter, "fetch_native_price", fake_fetch_native_price)
+
+    prices_accumulator = PriceData(base_asset=eth_address, prices={})
+    result = await adapter.fetch_prices([test_asset_address], prices_accumulator)
+
+    expected_price_wei = int(Decimal(high_precision_price_str) * 10**18)
+    expected_price_wei_normalized = expected_price_wei // (10 ** (18 - 18))
+
+    assert test_asset_address in result.prices
+    assert result.prices[test_asset_address] == expected_price_wei_normalized
+    assert isinstance(result.prices[test_asset_address], int)
+
+
+@pytest.mark.asyncio
+async def test_fetch_native_price_invalid_json(monkeypatch, config):
+    adapter = CowSwapAdapter(config)
+    test_token = "0xTestToken"
+
+    mock_response = Mock()
+    mock_response.raise_for_status = Mock()
+    mock_response.json = Mock(side_effect=json.JSONDecodeError("test", "doc", 0))
+
+    async def fake_to_thread(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr("asyncio.to_thread", fake_to_thread)
+
+    with pytest.raises(ValueError, match="Invalid JSON from CowSwap API"):
+        await adapter.fetch_native_price(test_token)
+
+
+@pytest.mark.asyncio
+async def test_fetch_native_price_non_dict_response(monkeypatch, config):
+    adapter = CowSwapAdapter(config)
+    test_token = "0xTestToken"
+
+    mock_response = Mock()
+    mock_response.raise_for_status = Mock()
+    mock_response.json = Mock(return_value="not a dict")
+
+    async def fake_to_thread(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr("asyncio.to_thread", fake_to_thread)
+
+    with pytest.raises(ValueError, match="Invalid response structure"):
+        await adapter.fetch_native_price(test_token)
+
+
+@pytest.mark.asyncio
+async def test_fetch_native_price_missing_price_field(monkeypatch, config):
+    adapter = CowSwapAdapter(config)
+    test_token = "0xTestToken"
+
+    mock_response = Mock()
+    mock_response.raise_for_status = Mock()
+    mock_response.json = Mock(return_value={"other_field": "value"})
+
+    async def fake_to_thread(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr("asyncio.to_thread", fake_to_thread)
+
+    with pytest.raises(ValueError, match="Invalid response structure"):
+        await adapter.fetch_native_price(test_token)
+
+
+@pytest.mark.asyncio
+async def test_fetch_native_price_invalid_price_value(monkeypatch, config):
+    adapter = CowSwapAdapter(config)
+    test_token = "0xTestToken"
+
+    mock_response = Mock()
+    mock_response.raise_for_status = Mock()
+    mock_response.json = Mock(return_value={"price": "not_a_number"})
+
+    async def fake_to_thread(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr("asyncio.to_thread", fake_to_thread)
+
+    with pytest.raises(ValueError, match="Invalid price value"):
+        await adapter.fetch_native_price(test_token)
+
+
+@pytest.mark.asyncio
+async def test_fetch_native_price_valid_string_price(monkeypatch, config):
+    adapter = CowSwapAdapter(config)
+    test_token = "0xTestToken"
+
+    mock_response = Mock()
+    mock_response.raise_for_status = Mock()
+    mock_response.json = Mock(return_value={"price": "123.456"})
+
+    async def fake_to_thread(*args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr("asyncio.to_thread", fake_to_thread)
+
+    result = await adapter.fetch_native_price(test_token)
+    assert result == Decimal("123.456")
+    assert isinstance(result, Decimal)
