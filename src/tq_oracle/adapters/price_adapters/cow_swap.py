@@ -91,10 +91,12 @@ class CowSwapAdapter(BasePriceAdapter):
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException, requests.exceptions.HTTPError),
-        max_time=5,
-        giveup=lambda e: isinstance(e, requests.exceptions.HTTPError)
-        and e.response is not None
-        and e.response.status_code != 429,
+        max_tries=5,
+        giveup=lambda e: (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code not in {429, 500, 502, 503, 504}
+        ),
         jitter=backoff.full_jitter,
     )
     async def fetch_native_price(self, token_address: str) -> float:
@@ -108,7 +110,7 @@ class CowSwapAdapter(BasePriceAdapter):
         """
         url = f"{self.api_base_url}/token/{token_address}/native_price"
         logger.debug(f"Calling {url}")
-        response = await asyncio.to_thread(requests.get, url)
+        response = await asyncio.to_thread(requests.get, url, timeout=10.0)
         response.raise_for_status()
         data = response.json()
         return float(data["price"])
