@@ -100,8 +100,18 @@ class OracleSettings(BaseSettings):
     pre_check_timeout: float = 12.0
 
     # --- price validation ---
-    price_warning_tolerance_percentage: float = 0.5
-    price_failure_tolerance_percentage: float = 1.0
+    price_warning_tolerance_percentage: float = Field(
+        default=0.5,
+        gt=0,
+        lt=100.0,
+        description="Price deviation warning threshold (%). Must be positive and less than failure threshold.",
+    )
+    price_failure_tolerance_percentage: float = Field(
+        default=1.0,
+        gt=0,
+        lt=100.0,
+        description="Price deviation failure threshold (%). Must be positive and greater than warning threshold.",
+    )
 
     # Pyth-specific settings
     pyth_enabled: bool = True
@@ -145,6 +155,19 @@ class OracleSettings(BaseSettings):
         if v is None or isinstance(v, SecretStr):
             return v
         return SecretStr(v)
+
+    @model_validator(mode="after")
+    def validate_price_tolerance_ordering(self) -> "OracleSettings":
+        """Validate that warning tolerance is less than failure tolerance."""
+        if (
+            self.price_warning_tolerance_percentage
+            >= self.price_failure_tolerance_percentage
+        ):
+            raise ValueError(
+                f"price_warning_tolerance_percentage ({self.price_warning_tolerance_percentage}) "
+                f"must be less than price_failure_tolerance_percentage ({self.price_failure_tolerance_percentage})"
+            )
+        return self
 
     @model_validator(mode="after")
     def set_derived_values(self) -> "OracleSettings":
