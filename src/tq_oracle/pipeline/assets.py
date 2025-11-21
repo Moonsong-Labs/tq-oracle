@@ -32,14 +32,19 @@ async def _fetch_subvault_addresses(state: AppState) -> list[str]:
     vault_abi = load_vault_abi()
     vault_address = w3.to_checksum_address(s.vault_address_required)
     contract = w3.eth.contract(address=vault_address, abi=vault_abi)
+    block_number = s.block_number_required
 
-    count = await asyncio.to_thread(contract.functions.subvaults().call)
+    count = await asyncio.to_thread(
+        contract.functions.subvaults().call, block_identifier=block_number
+    )
     log.debug("Vault has %d subvaults", count)
 
     # Fetch all subvault addresses in parallel to avoid thread pool exhaustion
     subvault_addresses = await asyncio.gather(
         *[
-            asyncio.to_thread(contract.functions.subvaultAt(i).call)
+            asyncio.to_thread(
+                contract.functions.subvaultAt(i).call, block_identifier=block_number
+            )
             for i in range(count)
         ]
     )
@@ -70,21 +75,29 @@ def _process_adapter_results(
         results: Results from asyncio.gather (may contain exceptions)
         asset_data: List to append successful asset results to
         log: Logger instance
+
+    Raises:
+        ValueError: If any adapter failed
     """
+    failures: list[tuple[str, BaseException]] = []
+
     for task_info, result in zip(tasks_info, results):
         if isinstance(result, BaseException):
             e = result
             if len(task_info) == 2:  # (name, _)
                 name = task_info[0]
                 log.error("Adapter '%s' failed: %s", name, e)
+                failures.append((name, e))
             elif len(task_info) == 3:  # (subvault_addr, adapter, name)
                 subvault_addr, _, name = task_info
+                identifier = f"{name} (subvault {subvault_addr})"
                 log.error(
                     "Adapter '%s' failed for subvault %s: %s",
                     name,
                     subvault_addr,
                     e,
                 )
+                failures.append((identifier, e))
         elif isinstance(result, list):
             assets = result
             if len(task_info) == 2:  # (name, _)
@@ -99,6 +112,12 @@ def _process_adapter_results(
                     len(assets),
                 )
             asset_data.append(assets)
+
+    if failures:
+        failure_list = ", ".join(name for name, _ in failures)
+        raise ValueError(
+            f"Failed to collect assets from {len(failures)} adapter(s): {failure_list}"
+        )
 
 
 async def collect_assets(ctx: PipelineContext) -> None:

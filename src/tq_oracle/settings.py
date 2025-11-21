@@ -332,9 +332,7 @@ class OracleSettings(BaseSettings):
                 )
             from .abi import get_oracle_address_from_vault
 
-            self._oracle_address = get_oracle_address_from_vault(
-                self.vault_address, self.vault_rpc
-            )
+            self._oracle_address = get_oracle_address_from_vault(self)
         return self._oracle_address
 
     @property
