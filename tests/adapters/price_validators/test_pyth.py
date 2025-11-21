@@ -87,6 +87,28 @@ def test_deviation_thresholds(validator):
     assert validator.failure_tolerance == 1.0
 
 
+def test_calculate_deviation_requires_positive_reference(validator):
+    """Reference prices must be positive to avoid division errors."""
+    with pytest.raises(ValueError):
+        validator._calculate_price_deviation_percentage(0, 1000)
+
+    with pytest.raises(ValueError):
+        validator._calculate_price_deviation_percentage(-1000, 900)
+
+
+def test_calculate_deviation_extreme_movement_and_zero_actual(validator):
+    """Large moves and zero actual prices still produce bounded deviations."""
+    # 90% drop relative to reference
+    assert validator._calculate_price_deviation_percentage(1000, 100) == pytest.approx(
+        90.0
+    )
+
+    # Actual price can be zero: deviation is 100%
+    assert validator._calculate_price_deviation_percentage(1000, 0) == pytest.approx(
+        100.0
+    )
+
+
 @pytest.mark.asyncio
 async def test_validate_prices_disabled(config, eth_address, usdc_address):
     """Test that validation passes when Pyth is disabled."""
