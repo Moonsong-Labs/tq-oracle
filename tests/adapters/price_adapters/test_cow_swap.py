@@ -1,6 +1,5 @@
 import pytest
 from decimal import Decimal, ROUND_HALF_UP
-
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
 from tq_oracle.settings import OracleSettings
@@ -97,11 +96,11 @@ async def test_fetch_prices_uses_native_quote_in_wei(
     adapter = CowSwapAdapter(config)
     wbtc_address = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
 
-    async def _fake_native_price(token_address: str) -> float:
+    async def _fake_native_price(token_address: str) -> str:
         if token_address == usdc_address:
-            return 336732429.45504427  # wei per base unit from CoW API sample
+            return "336732429.45504427"  # CoW API returns decimal string
         if token_address == wbtc_address:
-            return 303129509051.44714  # wei per base unit from CoW API sample
+            return "303129509051.44714"
         raise AssertionError("unexpected token address")
 
     monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
@@ -121,8 +120,8 @@ async def test_fetch_prices_scales_to_d18_with_round_half_up(
     adapter = CowSwapAdapter(config)
     token_address = "0xToken"
 
-    async def _fake_native_price(token_address: str) -> float:
-        return 1.2345678901234567  # native price with fractional wei component
+    async def _fake_native_price(token_address: str) -> str:
+        return "1.2345678901234567"  # native price with fractional wei component
 
     monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
 
@@ -293,3 +292,28 @@ async def test_fetch_prices_usds_not_supported_on_testnet(eth_address, usds_addr
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 0
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_preserves_precision(monkeypatch, config, eth_address):
+    adapter = CowSwapAdapter(config)
+    test_asset_address = "0xTestAsset"
+    high_precision_price_str = "12345.123456789123456789"  # More than float precision
+
+    async def _fake_native_price(_token_address: str) -> str:
+        return high_precision_price_str
+
+    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
+
+    prices_accumulator = PriceData(base_asset=eth_address, prices={})
+    result = await adapter.fetch_prices([test_asset_address], prices_accumulator)
+
+    expected_price_wei = int(
+        Decimal(high_precision_price_str)
+        .scaleb(18)
+        .to_integral_value(rounding=ROUND_HALF_UP)
+    )
+
+    assert test_asset_address in result.prices
+    assert result.prices[test_asset_address] == expected_price_wei
+    assert isinstance(result.prices[test_asset_address], int)

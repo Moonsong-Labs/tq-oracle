@@ -45,6 +45,10 @@ def usdc_address(config):
     return address
 
 
+async def _usdc_decimals(self, _token_address: str) -> int:
+    return 6
+
+
 def _make_mock_response(payload: dict | list) -> MagicMock:
     response = MagicMock()
     response.json.return_value = payload
@@ -87,8 +91,26 @@ def test_deviation_thresholds(validator):
     assert validator.failure_tolerance == 1.0
 
 
-async def _usdc_decimals(self, _token_address: str) -> int:
-    return 6
+def test_calculate_deviation_requires_positive_reference(validator):
+    """Reference prices must be positive to avoid division errors."""
+    with pytest.raises(ValueError):
+        validator._calculate_price_deviation_percentage(0, 1000)
+
+    with pytest.raises(ValueError):
+        validator._calculate_price_deviation_percentage(-1000, 900)
+
+
+def test_calculate_deviation_extreme_movement_and_zero_actual(validator):
+    """Large moves and zero actual prices still produce bounded deviations."""
+    # 90% drop relative to reference
+    assert validator._calculate_price_deviation_percentage(1000, 100) == pytest.approx(
+        90.0
+    )
+
+    # Actual price can be zero: deviation is 100%
+    assert validator._calculate_price_deviation_percentage(1000, 0) == pytest.approx(
+        100.0
+    )
 
 
 @pytest.mark.asyncio
@@ -123,18 +145,18 @@ async def test_validate_prices_with_mocked_pyth(
             {
                 "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 "price": {
-                    "price": "3000",
-                    "expo": 0,
-                    "conf": "10",
+                    "price": "300000000000",
+                    "expo": -8,
+                    "conf": "1000000000",
                     "publish_time": current_time,
                 },
             },
             {
                 "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
                 "price": {
-                    "price": "1",
-                    "expo": 0,
-                    "conf": "1",
+                    "price": "100000000",
+                    "expo": -8,
+                    "conf": "1000000",
                     "publish_time": current_time,
                 },
             },
@@ -180,18 +202,18 @@ async def test_validate_prices_fails_on_excessive_deviation(
             {
                 "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 "price": {
-                    "price": "3000",
-                    "expo": 0,
-                    "conf": "10",
+                    "price": "300000000000",
+                    "expo": -8,
+                    "conf": "1000000000",
                     "publish_time": current_time,
                 },
             },
             {
                 "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
                 "price": {
-                    "price": "1",
-                    "expo": 0,
-                    "conf": "1",
+                    "price": "100000000",
+                    "expo": -8,
+                    "conf": "1000000",
                     "publish_time": current_time,
                 },
             },
