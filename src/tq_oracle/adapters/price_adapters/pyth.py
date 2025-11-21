@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from urllib.parse import urlencode
@@ -98,11 +99,22 @@ class PythAdapter(BasePriceAdapter):
                 params={"query": f"{symbol}/{quote}".lower(), "asset_type": "crypto"},
             )
             r.raise_for_status()
-        except Exception as exc:  # pragma: no cover
-            logger.error("Feed discovery failed for %s/%s: %s", symbol, quote, exc)
+        except requests.RequestException as exc:  # pragma: no cover
+            logger.error(
+                "Network error discovering feed for %s/%s: %s", symbol, quote, exc
+            )
             return None
 
-        feeds = r.json()
+        try:
+            feeds = r.json()
+        except (json.JSONDecodeError, ValueError) as exc:  # pragma: no cover
+            logger.error(
+                "Invalid JSON in feed discovery response for %s/%s: %s",
+                symbol,
+                quote,
+                exc,
+            )
+            return None
         if not isinstance(feeds, list):
             logger.debug(
                 "Unexpected feed discovery payload for %s/%s; skipping dynamic resolution",
