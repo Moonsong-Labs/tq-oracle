@@ -109,3 +109,52 @@ async def test_tvl_only_assets_tracked():
 
     assert result.assets == {"0xUSDC": 1500, "0xEXTRA": 250}
     assert result.tvl_only_assets == {"0xEXTRA"}
+
+
+@pytest.mark.asyncio
+async def test_tvl_only_flag_conflict_raises_error():
+    """When adapters disagree on tvl_only, a ValueError should be raised."""
+    protocol_assets = [
+        [AssetData("0xCONFLICT", 1000, tvl_only=False)],
+        [AssetData("0xCONFLICT", 500, tvl_only=True)],
+    ]
+
+    with pytest.raises(ValueError, match="conflicting tvl_only flags"):
+        await compute_total_aggregated_assets(protocol_assets)
+
+
+@pytest.mark.asyncio
+async def test_tvl_only_flag_conflict_multiple_assets():
+    """Multiple conflicting assets should all be reported."""
+    protocol_assets = [
+        [
+            AssetData("0xASSET1", 100, tvl_only=True),
+            AssetData("0xASSET2", 200, tvl_only=True),
+        ],
+        [
+            AssetData("0xASSET1", 50, tvl_only=False),
+            AssetData("0xASSET2", 75, tvl_only=False),
+        ],
+    ]
+
+    with pytest.raises(ValueError) as exc_info:
+        await compute_total_aggregated_assets(protocol_assets)
+
+    error_msg = str(exc_info.value)
+    assert "0xASSET1" in error_msg
+    assert "0xASSET2" in error_msg
+
+
+@pytest.mark.asyncio
+async def test_tvl_only_consistent_across_adapters_no_error():
+    """When all adapters agree on tvl_only flag, no error should be raised."""
+    protocol_assets = [
+        [AssetData("0xCONSISTENT", 1000, tvl_only=True)],
+        [AssetData("0xCONSISTENT", 500, tvl_only=True)],
+        [AssetData("0xCONSISTENT", 300, tvl_only=True)],
+    ]
+
+    result = await compute_total_aggregated_assets(protocol_assets)
+
+    assert result.assets == {"0xCONSISTENT": 1800}
+    assert result.tvl_only_assets == {"0xCONSISTENT"}
