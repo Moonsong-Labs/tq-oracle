@@ -84,7 +84,7 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
             (
                 _price_d18,
                 last_report_timestamp,
-                _is_suspicious,
+                is_suspicious,
             ) = await oracle.functions.getReport(first_asset).call(
                 block_identifier=block_number
             )
@@ -111,6 +111,13 @@ class TimeoutCheckAdapter(BaseCheckAdapter):
 
             next_valid_time = last_report_timestamp + timeout
             can_submit = current_timestamp >= next_valid_time
+
+            if is_suspicious:
+                return CheckResult(
+                    passed=True,
+                    message="Last report marked as suspicious, immediate replace allowed",
+                    retry_recommended=False,
+                )
 
             if can_submit:
                 return CheckResult(
