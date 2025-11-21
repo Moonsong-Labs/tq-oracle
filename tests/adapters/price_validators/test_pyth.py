@@ -117,18 +117,18 @@ async def test_validate_prices_with_mocked_pyth(config, eth_address, usdc_addres
             {
                 "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 "price": {
-                    "price": "3000",
-                    "expo": 0,
-                    "conf": "10",
+                    "price": "300000000000",
+                    "expo": -8,
+                    "conf": "1000000000",
                     "publish_time": current_time,
                 },
             },
             {
                 "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
                 "price": {
-                    "price": "1",
-                    "expo": 0,
-                    "conf": "1",
+                    "price": "100000000",
+                    "expo": -8,
+                    "conf": "1000000",
                     "publish_time": current_time,
                 },
             },
@@ -169,18 +169,18 @@ async def test_validate_prices_fails_on_excessive_deviation(
             {
                 "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 "price": {
-                    "price": "3000",
-                    "expo": 0,
-                    "conf": "10",
+                    "price": "300000000000",
+                    "expo": -8,
+                    "conf": "1000000000",
                     "publish_time": current_time,
                 },
             },
             {
                 "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
                 "price": {
-                    "price": "1",
-                    "expo": 0,
-                    "conf": "1",
+                    "price": "100000000",
+                    "expo": -8,
+                    "conf": "1000000",
                     "publish_time": current_time,
                 },
             },

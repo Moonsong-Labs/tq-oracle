@@ -46,3 +46,9 @@ ignore_timeout_check = true
 ignore_active_proposal_check = true
 pre_check_retries = 3
 pre_check_timeout = 12.0
+
+# Pyth settings
+pyth_enabled = true
+pyth_max_confidence_ratio = 0.1  # Maximum allowed confidence ratio for Pyth prices (default: 0.03)
+pyth_hermes_endpoint = "https://hermes.pyth.network"
+pyth_staleness_threshold = 60
