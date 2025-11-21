@@ -180,6 +180,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         )
 
         all_assets: list[AssetData] = []
+        failed_vaults: list[tuple[str, Exception]] = []
+
         for vault_addr, result in zip(vault_addresses, asset_results):
             if isinstance(result, Exception):
                 logger.error(
@@ -187,8 +189,15 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                     vault_addr,
                     result,
                 )
+                failed_vaults.append((vault_addr, result))
             elif isinstance(result, list):
                 all_assets.extend(result)
+
+        if failed_vaults:
+            vault_list = ", ".join(addr for addr, _ in failed_vaults)
+            raise ValueError(
+                f"Failed to fetch assets from {len(failed_vaults)} vault(s): {vault_list}"
+            )
 
         logger.info(
             "Fetched %d total idle balance entries from main vault + %d subvaults",
