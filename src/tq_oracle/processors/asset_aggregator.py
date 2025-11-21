@@ -28,6 +28,7 @@ async def compute_total_aggregated_assets(
     """
     aggregated: dict[str, int] = {}
     tvl_only_assets: set[str] = set()
+    non_tvl_only_assets: set[str] = set()
 
     for adapter_assets in protocol_assets:
         for asset in adapter_assets:
@@ -35,4 +36,10 @@ async def compute_total_aggregated_assets(
             aggregated[asset.asset_address] = current + asset.amount
             if getattr(asset, "tvl_only", False):
                 tvl_only_assets.add(asset.asset_address)
+            else:
+                non_tvl_only_assets.add(asset.asset_address)
+    if tvl_only_assets & non_tvl_only_assets:
+        raise ValueError(
+            f"Assets with conflicting tvl_only flags: {tvl_only_assets & non_tvl_only_assets}"
+        )
     return AggregatedAssets(assets=aggregated, tvl_only_assets=tvl_only_assets)
