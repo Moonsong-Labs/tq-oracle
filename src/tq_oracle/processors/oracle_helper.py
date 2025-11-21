@@ -71,15 +71,15 @@ async def derive_final_prices(
 
         return FinalPrices(prices=prices)
     except ContractLogicError as e:
-        if config.ignore_empty_vault and "asset not found" in str(e):
-            logger.warning(
-                "OracleHelper contract returned 'asset not found' error. "
-                "Returning zero prices due to --ignore-empty-vault flag."
+        logger.error("OracleHelper contract call failed: %s", str(e))
+
+        if config.ignore_empty_vault and total_assets == 0:
+            logger.info(
+                "Vault is empty and ignore_empty_vault is enabled, skipping OracleHelper call"
             )
-            prices = {asset: 0 for asset, _ in asset_prices}
-            return FinalPrices(prices=prices)
+            return FinalPrices(prices={asset: 0 for asset, _ in asset_prices})
         else:
-            raise
+            raise e
 
 
 def get_oracle_helper_contract(config: OracleSettings) -> Contract:

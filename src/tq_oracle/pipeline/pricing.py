@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+import backoff
+
 from ..adapters import PRICE_ADAPTERS
 from ..adapters.price_adapters.base import PriceData
 from ..checks.price_validators import PriceValidationError, run_price_validations
@@ -36,13 +40,48 @@ async def price_assets(ctx: PipelineContext) -> None:
         price_data = await price_adapter.fetch_prices(asset_addresses, price_data)
         log.debug("Price adapter returned %d prices", len(price_data.prices))
 
-    log.info("Running price validations...")
-    try:
+    log.info(
+        "Running price validations (max retries: %d, timeout: %.1fs)...",
+        s.price_validation_retries,
+        s.price_validation_timeout,
+    )
+
+    def _should_giveup(exc: Exception) -> bool:
+        return isinstance(exc, PriceValidationError) and not exc.retry_recommended
+
+    def _on_backoff(details: Any) -> None:
+        log.warning(
+            "Price validation failed (attempt %d of %d): %s",
+            details["tries"],
+            s.price_validation_retries + 1,
+            details.get("exception", details.get("value")),
+        )
+
+    def _on_giveup(details: Any) -> None:
+        exc = details.get("exception", details.get("value"))
+        if isinstance(exc, PriceValidationError) and not exc.retry_recommended:
+            log.error("Price validation failed (retry not recommended): %s", exc)
+        else:
+            log.error(
+                "Price validations failed after %d attempts: %s",
+                details["tries"],
+                exc,
+            )
+
+    @backoff.on_exception(
+        backoff.constant,
+        PriceValidationError,
+        max_tries=s.price_validation_retries + 1,
+        interval=s.price_validation_timeout,
+        giveup=_should_giveup,
+        on_backoff=_on_backoff,
+        on_giveup=_on_giveup,
+    )
+    async def _run_price_validations_with_retry() -> None:
         await run_price_validations(s, price_data)
-        log.info("Price validations passed successfully")
-    except PriceValidationError as e:
-        log.error("Price validations failed: %s", e)
-        raise
+
+    await _run_price_validations_with_retry()
+    log.info("Price validations passed successfully")
 
     log.info("Calculating total assets in base asset...")
     log.debug(f"Assets found: {aggregated}")

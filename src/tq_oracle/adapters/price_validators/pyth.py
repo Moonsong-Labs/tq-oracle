@@ -56,6 +56,30 @@ class PythValidator(BasePriceValidator):
         logger.debug(f" Fetched prices for {len(pyth_prices.prices)} assets")
         logger.debug(f" Pyth price keys: {list(pyth_prices.prices.keys())}")
 
+        stale_assets = self.pyth_adapter.last_stale_feeds
+        missing_assets = set(asset_addresses) - set(pyth_prices.prices.keys())
+
+        if stale_assets:
+            logger.warning(
+                "Pyth prices marked stale for assets: %s", sorted(stale_assets)
+            )
+        if missing_assets:
+            logger.warning("Missing Pyth prices for assets: %s", sorted(missing_assets))
+
+        if self.config.pyth_fail_on_stale_price and stale_assets:
+            return CheckResult(
+                passed=False,
+                message=f"Pyth prices stale for assets: {sorted(stale_assets)}",
+                retry_recommended=True,
+            )
+
+        if self.config.pyth_fail_on_missing_price and missing_assets:
+            return CheckResult(
+                passed=False,
+                message=f"Missing Pyth prices for assets: {sorted(missing_assets)}",
+                retry_recommended=False,
+            )
+
         for asset_address, pyth_price in pyth_prices.prices.items():
             logger.debug(f" Processing asset {asset_address}")
             oracle_price = price_data.prices[asset_address]
