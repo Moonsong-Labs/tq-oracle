@@ -1,4 +1,5 @@
 import pytest
+from web3 import Web3
 
 from tq_oracle.adapters.asset_adapters.base import AssetData
 from tq_oracle.processors.asset_aggregator import compute_total_aggregated_assets
@@ -144,10 +145,64 @@ async def test_address_normalization_with_tvl_only():
     protocol_assets = [
         [AssetData("0x6B175474E89094C44Da98b954EedeAC495271d0F", 1000, tvl_only=True)],
         [AssetData("0x6b175474e89094c44da98b954eedeac495271d0f", 500, tvl_only=True)],
-        [AssetData("0x6B175474E89094C44DA98B954EEDEAC495271D0F", 300)],
+        [AssetData("0x6B175474E89094C44DA98B954EEDEAC495271D0F", 300, tvl_only=True)],
     ]
 
     result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {dai_checksummed: 1800}
     assert result.tvl_only_assets == {dai_checksummed}
+
+
+@pytest.mark.asyncio
+async def test_tvl_only_flag_conflict_raises_error():
+    """When adapters disagree on tvl_only, a ValueError should be raised."""
+    usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    protocol_assets = [
+        [AssetData(usdc.lower(), 1000, tvl_only=False)],
+        [AssetData(usdc, 500, tvl_only=True)],
+    ]
+
+    with pytest.raises(ValueError, match="conflicting tvl_only flags"):
+        await compute_total_aggregated_assets(protocol_assets)
+
+
+@pytest.mark.asyncio
+async def test_tvl_only_flag_conflict_multiple_assets():
+    """Multiple conflicting assets should all be reported."""
+    dai = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    usdt = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+    protocol_assets = [
+        [
+            AssetData(dai, 100, tvl_only=True),
+            AssetData(usdt, 200, tvl_only=True),
+        ],
+        [
+            AssetData(dai.lower(), 50, tvl_only=False),
+            AssetData(usdt.lower(), 75, tvl_only=False),
+        ],
+    ]
+
+    with pytest.raises(ValueError) as exc_info:
+        await compute_total_aggregated_assets(protocol_assets)
+
+    error_msg = str(exc_info.value)
+    assert "conflicting tvl_only flags" in error_msg
+    assert Web3.to_checksum_address(dai) in error_msg
+    assert Web3.to_checksum_address(usdt) in error_msg
+
+
+@pytest.mark.asyncio
+async def test_tvl_only_consistent_across_adapters_no_error():
+    """When all adapters agree on tvl_only flag, no error should be raised."""
+    consistent = "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
+    protocol_assets = [
+        [AssetData(consistent, 1000, tvl_only=True)],
+        [AssetData(consistent.lower(), 500, tvl_only=True)],
+        [AssetData(consistent.upper(), 300, tvl_only=True)],
+    ]
+
+    result = await compute_total_aggregated_assets(protocol_assets)
+
+    assert result.assets == {Web3.to_checksum_address(consistent): 1800}
+    assert result.tvl_only_assets == {Web3.to_checksum_address(consistent)}
