@@ -182,3 +182,29 @@ async def test_fetch_all_assets_includes_extra_addresses(config, monkeypatch):
         adapter.w3.to_checksum_address(extra_address),
     }
     assert set(recorded) == expected
+
+
+@pytest.mark.asyncio
+async def test_fetch_all_assets_fails_if_any_vault_fails(config, monkeypatch):
+    adapter = IdleBalancesAdapter(config)
+
+    subvault_addr = "0x00000000000000000000000000000000000000AA"
+    failed_vault_addr = "0x00000000000000000000000000000000000000BB"
+
+    async def fake_fetch_subvault_addresses():
+        return [subvault_addr, failed_vault_addr]
+
+    async def fake_fetch_assets(address):
+        if adapter.w3.to_checksum_address(address).lower() == failed_vault_addr.lower():
+            raise ConnectionError("RPC connection failed")
+        return [AssetData(asset_address="0xToken", amount=1)]
+
+    monkeypatch.setattr(
+        adapter,
+        "_fetch_subvault_addresses",
+        fake_fetch_subvault_addresses,
+    )
+    monkeypatch.setattr(adapter, "fetch_assets", fake_fetch_assets)
+
+    with pytest.raises(ValueError, match=r"Failed to fetch assets from 1 vault\(s\)"):
+        await adapter.fetch_all_assets()
