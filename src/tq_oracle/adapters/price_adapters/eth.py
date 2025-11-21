@@ -64,6 +64,4 @@ class ETHAdapter(BasePriceAdapter):
             assert self.weth_address is not None
             prices_accumulator.prices[self.weth_address] = 10**18
 
-        self.validate_prices(prices_accumulator)
-
         return prices_accumulator
