@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from ..adapters.check_adapters.base import CheckResult
 from ..adapters.price_adapters.base import PriceData
 from ..adapters.price_validators import PRICE_VALIDATORS
 from ..settings import OracleSettings
@@ -48,8 +49,6 @@ async def run_price_validations(
             logger.error(f"Validator '{validator.name}' raised exception: {result}")
             failed_validations.append(f"{validator.name}: {str(result)}")
             continue
-
-        from ..adapters.check_adapters.base import CheckResult
 
         if isinstance(result, CheckResult):
             if result.passed:
