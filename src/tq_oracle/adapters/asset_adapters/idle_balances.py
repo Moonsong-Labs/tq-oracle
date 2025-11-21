@@ -133,7 +133,19 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             for asset_addr in supported_assets
         ]
 
-        assets = list(await asyncio.gather(*asset_tasks))
+        asset_results = await asyncio.gather(*asset_tasks, return_exceptions=True)
+
+        assets: list[AssetData] = []
+        for asset_addr, result in zip(supported_assets, asset_results):
+            if isinstance(result, Exception):
+                logger.error(
+                    "Failed to fetch balance for asset %s in subvault %s: %s",
+                    asset_addr,
+                    subvault_address,
+                    result,
+                )
+            elif isinstance(result, AssetData):
+                assets.append(result)
 
         logger.debug("Fetched %d L1 asset balances for subvault", len(assets))
         return assets
@@ -168,6 +180,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         )
 
         all_assets: list[AssetData] = []
+        failed_vaults: list[tuple[str, Exception]] = []
+
         for vault_addr, result in zip(vault_addresses, asset_results):
             if isinstance(result, Exception):
                 logger.error(
@@ -175,8 +189,15 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                     vault_addr,
                     result,
                 )
+                failed_vaults.append((vault_addr, result))
             elif isinstance(result, list):
                 all_assets.extend(result)
+
+        if failed_vaults:
+            vault_list = ", ".join(addr for addr, _ in failed_vaults)
+            raise ValueError(
+                f"Failed to fetch assets from {len(failed_vaults)} vault(s): {vault_list}"
+            )
 
         logger.info(
             "Fetched %d total idle balance entries from main vault + %d subvaults",
@@ -223,10 +244,25 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             logger.debug("%s %d: %s", item_type.capitalize(), index, item)
             return item
 
-        items = await asyncio.gather(*[fetch_item_at(i) for i in range(count)])
+        item_results = await asyncio.gather(
+            *[fetch_item_at(i) for i in range(count)], return_exceptions=True
+        )
+
+        items: list[str] = []
+        for index, result in enumerate(item_results):
+            if isinstance(result, Exception):
+                logger.error(
+                    "Failed to fetch %s at index %d from contract %s: %s",
+                    item_type,
+                    index,
+                    checksum_address,
+                    result,
+                )
+            elif isinstance(result, str):
+                items.append(result)
 
         logger.debug("Retrieved %d %ss", len(items), item_type)
-        return list(items)
+        return items
 
     async def _fetch_subvault_addresses(self) -> list[str]:
         """Get the subvault addresses for the given vault."""
@@ -242,9 +278,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     async def _fetch_supported_assets(self) -> list[str]:
         """Get the supported assets for the given vault."""
         oracle_abi = load_oracle_abi()
-        oracle_address = get_oracle_address_from_vault(
-            self.config.vault_address_required, self.config.vault_rpc_required
-        )
+        oracle_address = get_oracle_address_from_vault(self.config)
         raw_assets = await self._fetch_contract_list(
             contract_address=oracle_address,
             abi=oracle_abi,

@@ -23,6 +23,7 @@ def config():
         private_key=None,
         safe_address="0x" + "a" * 40,
         safe_txn_srvc_api_key="test-api-key",
+        ignore_active_proposal_check=False,
     )
 
 

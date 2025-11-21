@@ -128,6 +128,13 @@ def report(
             help="Override logging verbosity (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL).",
         ),
     ] = None,
+    allow_dangerous: Annotated[
+        bool | None,
+        typer.Option(
+            "--allow-dangerous/--disallow-dangerous",
+            help="Enable dangerous operations (required for skip_subvault_existence_check)",
+        ),
+    ] = None,
     show_config: Annotated[
         bool,
         typer.Option(
@@ -161,6 +168,8 @@ def report(
         init_kwargs["ignore_active_proposal_check"] = ignore_active_proposal_check
     if log_level is not None:
         init_kwargs["log_level"] = log_level.upper()
+    if allow_dangerous is not None:
+        init_kwargs["allow_dangerous"] = allow_dangerous
 
     settings = OracleSettings(**init_kwargs)
 

@@ -23,10 +23,10 @@ class BaseCheckAdapter(ABC):
     @abstractmethod
     async def run_check(self) -> CheckResult:
         """Execute the check and return result."""
-        pass
+        raise NotImplementedError
 
     @property
     @abstractmethod
     def name(self) -> str:
         """Human-readable name for this check."""
-        pass
+        raise NotImplementedError
