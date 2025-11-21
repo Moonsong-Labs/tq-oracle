@@ -117,18 +117,18 @@ async def test_validate_prices_with_mocked_pyth(config, eth_address, usdc_addres
             {
                 "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 "price": {
-                    "price": "3000",
-                    "expo": 0,
-                    "conf": "10",
+                    "price": "300000000000",
+                    "expo": -8,
+                    "conf": "1000000000",
                     "publish_time": current_time,
                 },
             },
             {
                 "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
                 "price": {
-                    "price": "1",
-                    "expo": 0,
-                    "conf": "1",
+                    "price": "100000000",
+                    "expo": -8,
+                    "conf": "1000000",
                     "publish_time": current_time,
                 },
             },
@@ -169,18 +169,18 @@ async def test_validate_prices_fails_on_excessive_deviation(
             {
                 "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
                 "price": {
-                    "price": "3000",
-                    "expo": 0,
-                    "conf": "10",
+                    "price": "300000000000",
+                    "expo": -8,
+                    "conf": "1000000000",
                     "publish_time": current_time,
                 },
             },
             {
                 "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
                 "price": {
-                    "price": "1",
-                    "expo": 0,
-                    "conf": "1",
+                    "price": "100000000",
+                    "expo": -8,
+                    "conf": "1000000",
                     "publish_time": current_time,
                 },
             },
@@ -267,6 +267,105 @@ async def test_validate_prices_handles_api_error(config, eth_address, usdc_addre
 
         assert not result.passed
         assert result.retry_recommended
+
+
+@pytest.mark.asyncio
+async def test_validate_prices_fails_on_missing_feed_when_flag_set(
+    config, eth_address, usdc_address
+):
+    """Validator should fail when a feed is missing and fail_on_missing is enabled."""
+
+    config.pyth_fail_on_missing_price = True
+    validator = PythValidator(config)
+
+    current_time = int(time.time())
+
+    # Only ETH feed present in response; USDC feed missing
+    mock_response_data = {
+        "parsed": [
+            {
+                "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+                "price": {
+                    "price": "3000",
+                    "expo": 0,
+                    "conf": "10",
+                    "publish_time": current_time,
+                },
+            }
+        ]
+    }
+
+    mock_price_response = _make_mock_response(mock_response_data)
+    mock_discovery_response = _make_mock_response(_default_discovery_payload())
+
+    with patch(
+        "requests.get",
+        side_effect=_patch_requests(mock_discovery_response, mock_price_response),
+    ):
+        price_data = PriceData(
+            base_asset=eth_address,
+            prices={usdc_address: int((1 / 3000) * 1e18)},
+        )
+
+        result = await validator.validate_prices(price_data)
+
+        assert not result.passed
+        assert not result.retry_recommended
+        assert "missing" in result.message.lower()
+
+
+@pytest.mark.asyncio
+async def test_validate_prices_fails_on_stale_feed_when_flag_set(
+    config, eth_address, usdc_address
+):
+    """Validator should fail when a feed is stale and fail_on_stale is enabled."""
+
+    config.pyth_fail_on_stale_price = True
+    validator = PythValidator(config)
+
+    stale_time = int(time.time()) - 120
+    current_time = int(time.time())
+
+    mock_response_data = {
+        "parsed": [
+            {
+                "id": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+                "price": {
+                    "price": "3000",
+                    "expo": 0,
+                    "conf": "10",
+                    "publish_time": current_time,
+                },
+            },
+            {
+                "id": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+                "price": {
+                    "price": "1",
+                    "expo": 0,
+                    "conf": "1",
+                    "publish_time": stale_time,
+                },
+            },
+        ]
+    }
+
+    mock_price_response = _make_mock_response(mock_response_data)
+    mock_discovery_response = _make_mock_response(_default_discovery_payload())
+
+    with patch(
+        "requests.get",
+        side_effect=_patch_requests(mock_discovery_response, mock_price_response),
+    ):
+        price_data = PriceData(
+            base_asset=eth_address,
+            prices={usdc_address: int((1 / 3000) * 1e18)},
+        )
+
+        result = await validator.validate_prices(price_data)
+
+        assert not result.passed
+        assert result.retry_recommended
+        assert "stale" in result.message.lower()
 
 
 @pytest.mark.asyncio
