@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 class PriceValidationError(Exception):
     """Raised when a price validation fails and execution should stop."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, retry_recommended: bool = False):
         super().__init__(message)
+        self.retry_recommended = retry_recommended
 
 
 async def run_price_validations(
@@ -43,6 +44,7 @@ async def run_price_validations(
     )
 
     failed_validations = []
+    retry_recommended = False
     for validator, result in zip(validators, results):
         if isinstance(result, Exception):
             logger.error(f"Validator '{validator.name}' raised exception: {result}")
@@ -57,7 +59,9 @@ async def run_price_validations(
             else:
                 logger.warning(f"✗ {validator.name}: {result.message}")
                 failed_validations.append(result.message)
+                if result.retry_recommended:
+                    retry_recommended = True
 
     if failed_validations:
         error_msg = f"Price validations failed: {'; '.join(failed_validations)}"
-        raise PriceValidationError(error_msg)
+        raise PriceValidationError(error_msg, retry_recommended=retry_recommended)

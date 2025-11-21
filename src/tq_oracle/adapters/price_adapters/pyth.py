@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from urllib.parse import urlencode
 
+import backoff
 import requests
 from web3 import Web3
 
@@ -24,6 +26,8 @@ class PythAdapter(BasePriceAdapter):
         self.hermes_endpoint = config.pyth_hermes_endpoint
         self.staleness_threshold = config.pyth_staleness_threshold
         self.max_confidence_ratio = config.pyth_max_confidence_ratio
+        self.last_missing_feeds: set[str] = set()
+        self.last_stale_feeds: set[str] = set()
 
         self._address_to_symbol: dict[str, str] = {
             self._canonical_address(addr): sym
@@ -47,10 +51,23 @@ class PythAdapter(BasePriceAdapter):
         shift = 18 + expo
         return value * (10**shift) if shift >= 0 else value // (10**-shift)
 
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.exceptions.RequestException, requests.exceptions.HTTPError),
+        max_tries=5,
+        giveup=lambda e: (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code not in {429, 500, 502, 503, 504}
+        ),
+        jitter=backoff.full_jitter,
+    )
     async def _http_get(self, url: str, *, params: dict | None = None):
-        return await asyncio.to_thread(
+        response = await asyncio.to_thread(
             lambda: requests.get(url, params=params, timeout=2.0)
         )
+        response.raise_for_status()
+        return response
 
     async def _resolve_feed_id(self, symbol: str, quote: str = "USD") -> str | None:
         key = f"{symbol.upper()}/{quote.upper()}"
@@ -82,11 +99,22 @@ class PythAdapter(BasePriceAdapter):
                 params={"query": f"{symbol}/{quote}".lower(), "asset_type": "crypto"},
             )
             r.raise_for_status()
-        except Exception as exc:  # pragma: no cover
-            logger.error("Feed discovery failed for %s/%s: %s", symbol, quote, exc)
+        except requests.RequestException as exc:  # pragma: no cover
+            logger.error(
+                "Network error discovering feed for %s/%s: %s", symbol, quote, exc
+            )
             return None
 
-        feeds = r.json()
+        try:
+            feeds = r.json()
+        except (json.JSONDecodeError, ValueError) as exc:  # pragma: no cover
+            logger.error(
+                "Invalid JSON in feed discovery response for %s/%s: %s",
+                symbol,
+                quote,
+                exc,
+            )
+            return None
         if not isinstance(feeds, list):
             logger.debug(
                 "Unexpected feed discovery payload for %s/%s; skipping dynamic resolution",
@@ -127,15 +155,11 @@ class PythAdapter(BasePriceAdapter):
         )
         denom = abs(price_18)
         if denom == 0:
-            logger.warning("%s price is zero; cannot compute confidence ratio", symbol)
-            return
+            raise ValueError(f"{symbol} price is zero")
         conf_ratio = conf_18 / denom
         if conf_ratio > self.max_confidence_ratio:
-            logger.warning(
-                "%s confidence ratio too high: %.4f (max: %s)",
-                symbol,
-                conf_ratio,
-                self.max_confidence_ratio,
+            raise ValueError(
+                f"{symbol} confidence ratio {conf_ratio:.4f} exceeds maximum {self.max_confidence_ratio}"
             )
 
     def _symbol_for(self, address: str) -> str | None:
@@ -144,6 +168,9 @@ class PythAdapter(BasePriceAdapter):
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
+        self.last_missing_feeds = set()
+        self.last_stale_feeds = set()
+
         base_address = self._canonical_address(prices_accumulator.base_asset)
         base_symbol = self._symbol_for(base_address)
         if not base_symbol:
@@ -197,6 +224,7 @@ class PythAdapter(BasePriceAdapter):
                 )
             else:
                 logger.warning("Could not resolve feed ID for %s/USD, skipping", symbol)
+                self.last_missing_feeds.add(canonical_to_original[canonical])
 
         if not resolved_assets:
             return prices_accumulator
@@ -233,6 +261,7 @@ class PythAdapter(BasePriceAdapter):
             feed = feeds_by_id.get(feed_id.removeprefix("0x"))
             if not feed:
                 logger.warning("Price feed for %s/USD not found", symbol)
+                self.last_missing_feeds.add(original_address)
                 continue
 
             price_obj = feed.get("price", {}) or {}
@@ -243,6 +272,7 @@ class PythAdapter(BasePriceAdapter):
                     symbol,
                     now - publish_time,
                 )
+                self.last_stale_feeds.add(original_address)
                 continue
 
             asset_usd_price_18 = self._scale_to_18(
