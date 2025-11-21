@@ -60,7 +60,7 @@ class PythAdapter(BasePriceAdapter):
     )
     async def _http_get(self, url: str, *, params: dict | None = None):
         response = await asyncio.to_thread(
-            lambda: requests.get(url, params=params, timeout=2.0)
+            lambda: requests.get(url, params=params, timeout=10.0)
         )
         response.raise_for_status()
         return response

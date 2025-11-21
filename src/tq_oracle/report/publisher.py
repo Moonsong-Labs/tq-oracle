@@ -140,7 +140,9 @@ async def send_to_safe(
         if config.safe_txn_srvc_api_key
         else None
     )
-    tx_service = TransactionServiceApi(network, ethereum_client, api_key=api_key)
+    tx_service = TransactionServiceApi(
+        network, ethereum_client, api_key=api_key, request_timeout=10
+    )
 
     safe_checksum = Web3.to_checksum_address(config.safe_address)
 
