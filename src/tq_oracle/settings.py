@@ -110,6 +110,8 @@ class OracleSettings(BaseSettings):
     pyth_staleness_threshold: int = 60
     pyth_max_confidence_ratio: float = 0.03
     pyth_dynamic_discovery_enabled: bool = True
+    pyth_fail_on_missing_price: bool = False
+    pyth_fail_on_stale_price: bool = False
 
     # --- RPC settings ---
     max_calls: int = 3
@@ -310,9 +312,7 @@ class OracleSettings(BaseSettings):
                 )
             from .abi import get_oracle_address_from_vault
 
-            self._oracle_address = get_oracle_address_from_vault(
-                self.vault_address, self.vault_rpc
-            )
+            self._oracle_address = get_oracle_address_from_vault(self)
         return self._oracle_address
 
     @property
