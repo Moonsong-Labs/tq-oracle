@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 import backoff
 import requests
-from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput, ContractLogicError
 
-from ...abi import load_erc20_abi
 from ...settings import Network, OracleSettings
 from .base import BasePriceAdapter, PriceData
 
@@ -56,45 +55,15 @@ class CowSwapAdapter(BasePriceAdapter):
     def adapter_name(self) -> str:
         return "cow_swap"
 
-    async def get_token_decimals(self, token_address: str) -> int:
-        """Fetch token decimals from on-chain contract, with caching.
-
-        Args:
-            token_address: The token contract address
-
-        Returns:
-            Number of decimals for the token
-        """
-        if token_address in self._decimals_cache:
-            return self._decimals_cache[token_address]
-
-        w3 = Web3(Web3.HTTPProvider(self.vault_rpc))
-        erc20_abi = load_erc20_abi()
-        token_contract = w3.eth.contract(
-            address=w3.to_checksum_address(token_address),
-            abi=erc20_abi,
-        )
-
-        decimals = await asyncio.to_thread(
-            lambda: int(
-                token_contract.functions.decimals().call(
-                    block_identifier=self.block_number
-                )
-            )
-        )
-
-        self._decimals_cache[token_address] = decimals
-        logger.debug(f" Fetched decimals for {token_address}: {decimals}")
-
-        return decimals
-
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException, requests.exceptions.HTTPError),
-        max_time=5,
-        giveup=lambda e: isinstance(e, requests.exceptions.HTTPError)
-        and e.response is not None
-        and e.response.status_code != 429,
+        max_tries=5,
+        giveup=lambda e: (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code not in {429, 500, 502, 503, 504}
+        ),
         jitter=backoff.full_jitter,
     )
     async def fetch_native_price(self, token_address: str) -> float:
@@ -132,7 +101,8 @@ class CowSwapAdapter(BasePriceAdapter):
             - Fetches native prices directly from CoW Swap API.
             - Processes all assets EXCEPT those on the skipped_assets (ETH, WETH).
             - Token decimals are fetched dynamically from on-chain and cached.
-            - CoW API returns price per 1 whole token in ETH.
+            - CoW API returns the amount of native token atoms (wei) needed per
+              single smallest token unit (base unit).
         """
         if prices_accumulator.base_asset != self.eth_address:
             raise ValueError("CowSwap adapter only supports ETH as base asset")
@@ -143,18 +113,31 @@ class CowSwapAdapter(BasePriceAdapter):
                 continue
 
             try:
-                token_decimals = await self.get_token_decimals(asset_address)
                 native_price = await self.fetch_native_price(asset_address)
 
-                price_wei = int(Decimal(str(native_price)) * 10**18)
-                price_wei_normalized = price_wei // (10 ** (18 - token_decimals))
-                logger.debug(
-                    f" Fetched price for {asset_address}: {price_wei_normalized} wei (decimals: {token_decimals})"
+                price_wei = int(
+                    Decimal(str(native_price))
+                    .scaleb(18)
+                    .to_integral_value(rounding=ROUND_HALF_UP)
                 )
-                prices_accumulator.prices[asset_address] = price_wei_normalized
+                logger.debug(
+                    f" Fetched price for {asset_address}: {price_wei} (D18) per base unit "
+                )
+                prices_accumulator.prices[asset_address] = price_wei
 
-            except Exception as e:
-                logger.warning(f" Failed to fetch price for {asset_address}: {e}")
+            except (
+                requests.exceptions.RequestException,
+                requests.exceptions.HTTPError,
+            ) as e:
+                logger.warning(
+                    f" Network error fetching price for {asset_address}: {e}"
+                )
+                continue
+            except ValueError as e:
+                logger.warning(f" Invalid price data for {asset_address}: {e}")
+                continue
+            except (BadFunctionCallOutput, ContractLogicError) as e:
+                logger.warning(f" Contract call failed for {asset_address}: {e}")
                 continue
 
         self.validate_prices(prices_accumulator)
