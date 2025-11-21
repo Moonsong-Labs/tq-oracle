@@ -106,7 +106,9 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     def adapter_name(self) -> str:
         return "idle_balances"
 
-    async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
+    async def fetch_assets(
+        self, subvault_address: str, *, supported_assets: list[str] | None = None
+    ) -> list[AssetData]:
         """Fetch idle balances for the given subvault on the configured chain.
 
         Args:
@@ -115,7 +117,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         Returns:
             List of AssetData objects containing asset addresses and balances
         """
-        supported_assets = await self._fetch_supported_assets()
+        if supported_assets is None:
+            supported_assets = await self._fetch_supported_assets()
 
         logger.debug(
             "Fetching L1 balances for subvault %s across %d assets",
@@ -161,9 +164,13 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             len(subvault_addresses),
             len(vault_addresses) - 1 - len(subvault_addresses),
         )
+        supported_assets = await self._fetch_supported_assets()
 
         asset_results = await asyncio.gather(
-            *[self.fetch_assets(addr) for addr in vault_addresses],
+            *[
+                self.fetch_assets(addr, supported_assets=supported_assets)
+                for addr in vault_addresses
+            ],
             return_exceptions=True,
         )
 
