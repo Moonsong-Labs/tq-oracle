@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 import backoff
 import requests
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 from web3 import Web3
 
 from tq_oracle.abi import load_erc20_abi
@@ -17,6 +18,43 @@ from tq_oracle.settings import OracleSettings
 from .base import BasePriceAdapter, PriceData
 
 logger = logging.getLogger(__name__)
+
+
+class HermesPrice(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    price: int
+    expo: int
+    publish_time: int
+    conf: int = 0
+
+    @field_validator("price", "expo", "publish_time", "conf", mode="before")
+    @classmethod
+    def _ints_from_str(cls, value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise ValueError("value must be an integer")
+
+
+class HermesFeed(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    price: HermesPrice
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _non_empty_id(cls, value) -> str:
+        if value is None:
+            raise ValueError("feed id must be non-empty")
+        as_str = str(value)
+        if not as_str:
+            raise ValueError("feed id must be non-empty")
+        return as_str
+
+
+class HermesResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    parsed: list[HermesFeed]
 
 
 class PythAdapter(BasePriceAdapter):
@@ -145,10 +183,10 @@ class PythAdapter(BasePriceAdapter):
         )
         return feed_id
 
-    def _check_confidence(self, price_obj: dict, price_18: int, symbol: str) -> None:
-        conf_18 = self._scale_to_18(
-            int(price_obj.get("conf", 0)), int(price_obj.get("expo", 0))
-        )
+    def _check_confidence(
+        self, price_obj: HermesPrice, price_18: int, symbol: str
+    ) -> None:
+        conf_18 = self._scale_to_18(price_obj.conf, price_obj.expo)
         denom = abs(price_18)
         if denom == 0:
             raise ValueError(f"{symbol} price is zero")
@@ -251,25 +289,51 @@ class PythAdapter(BasePriceAdapter):
 
         response = await self._http_get(url)
         response.raise_for_status()
-        parsed_feeds = response.json().get("parsed", [])
-        feeds_by_id = {feed.get("id"): feed for feed in parsed_feeds}
-        logger.debug("Received %d price feeds", len(parsed_feeds))
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON from Pyth Hermes: {e}")
+
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected dict from Pyth, got {type(data).__name__}")
+
+        if "parsed" not in data:
+            raise ValueError("Missing 'parsed' field in Pyth response")
+
+        parsed_feeds = data["parsed"]
+        if not isinstance(parsed_feeds, list):
+            raise ValueError(
+                f"Expected list for 'parsed' field, got {type(parsed_feeds).__name__}"
+            )
+
+        for i, feed in enumerate(parsed_feeds):
+            if not isinstance(feed, dict):
+                raise ValueError(
+                    f"Invalid feed item at index {i}: expected dict, got {type(feed).__name__}"
+                )
+
+        try:
+            parsed_response = HermesResponse.model_validate(data)
+        except ValidationError as e:
+            raise ValueError(f"Invalid Pyth Hermes response: {e}") from e
+
+        feeds_by_id = {feed.id: feed for feed in parsed_response.parsed}
+        logger.debug("Received %d price feeds", len(parsed_response.parsed))
 
         base_feed = feeds_by_id.get(base_feed_id.removeprefix("0x"))
         if not base_feed:
             raise ValueError(f"{base_symbol}/USD price feed not in Pyth response")
 
-        base_price_obj = base_feed.get("price", {}) or {}
-        base_publish_time = int(base_price_obj.get("publish_time", 0))
+        base_price_obj = base_feed.price
+        base_publish_time = base_price_obj.publish_time
         now = int(time.time())
         if (now - base_publish_time) > self.staleness_threshold:
             raise ValueError(
                 f"{base_symbol}/USD price is stale (age: {now - base_publish_time}s)"
             )
 
-        base_usd_price_18 = self._scale_to_18(
-            int(base_price_obj.get("price", 0)), int(base_price_obj.get("expo", 0))
-        )
+        base_usd_price_18 = self._scale_to_18(base_price_obj.price, base_price_obj.expo)
         self._check_confidence(base_price_obj, base_usd_price_18, f"{base_symbol}/USD")
         logger.debug("%s/USD price: $%.6f", base_symbol, base_usd_price_18 / 10**18)
 
@@ -280,8 +344,8 @@ class PythAdapter(BasePriceAdapter):
                 self.last_missing_feeds.add(original_address)
                 continue
 
-            price_obj = feed.get("price", {}) or {}
-            publish_time = int(price_obj.get("publish_time", 0))
+            price_obj = feed.price
+            publish_time = price_obj.publish_time
             if (now - publish_time) > self.staleness_threshold:
                 logger.warning(
                     "%s/USD price is stale (age: %ss), skipping",
@@ -291,9 +355,7 @@ class PythAdapter(BasePriceAdapter):
                 self.last_stale_feeds.add(original_address)
                 continue
 
-            asset_usd_price_18 = self._scale_to_18(
-                int(price_obj.get("price", 0)), int(price_obj.get("expo", 0))
-            )
+            asset_usd_price_18 = self._scale_to_18(price_obj.price, price_obj.expo)
             self._check_confidence(price_obj, asset_usd_price_18, f"{symbol}/USD")
 
             asset_price_18 = (asset_usd_price_18 * 10**18) // base_usd_price_18
