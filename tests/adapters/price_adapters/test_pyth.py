@@ -27,6 +27,23 @@ def test_adapter_name(adapter):
     assert adapter.adapter_name == "pyth"
 
 
+class TestScaleTo18:
+    def test_scale_to_18_typical_pyth_expo(self, adapter):
+        result = adapter._scale_to_18(250012345678, -8)
+        assert result == 2500123456780000000000
+
+    def test_scale_to_18_negative_price_rejected(self, adapter):
+        with pytest.raises(ValueError, match="Price value must be non-negative"):
+            adapter._scale_to_18(-12345, -8)
+
+    def test_scale_to_18_expo_out_of_range(self, adapter):
+        with pytest.raises(ValueError, match="Exponent .* out of supported range"):
+            adapter._scale_to_18(1, 26)
+
+        with pytest.raises(ValueError, match="Exponent .* out of supported range"):
+            adapter._scale_to_18(1, -256)
+
+
 def test_check_confidence_passes_with_low_confidence(adapter):
     price_obj = {"price": "100000000", "conf": "1000000", "expo": -8}
     price_18 = 1000000000000000000
