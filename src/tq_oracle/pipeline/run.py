@@ -104,13 +104,34 @@ async def run_report(state: AppState, vault_address: str) -> None:
         },
     )
 
-    ctx = PipelineContext(state=state, vault_address=vault_address)
-    ctx.base_asset = await _discover_base_asset(state)
+    timeout_s = s.global_timeout_seconds
 
-    await run_preflight(ctx)
-    await collect_assets(ctx)
-    await price_assets(ctx)
-    await build_report(ctx)
-    await publish_report(ctx)
+    ctx = PipelineContext(state=state, vault_address=vault_address)
+
+    async def _run_pipeline() -> None:
+        ctx.base_asset = await _discover_base_asset(state)
+
+        await run_preflight(ctx)
+        await collect_assets(ctx)
+        await price_assets(ctx)
+        await build_report(ctx)
+        await publish_report(ctx)
+
+    try:
+        if timeout_s is None or timeout_s <= 0:
+            await _run_pipeline()
+        else:
+            async with asyncio.timeout(timeout_s):
+                await _run_pipeline()
+    except asyncio.TimeoutError as exc:
+        log.error(
+            "Report pipeline timed out",
+            extra={"vault": vault_address, "timeout_seconds": timeout_s},
+        )
+        raise asyncio.TimeoutError(
+            "Report exceeded global timeout "
+            f"{timeout_s}s (vault={vault_address})\n N.B. This can be changed via `global_timeout_seconds` "
+            "or CLI flag `--global-timeout-seconds`."
+        ) from exc
 
     log.info("Report completed", extra={"vault": vault_address})
