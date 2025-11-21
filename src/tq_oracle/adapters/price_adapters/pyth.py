@@ -137,15 +137,11 @@ class PythAdapter(BasePriceAdapter):
         )
         denom = abs(price_18)
         if denom == 0:
-            logger.warning("%s price is zero; cannot compute confidence ratio", symbol)
-            return
+            raise ValueError(f"{symbol} price is zero")
         conf_ratio = conf_18 / denom
         if conf_ratio > self.max_confidence_ratio:
-            logger.warning(
-                "%s confidence ratio too high: %.4f (max: %s)",
-                symbol,
-                conf_ratio,
-                self.max_confidence_ratio,
+            raise ValueError(
+                f"{symbol} confidence ratio {conf_ratio:.4f} exceeds maximum {self.max_confidence_ratio}"
             )
 
     def _symbol_for(self, address: str) -> str | None:
