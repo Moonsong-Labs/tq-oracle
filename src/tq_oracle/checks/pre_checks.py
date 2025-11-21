@@ -20,7 +20,6 @@ class PreCheckError(Exception):
 
 async def run_pre_checks(
     config: OracleSettings,
-    vault_address: str,
 ) -> None:
     """Run all pre-checks before proceeding with oracle flow.
 
