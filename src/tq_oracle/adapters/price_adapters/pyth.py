@@ -24,6 +24,8 @@ class PythAdapter(BasePriceAdapter):
         self.hermes_endpoint = config.pyth_hermes_endpoint
         self.staleness_threshold = config.pyth_staleness_threshold
         self.max_confidence_ratio = config.pyth_max_confidence_ratio
+        self.last_missing_feeds: set[str] = set()
+        self.last_stale_feeds: set[str] = set()
 
         self._address_to_symbol: dict[str, str] = {
             self._canonical_address(addr): sym
@@ -140,6 +142,9 @@ class PythAdapter(BasePriceAdapter):
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
+        self.last_missing_feeds = set()
+        self.last_stale_feeds = set()
+
         base_address = self._canonical_address(prices_accumulator.base_asset)
         base_symbol = self._symbol_for(base_address)
         if not base_symbol:
@@ -193,6 +198,7 @@ class PythAdapter(BasePriceAdapter):
                 )
             else:
                 logger.warning("Could not resolve feed ID for %s/USD, skipping", symbol)
+                self.last_missing_feeds.add(canonical_to_original[canonical])
 
         if not resolved_assets:
             return prices_accumulator
@@ -229,6 +235,7 @@ class PythAdapter(BasePriceAdapter):
             feed = feeds_by_id.get(feed_id.removeprefix("0x"))
             if not feed:
                 logger.warning("Price feed for %s/USD not found", symbol)
+                self.last_missing_feeds.add(original_address)
                 continue
 
             price_obj = feed.get("price", {}) or {}
@@ -239,6 +246,7 @@ class PythAdapter(BasePriceAdapter):
                     symbol,
                     now - publish_time,
                 )
+                self.last_stale_feeds.add(original_address)
                 continue
 
             asset_usd_price_18 = self._scale_to_18(
