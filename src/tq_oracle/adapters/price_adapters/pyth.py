@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 import requests
 from web3 import Web3
 
+from tq_oracle.abi import load_erc20_abi
 from tq_oracle.constants import PYTH_PRICE_FEED_IDS
 from tq_oracle.settings import OracleSettings
 
@@ -24,6 +25,8 @@ class PythAdapter(BasePriceAdapter):
         self.hermes_endpoint = config.pyth_hermes_endpoint
         self.staleness_threshold = config.pyth_staleness_threshold
         self.max_confidence_ratio = config.pyth_max_confidence_ratio
+        self.vault_rpc = config.vault_rpc_required
+        self.block_number = config.block_number
 
         self._address_to_symbol: dict[str, str] = {
             self._canonical_address(addr): sym
@@ -147,6 +150,26 @@ class PythAdapter(BasePriceAdapter):
     def _symbol_for(self, address: str) -> str | None:
         return self._address_to_symbol.get(self._canonical_address(address))
 
+    async def get_token_decimals(self, token_address: str) -> int:
+        """Fetch token decimals from chain with caching."""
+
+        w3 = Web3(Web3.HTTPProvider(self.vault_rpc))
+        erc20_abi = load_erc20_abi()
+        token_contract = w3.eth.contract(
+            address=w3.to_checksum_address(token_address),
+            abi=erc20_abi,
+        )
+
+        decimals = await asyncio.to_thread(
+            lambda: int(
+                token_contract.functions.decimals().call(
+                    block_identifier=self.config.block_number_required
+                )
+            )
+        )
+
+        return decimals
+
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
@@ -257,13 +280,16 @@ class PythAdapter(BasePriceAdapter):
             self._check_confidence(price_obj, asset_usd_price_18, f"{symbol}/USD")
 
             asset_price_18 = (asset_usd_price_18 * 10**18) // base_usd_price_18
-            prices_accumulator.prices[original_address] = asset_price_18
+            decimals = await self.get_token_decimals(original_address)
+            price_per_base_unit_d18 = (asset_price_18 * 10**18) // (10**decimals)
+            prices_accumulator.prices[original_address] = price_per_base_unit_d18
             logger.debug(
-                "%s: $%.6f = %s %s",
+                "%s: $%.6f = %.9f %s per base unit (decimals=%d)",
                 symbol,
                 asset_usd_price_18 / 10**18,
-                asset_price_18,
+                price_per_base_unit_d18 / 10**18,
                 base_symbol,
+                decimals,
             )
 
         self.validate_prices(prices_accumulator)

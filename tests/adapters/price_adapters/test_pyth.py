@@ -15,6 +15,7 @@ def config():
         dry_run=False,
         private_key=None,
         safe_txn_srvc_api_key=None,
+        pyth_max_confidence_ratio=0.03,
     )
 
 

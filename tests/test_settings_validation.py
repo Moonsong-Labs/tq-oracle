@@ -77,8 +77,11 @@ def test_price_tolerance_ordering_validation():
         )
 
 
-def test_valid_price_tolerance_configuration():
+def test_valid_price_tolerance_configuration(monkeypatch):
     """Test that valid price tolerance configurations are accepted."""
+    # Force config source to ignore any local TOML so defaults are deterministic
+    monkeypatch.setenv("TQ_ORACLE_CONFIG", "/nonexistent/path.toml")
+
     # Default values should work
     config = OracleSettings(
         vault_address="0xVault",
