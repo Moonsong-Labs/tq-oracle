@@ -23,7 +23,6 @@ def config():
         private_key=None,
         safe_address=None,
         safe_txn_srvc_api_key=None,
-        ignore_timeout_check=False,
     )
 
 

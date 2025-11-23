@@ -1,5 +1,6 @@
 import pytest
-from decimal import Decimal, ROUND_HALF_UP
+
+from decimal import Decimal
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
 from tq_oracle.settings import OracleSettings
@@ -87,76 +88,6 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
     assert result.prices["0x111"] == 1
-
-
-@pytest.mark.asyncio
-async def test_fetch_prices_uses_native_quote_in_wei(
-    monkeypatch, config, eth_address, usdc_address
-):
-    adapter = CowSwapAdapter(config)
-    wbtc_address = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
-
-    async def _fake_native_price(token_address: str) -> str:
-        if token_address == usdc_address:
-            return "336732429.45504427"  # CoW API returns decimal string
-        if token_address == wbtc_address:
-            return "303129509051.44714"
-        raise AssertionError("unexpected token address")
-
-    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
-
-    result = await adapter.fetch_prices(
-        [usdc_address, wbtc_address], PriceData(base_asset=eth_address, prices={})
-    )
-
-    assert result.prices[usdc_address] == 336732429455044270000000000
-    assert result.prices[wbtc_address] == 303129509051447140000000000000
-
-
-@pytest.mark.asyncio
-async def test_fetch_prices_scales_to_d18_with_round_half_up(
-    monkeypatch, config, eth_address
-):
-    adapter = CowSwapAdapter(config)
-    token_address = "0xToken"
-
-    async def _fake_native_price(token_address: str) -> str:
-        return "1.2345678901234567"  # native price with fractional wei component
-
-    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
-
-    result = await adapter.fetch_prices(
-        [token_address], PriceData(base_asset=eth_address, prices={})
-    )
-
-    expected = int(
-        Decimal("1.2345678901234567")
-        .scaleb(18)
-        .to_integral_value(rounding=ROUND_HALF_UP)
-    )
-    assert result.prices[token_address] == expected
-
-
-@pytest.mark.asyncio
-async def test_fetch_prices_does_not_rescale_by_token_decimals(
-    monkeypatch, config, eth_address
-):
-    adapter = CowSwapAdapter(config)
-    token_address = "0xToken"
-
-    async def _fake_native_price(token_address: str) -> float:
-        return 1234.5  # native price in wei per smallest token unit
-
-    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
-
-    result = await adapter.fetch_prices(
-        [token_address], PriceData(base_asset=eth_address, prices={})
-    )
-
-    expected = int(
-        Decimal("1234.5").scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
-    )
-    assert result.prices[token_address] == expected
 
 
 @pytest.mark.asyncio
@@ -295,25 +226,25 @@ async def test_fetch_prices_usds_not_supported_on_testnet(eth_address, usds_addr
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_preserves_precision(monkeypatch, config, eth_address):
+async def test_fetch_prices_preserves_precision(mocker, config, eth_address):
     adapter = CowSwapAdapter(config)
     test_asset_address = "0xTestAsset"
     high_precision_price_str = "12345.123456789123456789"  # More than float precision
 
-    async def _fake_native_price(_token_address: str) -> str:
-        return high_precision_price_str
-
-    monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
+    mocker.patch.object(
+        adapter,
+        "fetch_native_price",
+        return_value=high_precision_price_str,
+    )
+    mocker.patch.object(adapter, "get_token_decimals", return_value=18)
 
     prices_accumulator = PriceData(base_asset=eth_address, prices={})
     result = await adapter.fetch_prices([test_asset_address], prices_accumulator)
 
-    expected_price_wei = int(
-        Decimal(high_precision_price_str)
-        .scaleb(18)
-        .to_integral_value(rounding=ROUND_HALF_UP)
-    )
+    expected_price_wei = int(Decimal(high_precision_price_str) * 10**18)
+    # For a token with 18 decimals, price_wei_normalized should be the same as price_wei
+    expected_price_wei_normalized = expected_price_wei // (10 ** (18 - 18))
 
     assert test_asset_address in result.prices
-    assert result.prices[test_asset_address] == expected_price_wei
+    assert result.prices[test_asset_address] == expected_price_wei_normalized
     assert isinstance(result.prices[test_asset_address], int)
