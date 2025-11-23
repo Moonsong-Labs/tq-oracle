@@ -341,6 +341,22 @@ class OracleSettings(BaseSettings):
         return STRETH
 
     @property
+    def core_vaults_collector(self) -> str:
+        from .constants import CORE_VAULTS_COLLECTOR
+
+        return CORE_VAULTS_COLLECTOR
+
+    @property
+    def streth_redemption_asset(self) -> str:
+        from .constants import ETH_MAINNET_ASSETS
+
+        redemption_asset = ETH_MAINNET_ASSETS["WSTETH"]
+        if redemption_asset is None:
+            raise ValueError("WstETH deployment not found")
+
+        return redemption_asset
+
+    @property
     def multicall(self) -> str:
         from .constants import MULTICALL_ADDRESSES
 

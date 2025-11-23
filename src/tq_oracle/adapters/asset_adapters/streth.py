@@ -5,19 +5,13 @@ from typing import TYPE_CHECKING
 
 from web3 import Web3
 from web3.eth import Contract
-from web3.constants import ADDRESS_ZERO
 import backoff
 import random
 from web3.exceptions import ProviderConnectionError
 from ...logger import get_logger
-from ...abi import (
-    load_multicall_abi,
-    load_vault_abi,
-    load_compact_collector_abi,
-    load_compact_collector_bytecode,
-)
+from ...abi import load_multicall_abi, load_vault_abi, load_core_vaults_collector_abi
 from .base import AssetData, BaseAssetAdapter
-from eth_abi.abi import decode
+from eth_abi.abi import decode, encode
 
 if TYPE_CHECKING:
     from ...settings import OracleSettings
@@ -27,6 +21,8 @@ logger = get_logger(__name__)
 
 class StrETHAdapter(BaseAssetAdapter):
     streth_address: str
+    streth_redemption_asset: str
+    core_vaults_collector: str
     multicall: Contract
     w3: Web3
 
@@ -44,6 +40,13 @@ class StrETHAdapter(BaseAssetAdapter):
 
         self.vault_address = Web3.to_checksum_address(config.vault_address)
         self.streth_address = Web3.to_checksum_address(config.streth)
+        self.core_vaults_collector = Web3.to_checksum_address(
+            config.core_vaults_collector
+        )
+        self.streth_redemption_asset = Web3.to_checksum_address(
+            config.streth_redemption_asset
+        )
+
         self.multicall: Contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(config.multicall), abi=load_multicall_abi()
         )
@@ -78,32 +81,25 @@ class StrETHAdapter(BaseAssetAdapter):
         Returns:
             List of AssetData objects containing asset addresses and balances
         """
-        compact_collector_abi = load_compact_collector_abi()
-        compact_collector: Contract = self.w3.eth.contract(
-            address=Web3.to_checksum_address(ADDRESS_ZERO),
-            abi=compact_collector_abi,
+        collector = self.w3.eth.contract(
+            Web3.to_checksum_address(self.core_vaults_collector),
+            abi=load_core_vaults_collector_abi(),
         )
-
-        compact_collector_bytecode = load_compact_collector_bytecode()
-        runtime_bytecode: bytes = await self._rpc(
-            self.w3.eth.call,
-            transaction={"data": compact_collector_bytecode},
-            block_identifier=self.block_number,
-        )
-
-        address = Web3.to_checksum_address("0x" + "dead0dead".zfill(40))
 
         calls = []
         for subvault in subvault_addresses:
             calls.append(
                 [
-                    address,
-                    compact_collector.encode_abi(
-                        "getPosition",
+                    Web3.to_checksum_address(collector.address),
+                    collector.encode_abi(
+                        "getDistributions",
                         args=[
-                            self.streth_address,
-                            ADDRESS_ZERO,
                             Web3.to_checksum_address(subvault),
+                            encode(
+                                ["address", "address"],
+                                [self.streth_address, self.streth_redemption_asset],
+                            ),
+                            [],
                         ],
                     ),
                 ]
@@ -113,15 +109,15 @@ class StrETHAdapter(BaseAssetAdapter):
             await self._rpc(
                 self.multicall.functions.aggregate(calls).call,
                 block_identifier=self.block_number,
-                state_override={address: {"code": runtime_bytecode}},
             )
         )[1]
 
         cumulative_amounts: dict[str, int] = {}
-
         for call_result in call_results:
-            assets, amounts = decode(["address[]", "uint256[]"], call_result)
-            for asset, amount in zip(assets, amounts):
+            balances = list(
+                decode(["(address,int256,string,address)[]"], call_result)[0]
+            )
+            for asset, amount, _, _ in balances:
                 if amount != 0:
                     cumulative_amounts[asset] = (
                         cumulative_amounts.get(asset, 0) + amount
