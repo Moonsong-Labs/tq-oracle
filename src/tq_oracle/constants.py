@@ -19,6 +19,7 @@ class StakewiseAddresses(TypedDict):
     os_token_vault_escrow: str
     vault: str
 
+
 STRETH = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
 MULTICALL_ADDRESSES = "0xcA11bde05977b3631167028862bE2a173976CA11"
 

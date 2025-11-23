@@ -16,7 +16,7 @@ from ...abi import (
     load_compact_collector_abi,
     load_compact_collector_bytecode,
 )
-from .base import AssetData, BaseAssetAdapter, AdapterChain
+from .base import AssetData, BaseAssetAdapter
 from eth_abi.abi import decode
 
 if TYPE_CHECKING:
@@ -28,17 +28,16 @@ logger = get_logger(__name__)
 class StrETHAdapter(BaseAssetAdapter):
     streth_address: str
     multicall: Contract
-    chain: AdapterChain
     w3: Web3
 
-    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
+    def __init__(self, config: OracleSettings):
         """Initialize the adapter.
 
         Args:
             config: Oracle configuration
             chain: Which chain to query - always "vault_chain"
         """
-        super().__init__(config, chain=chain)
+        super().__init__(config)
 
         self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
         self.block_number = config.block_number_required
@@ -69,10 +68,6 @@ class StrETHAdapter(BaseAssetAdapter):
     @property
     def adapter_name(self) -> str:
         return "streth"
-
-    @property
-    def chain(self) -> AdapterChain:
-        return AdapterChain.VAULT_CHAIN
 
     async def _fetch_assets(self, subvault_addresses: list[str]) -> list[AssetData]:
         """Fetch strETH positions for the given subvaults on the configured chain.
