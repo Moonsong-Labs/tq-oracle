@@ -98,8 +98,11 @@ class OracleSettings(BaseSettings):
     ignore_active_proposal_check: bool = False
     pre_check_retries: int = 3
     pre_check_timeout: float = 12.0
+    global_timeout_seconds: float | None = 600.0
 
     # --- price validation ---
+    price_validation_retries: int = 3
+    price_validation_timeout: float = 12.0
     price_warning_tolerance_percentage: float = 0.5
     price_failure_tolerance_percentage: float = 1.0
 
@@ -109,6 +112,8 @@ class OracleSettings(BaseSettings):
     pyth_staleness_threshold: int = 60
     pyth_max_confidence_ratio: float = 0.03
     pyth_dynamic_discovery_enabled: bool = True
+    pyth_fail_on_missing_price: bool = False
+    pyth_fail_on_stale_price: bool = False
 
     # --- RPC settings ---
     max_calls: int = 3
@@ -309,9 +314,7 @@ class OracleSettings(BaseSettings):
                 )
             from .abi import get_oracle_address_from_vault
 
-            self._oracle_address = get_oracle_address_from_vault(
-                self.vault_address, self.vault_rpc
-            )
+            self._oracle_address = get_oracle_address_from_vault(self)
         return self._oracle_address
 
     @property

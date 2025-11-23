@@ -7,6 +7,9 @@ vault_rpc = "https://ethereum-rpc.publicnode.com"
 dry_run = true
 log_level = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
+# Pipeline timeout (seconds); set to 0 to disable
+global_timeout_seconds = 600
+
 # Configure additional adapters per subvault
 # By default, idle_balances adapter runs on ALL subvaults on the vault chain
 
@@ -43,3 +46,9 @@ ignore_timeout_check = true
 ignore_active_proposal_check = true
 pre_check_retries = 3
 pre_check_timeout = 12.0
+
+# Pyth settings
+pyth_enabled = true
+pyth_max_confidence_ratio = 0.1  # Maximum allowed confidence ratio for Pyth prices (default: 0.03)
+pyth_hermes_endpoint = "https://hermes.pyth.network"
+pyth_staleness_threshold = 60
