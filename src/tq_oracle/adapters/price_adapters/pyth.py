@@ -377,7 +377,7 @@ class PythAdapter(BasePriceAdapter):
                 symbol,
                 base_symbol,
                 asset_usd_price,
-                price_per_base_unit_d18 / Decimal(10**18),
+                price_per_base_unit_d18,
                 base_symbol,
                 decimals,
             )
