@@ -55,6 +55,24 @@ def test_encode_asset_prices_single():
     assert encoded.asset_prices == [("0xABC", 123 * 10**6)]
 
 
+def test_encode_asset_prices_preserves_fractional():
+    rp = PriceData(
+        base_asset="0xBASE",
+        prices={"0x0000000000000000000000000000000000000ABC": Decimal("1.23456789")},
+        decimals={
+            "0x0000000000000000000000000000000000000ABC": 18,
+            "0xBASE": 18,
+        },
+    )
+
+    encoded = encode_asset_prices(rp)
+
+    assert (
+        dict(encoded.asset_prices)["0x0000000000000000000000000000000000000ABC"]
+        == 1234567890000000000
+    )
+
+
 def test_encode_asset_prices_overwrites_base_asset_to_zero():
     rp = PriceData(
         base_asset=ETH_ASSET,

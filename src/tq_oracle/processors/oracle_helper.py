@@ -116,10 +116,13 @@ def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
         if address == prices.base_asset:
             normalized_price = 0
         else:
-            integral_price = int(
-                Decimal(price_per_base_unit).to_integral_value(rounding=ROUND_FLOOR)
+            # price_per_base_unit is base-asset per smallest unit of the token in D18.
+            # Multiply first to preserve fractional parts before flooring to an int.
+            normalized_price = int(
+                (Decimal(price_per_base_unit) * (10**decimals)).to_integral_value(
+                    rounding=ROUND_FLOOR
+                )
             )
-            normalized_price = integral_price * (10**decimals)
 
         asset_prices.append((address, normalized_price))
 
