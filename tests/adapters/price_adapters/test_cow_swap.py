@@ -52,6 +52,16 @@ def usds_address(config):
     return address
 
 
+@pytest.fixture(autouse=True)
+def stub_decimals(monkeypatch):
+    async def _decimals(
+        self, _token_address: str
+    ) -> int:  # pragma: no cover - simple stub
+        return 18
+
+    monkeypatch.setattr(CowSwapAdapter, "get_token_decimals", _decimals)
+
+
 @pytest.mark.asyncio
 async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(
     config, eth_address
@@ -85,7 +95,8 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(
     adapter = CowSwapAdapter(config)
     unsupported_address = "0xUnsupported"
     result = await adapter.fetch_prices(
-        [unsupported_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
+        [unsupported_address],
+        PriceData(base_asset=eth_address, prices={"0x111": Decimal(1)}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
@@ -108,6 +119,15 @@ async def test_fetch_prices_uses_native_quote_in_wei(
 
     monkeypatch.setattr(adapter, "fetch_native_price", _fake_native_price)
 
+    async def _fake_decimals(token_address: str) -> int:
+        if token_address == usdc_address:
+            return 6
+        if token_address == wbtc_address:
+            return 8
+        return 18
+
+    monkeypatch.setattr(adapter, "get_token_decimals", _fake_decimals)
+
     result = await adapter.fetch_prices(
         [usdc_address, wbtc_address], PriceData(base_asset=eth_address, prices={})
     )
@@ -118,8 +138,10 @@ async def test_fetch_prices_uses_native_quote_in_wei(
     expected_wbtc = int(
         Decimal(303129509051.44714).scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
     )
-    assert result.prices[usdc_address] == expected_usdc
-    assert result.prices[wbtc_address] == expected_wbtc
+    assert result.prices[usdc_address] == Decimal(expected_usdc)
+    assert result.prices[wbtc_address] == Decimal(expected_wbtc)
+    assert result.decimals[usdc_address] == 6
+    assert result.decimals[wbtc_address] == 8
 
 
 @pytest.mark.asyncio
@@ -141,7 +163,7 @@ async def test_fetch_prices_scales_to_d18_with_round_half_up(
     expected = int(
         Decimal(1.2345678901234567).scaleb(18).to_integral_value(rounding=ROUND_HALF_UP)
     )
-    assert result.prices[token_address] == expected
+    assert result.prices[token_address] == Decimal(expected)
 
 
 @pytest.mark.asyncio
@@ -161,7 +183,7 @@ async def test_fetch_prices_does_not_rescale_by_token_decimals(
     )
 
     expected = int(Decimal(1234.5).scaleb(18).to_integral_value(rounding=ROUND_HALF_UP))
-    assert result.prices[token_address] == expected
+    assert result.prices[token_address] == Decimal(expected)
 
 
 @pytest.mark.asyncio
@@ -171,13 +193,13 @@ async def test_fetch_prices_usdc_integration_with_previous_prices(
 ):
     adapter = CowSwapAdapter(config)
     result = await adapter.fetch_prices(
-        [usdc_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
+        [usdc_address], PriceData(base_asset=eth_address, prices={"0x111": Decimal(1)})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
-    assert result.prices["0x111"] == 1
+    assert result.prices["0x111"] == Decimal(1)
     price = result.prices[usdc_address]
-    assert isinstance(price, int)
+    assert isinstance(price, Decimal)
     assert price >= 0
 
 
@@ -188,13 +210,13 @@ async def test_fetch_prices_usdt_integration_with_previous_prices(
 ):
     adapter = CowSwapAdapter(config)
     result = await adapter.fetch_prices(
-        [usdt_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
+        [usdt_address], PriceData(base_asset=eth_address, prices={"0x111": Decimal(1)})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
-    assert result.prices["0x111"] == 1
+    assert result.prices["0x111"] == Decimal(1)
     price = result.prices[usdt_address]
-    assert isinstance(price, int)
+    assert isinstance(price, Decimal)
     assert price >= 0
 
 
@@ -211,8 +233,8 @@ async def test_fetch_prices_usdc_and_usdt_integration(
     assert len(result.prices) == 2
     usdc_price = result.prices[usdc_address]
     usdt_price = result.prices[usdt_address]
-    assert isinstance(usdc_price, int)
-    assert isinstance(usdt_price, int)
+    assert isinstance(usdc_price, Decimal)
+    assert isinstance(usdt_price, Decimal)
     assert usdc_price >= 0
     assert usdt_price >= 0
 
@@ -245,11 +267,11 @@ async def test_fetch_prices_usds_integration_with_previous_prices(
 ):
     adapter = CowSwapAdapter(config)
     result = await adapter.fetch_prices(
-        [usds_address], PriceData(base_asset=eth_address, prices={"0x111": 1})
+        [usds_address], PriceData(base_asset=eth_address, prices={"0x111": Decimal(1)})
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
-    assert result.prices["0x111"] == 1
+    assert result.prices["0x111"] == Decimal(1)
     price = result.prices[usds_address]
     assert isinstance(price, int)
     assert price >= 0
@@ -270,9 +292,9 @@ async def test_fetch_prices_all_stablecoins_integration(
     usdc_price = result.prices[usdc_address]
     usdt_price = result.prices[usdt_address]
     usds_price = result.prices[usds_address]
-    assert isinstance(usdc_price, int)
-    assert isinstance(usdt_price, int)
-    assert isinstance(usds_price, int)
+    assert isinstance(usdc_price, Decimal)
+    assert isinstance(usdt_price, Decimal)
+    assert isinstance(usds_price, Decimal)
     assert usdc_price >= 0
     assert usdt_price >= 0
     assert usds_price >= 0
@@ -317,8 +339,8 @@ async def test_fetch_prices_preserves_precision(monkeypatch, config, eth_address
     expected_price_wei_normalized = expected_price_wei // (10 ** (18 - 18))
 
     assert test_asset_address in result.prices
-    assert result.prices[test_asset_address] == expected_price_wei_normalized
-    assert isinstance(result.prices[test_asset_address], int)
+    assert result.prices[test_asset_address] == Decimal(expected_price_wei_normalized)
+    assert isinstance(result.prices[test_asset_address], Decimal)
 
 
 @pytest.mark.asyncio

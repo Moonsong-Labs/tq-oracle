@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 import backoff
 import requests
+from web3 import Web3
 from web3.exceptions import BadFunctionCallOutput, ContractLogicError
 
+from ...abi import load_erc20_abi
 from ...settings import Network, OracleSettings
 from .base import BasePriceAdapter, PriceData
 
@@ -102,6 +104,29 @@ class CowSwapAdapter(BasePriceAdapter):
 
         return price_decimal
 
+    async def get_token_decimals(self, token_address: str) -> int:
+        cached = self._decimals_cache.get(token_address)
+        if cached is not None:
+            return cached
+
+        w3 = Web3(Web3.HTTPProvider(self.vault_rpc))
+        erc20_abi = load_erc20_abi()
+        token_contract = w3.eth.contract(
+            address=w3.to_checksum_address(token_address),
+            abi=erc20_abi,
+        )
+
+        decimals = await asyncio.to_thread(
+            lambda: int(
+                token_contract.functions.decimals().call(
+                    block_identifier=self.block_number
+                )
+            )
+        )
+
+        self._decimals_cache[token_address] = decimals
+        return decimals
+
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
@@ -135,15 +160,12 @@ class CowSwapAdapter(BasePriceAdapter):
             try:
                 native_price = await self.fetch_native_price(asset_address)
 
-                price_wei = int(
-                    Decimal(native_price)
-                    .scaleb(18)
-                    .to_integral_value(rounding=ROUND_HALF_UP)
-                )
                 logger.debug(
-                    f" Fetched price for {asset_address}: {price_wei} (D18) per base unit "
+                    f" Fetched price for {asset_address}: {native_price} per base unit "
                 )
-                prices_accumulator.prices[asset_address] = price_wei
+                prices_accumulator.prices[asset_address] = native_price
+                decimals = await self.get_token_decimals(asset_address)
+                prices_accumulator.decimals[asset_address] = decimals
 
             except (
                 requests.exceptions.RequestException,

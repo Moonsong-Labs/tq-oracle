@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from unittest.mock import Mock
 
 import pytest
@@ -101,18 +102,18 @@ def test_check_confidence_passes_with_low_confidence(adapter):
 
 def test_check_confidence_fails_with_high_confidence(adapter):
     price_obj = HermesPrice(price="100000000", conf="5000000", expo=-8, publish_time=0)
-    price_18 = 10**18
+    price_val = Decimal(price_obj.price) * (Decimal(10) ** price_obj.expo)
 
     with pytest.raises(ValueError, match=r"confidence ratio .* exceeds maximum"):
-        adapter._check_confidence(price_obj, price_18, "ETH/USD")
+        adapter._check_confidence(price_obj, price_val, "ETH/USD")
 
 
 def test_check_confidence_fails_on_zero_price(adapter):
     price_obj = HermesPrice(price="0", conf="1000000", expo=-8, publish_time=0)
-    price_18 = 0
+    price_val = Decimal(0)
 
     with pytest.raises(ValueError, match="price is zero"):
-        adapter._check_confidence(price_obj, price_18, "ETH/USD")
+        adapter._check_confidence(price_obj, price_val, "ETH/USD")
 
 
 @pytest.mark.asyncio
