@@ -41,7 +41,15 @@ class PythValidator(BasePriceValidator):
             f" Asset addresses to validate (excluding base asset): {asset_addresses}"
         )
 
-        pyth_prices = PriceData(base_asset=price_data.base_asset, prices={})
+        pyth_prices = PriceData(
+            base_asset=price_data.base_asset,
+            prices={},
+            decimals={
+                price_data.base_asset: price_data.decimals.get(
+                    price_data.base_asset, 18
+                )
+            },
+        )
 
         try:
             pyth_prices = await self.pyth_adapter.fetch_prices(

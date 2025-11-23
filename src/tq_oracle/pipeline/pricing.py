@@ -33,7 +33,11 @@ async def price_assets(ctx: PipelineContext) -> None:
 
     asset_addresses = list(aggregated.assets)
     log.info("Fetching prices for %d assets...", len(asset_addresses))
-    price_data: PriceData = PriceData(base_asset=ctx.base_asset_required, prices={})
+    price_data: PriceData = PriceData(
+        base_asset=ctx.base_asset_required,
+        prices={},
+        decimals={ctx.base_asset_required: 18},
+    )
 
     price_adapters = [AdapterClass(s) for AdapterClass in PRICE_ADAPTERS]
     for price_adapter in price_adapters:

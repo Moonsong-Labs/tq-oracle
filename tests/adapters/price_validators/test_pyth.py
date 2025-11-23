@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 import time
 
@@ -99,7 +100,8 @@ async def test_validate_prices_disabled(config, eth_address, usdc_address):
 
     price_data = PriceData(
         base_asset=eth_address,
-        prices={usdc_address: 3000000000000000},
+        prices={usdc_address: Decimal(3000000000000000)},
+        decimals={eth_address: 18, usdc_address: 6},
     )
 
     result = await validator.validate_prices(price_data)
@@ -156,7 +158,8 @@ async def test_validate_prices_with_mocked_pyth(
 
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: 333_333_333_333_333_000_000_000_000},
+            prices={usdc_address: Decimal(333_333_333)},
+            decimals={eth_address: 18, usdc_address: 6},
         )
 
         result = await validator.validate_prices(price_data)
@@ -213,7 +216,8 @@ async def test_validate_prices_fails_on_excessive_deviation(
 
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: 500_000_000_000_000_000_000_000_000},
+            prices={usdc_address: Decimal(500_000_000_000_000_000_000_000_000)},
+            decimals={eth_address: 18, usdc_address: 6},
         )
 
         result = await validator.validate_prices(price_data)
@@ -263,7 +267,8 @@ async def test_validate_prices_handles_stale_eth_price(
 
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: 333_333_333_333_333_000_000_000_000},
+            prices={usdc_address: Decimal(333_333_333)},
+            decimals={eth_address: 18, usdc_address: 6},
         )
 
         result = await validator.validate_prices(price_data)
@@ -288,7 +293,8 @@ async def test_validate_prices_handles_api_error(
 
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: 333_333_333_333_333_000_000_000_000},
+            prices={usdc_address: Decimal(333_333_333)},
+            decimals={eth_address: 18, usdc_address: 6},
         )
 
         result = await validator.validate_prices(price_data)
@@ -332,7 +338,8 @@ async def test_validate_prices_fails_on_missing_feed_when_flag_set(
     ):
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: int((1 / 3000) * 1e18)},
+            prices={usdc_address: Decimal(333_333_333)},
+            decimals={eth_address: 18, usdc_address: 6},
         )
 
         result = await validator.validate_prices(price_data)
@@ -386,7 +393,8 @@ async def test_validate_prices_fails_on_stale_feed_when_flag_set(
     ):
         price_data = PriceData(
             base_asset=eth_address,
-            prices={usdc_address: int((1 / 3000) * 1e18)},
+            prices={usdc_address: Decimal(333_333_333)},
+            decimals={eth_address: 18, usdc_address: 6},
         )
 
         result = await validator.validate_prices(price_data)

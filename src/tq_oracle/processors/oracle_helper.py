@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_FLOOR
 
 from web3 import Web3
 from web3.contract import Contract
@@ -12,6 +13,13 @@ from ..logger import get_logger
 from ..settings import OracleSettings
 
 logger = get_logger(__name__)
+
+# From OracleHelper.sol:
+# Price of the asset expressed via the base asset.
+# If the price is 0, it means that the asset is the base asset, then for other assets:
+# If priceD18 = 1e18, it means that 1 asset = 1 base asset
+# If priceD18 = 0.5e18, it means that 1 asset = 0.5 base asset
+# If priceD18 = 2e18, it means that 1 asset = 2 base assets
 
 
 @dataclass
@@ -51,6 +59,10 @@ async def derive_final_prices(
 
     vault = Web3.to_checksum_address(config.vault_address)
     asset_prices = encode_asset_prices(price_data).asset_prices
+    logger.debug(f"Calling OracleHelper at {config.oracle_helper_address}")
+    logger.debug(f"Vault address: {vault}")
+    logger.debug(f"Total assets (D18): {total_assets}")
+    logger.debug(f"Asset prices (scaled to whole tokens): {asset_prices}")
     if excluded_assets:
         excluded_lower = {addr.lower() for addr in excluded_assets}
         asset_prices = [
@@ -94,9 +106,22 @@ def encode_asset_prices(prices: PriceData) -> EncodedAssetPrices:
 
     Python's default string sort is case-sensitive and doesn't match Solidity's behavior.
     """
-    # Always sets the base asset to price 0
-    if prices.base_asset in prices.prices:
-        prices.prices[prices.base_asset] = 0
-    # Sorts addresses numerically (as integers) to match Solidity's address comparison
-    asset_prices = sorted(prices.prices.items(), key=lambda item: int(item[0], 16))
+    asset_prices: list[tuple[str, int]] = []
+
+    for address, price_per_base_unit in prices.prices.items():
+        decimals = prices.decimals.get(address)
+        if decimals is None:
+            raise ValueError(f"Missing decimals for asset {address}")
+
+        if address == prices.base_asset:
+            normalized_price = 0
+        else:
+            integral_price = int(
+                Decimal(price_per_base_unit).to_integral_value(rounding=ROUND_FLOOR)
+            )
+            normalized_price = integral_price * (10**decimals)
+
+        asset_prices.append((address, normalized_price))
+
+    asset_prices.sort(key=lambda item: int(item[0], 16))
     return EncodedAssetPrices(asset_prices=asset_prices)

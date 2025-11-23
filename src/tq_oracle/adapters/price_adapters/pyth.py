@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 import backoff
 import requests
+from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 from web3 import Web3
 
@@ -80,10 +81,8 @@ class PythAdapter(BasePriceAdapter):
     def adapter_name(self) -> str:
         return "pyth"
 
-    def _scale_to_18(self, value: int, expo: int) -> int:
-        """Scale an integer `value * 10**expo` to 18-decimal fixed point."""
-        shift = 18 + expo
-        return value * (10**shift) if shift >= 0 else value // (10**-shift)
+    def _to_decimal(self, price_obj: HermesPrice) -> Decimal:
+        return Decimal(price_obj.price) * (Decimal(10) ** price_obj.expo)
 
     @backoff.on_exception(
         backoff.expo,
@@ -184,13 +183,13 @@ class PythAdapter(BasePriceAdapter):
         return feed_id
 
     def _check_confidence(
-        self, price_obj: HermesPrice, price_18: int, symbol: str
+        self, price_obj: HermesPrice, price_value: Decimal, symbol: str
     ) -> None:
-        conf_18 = self._scale_to_18(price_obj.conf, price_obj.expo)
-        denom = abs(price_18)
+        conf_value = Decimal(price_obj.conf) * (Decimal(10) ** price_obj.expo)
+        denom = abs(price_value)
         if denom == 0:
             raise ValueError(f"{symbol} price is zero")
-        conf_ratio = conf_18 / denom
+        conf_ratio = conf_value / denom
         if conf_ratio > self.max_confidence_ratio:
             raise ValueError(
                 f"{symbol} confidence ratio {conf_ratio:.4f} exceeds maximum {self.max_confidence_ratio}"
@@ -226,6 +225,7 @@ class PythAdapter(BasePriceAdapter):
         self.last_stale_feeds = set()
 
         base_address = Web3.to_checksum_address(prices_accumulator.base_asset)
+        prices_accumulator.decimals.setdefault(base_address, 18)
         base_symbol = self._symbol_for(base_address)
         if not base_symbol:
             raise ValueError(
@@ -333,9 +333,9 @@ class PythAdapter(BasePriceAdapter):
                 f"{base_symbol}/USD price is stale (age: {now - base_publish_time}s)"
             )
 
-        base_usd_price_18 = self._scale_to_18(base_price_obj.price, base_price_obj.expo)
-        self._check_confidence(base_price_obj, base_usd_price_18, f"{base_symbol}/USD")
-        logger.debug("%s/USD price: $%.6f", base_symbol, base_usd_price_18 / 10**18)
+        base_usd_price = self._to_decimal(base_price_obj)
+        self._check_confidence(base_price_obj, base_usd_price, f"{base_symbol}/USD")
+        logger.debug("%s/USD price: $%.6f", base_symbol, base_usd_price)
 
         for original_address, symbol, feed_id in resolved_assets.values():
             feed = feeds_by_id.get(feed_id.removeprefix("0x"))
@@ -355,18 +355,29 @@ class PythAdapter(BasePriceAdapter):
                 self.last_stale_feeds.add(original_address)
                 continue
 
-            asset_usd_price_18 = self._scale_to_18(price_obj.price, price_obj.expo)
-            self._check_confidence(price_obj, asset_usd_price_18, f"{symbol}/USD")
+            asset_usd_price = self._to_decimal(price_obj)
+            self._check_confidence(price_obj, asset_usd_price, f"{symbol}/USD")
 
-            asset_price_18 = (asset_usd_price_18 * 10**18) // base_usd_price_18
-            decimals = await self.get_token_decimals(original_address)
-            price_per_base_unit_d18 = (asset_price_18 * 10**18) // (10**decimals)
+            # Convert to ETH per base unit (token atom) in D18 fixed point
+            asset_per_base_token = (
+                asset_usd_price / base_usd_price
+            )  # ETH per whole token
+            decimals = prices_accumulator.decimals.get(original_address)
+            if decimals is None:
+                decimals = await self.get_token_decimals(original_address)
+
+            price_per_base_unit_d18 = (
+                asset_per_base_token * Decimal(10**18) / Decimal(10**decimals)
+            )
+
             prices_accumulator.prices[original_address] = price_per_base_unit_d18
+            prices_accumulator.decimals[original_address] = decimals
             logger.debug(
-                "%s: $%.6f = %.9f %s per base unit (decimals=%d)",
+                "%s/%s | $%.6f  |  %.9f %s per base unit (decimals=%d)",
                 symbol,
-                asset_usd_price_18 / 10**18,
-                price_per_base_unit_d18 / 10**18,
+                base_symbol,
+                asset_usd_price,
+                price_per_base_unit_d18 / Decimal(10**18),
                 base_symbol,
                 decimals,
             )
