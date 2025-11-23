@@ -8,13 +8,6 @@ TQ Oracle performs read smart contract READ calls through a registry of protocol
 
 For detailed system architecture and integration with Mellow Finance flexible-vaults, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Known Limitations & Assumptions
-
-> [!WARNING]
-> **stETH/ETH Peg Assumption**: The wstETH price adapter assumes a 1:1 peg between stETH and ETH when calculating wstETH prices. This assumption is **not validated** against market prices.
->
-> **Impact**: During stETH depeg events (e.g., market stress, liquidity crises), the oracle will report inaccurate TVL for vaults holding wstETH. The reported value will reflect the stETH/wstETH exchange rate multiplied by an assumed 1:1 stETH/ETH rate, not the actual market value.
-
 ## Running without installing
 
 You can run this CLI without any git cloning, directly with `uv`
@@ -71,27 +64,17 @@ All configuration options can be set via CLI arguments, environment variables, o
 
 | CLI Option | Environment Variable | TOML Key | Default | Description |
 |------------|---------------------|-----------|---------|-------------|
-| `VAULT_ADDRESS` | - | `vault_address` | *required* | Vault contract address (positional argument) |
+| `vault_address` (argument) | `TQ_ORACLE_VAULT_ADDRESS` | `vault_address` | *required* | Vault contract address passed as positional argument |
 | `--config` `-c` | - | - | Auto-detect | Path to TOML configuration file |
-| `--oracle-helper-address` `-h` | - | `oracle_helper_address` | Auto (mainnet/testnet) | OracleHelper contract address |
-| `--vault-rpc` | `VAULT_RPC` | `vault_rpc` | Auto (mainnet/sepolia/base) | Vault network RPC endpoint |
-| `--hl-rpc` | `HL_EVM_RPC` | `hl_rpc` | Auto (mainnet/testnet) | Hyperliquid RPC endpoint |
-| `--l1-subvault-address` | `L1_SUBVAULT_ADDRESS` | `l1_subvault_address` | - | L1 subvault for CCTP monitoring |
-| `--hl-subvault-address` | `HL_SUBVAULT_ADDRESS` | `hl_subvault_address` | Vault address | Hyperliquid subvault address |
-| `--safe-address` `-s` | - | `safe_address` | - | Gnosis Safe address for multi-sig |
-| `--hyperliquid-env` | `HYPERLIQUID_ENV` | `hyperliquid_env` | `"mainnet"` | Hyperliquid environment (`"mainnet"` or `"testnet"`) |
-| `--cctp-env` | `CCTP_ENV` | `cctp_env` | `"mainnet"` | CCTP environment (`"mainnet"` or `"testnet"`) |
-| `--dry-run/--no-dry-run` | - | `dry_run` | `true` | Preview without sending transaction |
-| `--private-key` | `PRIVATE_KEY` | ❌ *Never use TOML* | - | Private key for signing (required with Safe on --no-dry-run) |
-| `--safe-key` | `SAFE_TRANSACTION_SERVICE_API_KEY` | ❌ *Never use TOML* | - | API key for Safe Transaction Service |
-| `--ignore-empty-vault` | - | `ignore_empty_vault` | `false` | Suppress errors for empty vaults |
-| `--ignore-timeout-check` | - | `ignore_timeout_check` | `false` | Allow forced submission bypassing timeout |
-| `--ignore-active-proposal-check` | - | `ignore_active_proposal_check` | `false` | Allow duplicate submissions |
-| `--pre-check-retries` | - | `pre_check_retries` | `3` | Number of pre-check retry attempts |
-| `--pre-check-timeout` | - | `pre_check_timeout` | `12.0` | Timeout between pre-check retries (seconds) |
-| - | - | `log_level` | `"INFO"` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
-| - | - | `chainlink_price_warning_tolerance_percentage` | `0.5` | Price deviation warning threshold (%) |
-| - | - | `chainlink_price_failure_tolerance_percentage` | `1.0` | Price deviation failure threshold (%) |
+| `--network` `-n` | `TQ_ORACLE_NETWORK` | `network` | `"mainnet"` | Network to report on (`mainnet`, `sepolia`, `base`) |
+| `--block-number` | `TQ_ORACLE_BLOCK_NUMBER` | `block_number` | Latest block | Block number to snapshot vault state |
+| `--vault-rpc` | `TQ_ORACLE_VAULT_RPC` | `vault_rpc` | Network default | RPC endpoint for the selected vault network |
+| `--dry-run/--no-dry-run` | `TQ_ORACLE_DRY_RUN` | `dry_run` | `true` | Preview report without submitting a Safe transaction |
+| `--ignore-empty-vault/--require-nonempty-vault` | `TQ_ORACLE_IGNORE_EMPTY_VAULT` | `ignore_empty_vault` | `false` | Skip failure when vault holds zero assets |
+| `--ignore-timeout-check/--enforce-timeout-check` | `TQ_ORACLE_IGNORE_TIMEOUT_CHECK` | `ignore_timeout_check` | `false` | Skip minimum interval guard between reports |
+| `--ignore-active-proposal-check/--enforce-active-proposal-check` | `TQ_ORACLE_IGNORE_ACTIVE_PROPOSAL_CHECK` | `ignore_active_proposal_check` | `false` | Skip duplicate active proposal guard |
+| `--log-level` | `TQ_ORACLE_LOG_LEVEL` | `log_level` | `"INFO"` | Override logging verbosity (`TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
+| `--show-config` | - | - | `false` | Dump effective configuration (with secrets redacted) and exit |
 
 #### TOML-Only Options (Not available via CLI)
 
@@ -101,6 +84,8 @@ All configuration options can be set via CLI arguments, environment variables, o
 | `rpc_max_concurrent_calls` | `5` | Maximum concurrent RPC connections |
 | `rpc_delay` | `0.15` | Delay between RPC calls (seconds) |
 | `rpc_jitter` | `0.10` | Random jitter for RPC delays (seconds) |
+| `price_warning_tolerance_percentage` | `0.5` | Price deviation warning threshold (%) |
+| `price_failure_tolerance_percentage` | `1.0` | Price deviation failure threshold (%) |
 
 ### Advanced Configuration: Subvault Adapters
 
@@ -109,7 +94,6 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 **Configuration via TOML:**
 
 - Specify target subvault address
-- Define which chain the subvault operates on (L1 or Hyperliquid)
 - List additional adapters to run for this subvault
 - Option to skip default idle balances check
 - Option to skip subvault existence validation
@@ -117,19 +101,52 @@ TQ Oracle supports configuring multiple asset adapters per subvault address, all
 **Available Asset Adapters:**
 
 - `idle_balances` - Checks for idle USDC balances not yet deployed
-- `hyperliquid` - Fetches portfolio value from Hyperliquid
 
-See `tq-oracle-example.toml` for complete configuration examples.
+See `tq-oracle.toml.example` for complete configuration examples.
 
 ### Usage Examples
 
-> [!IMPORTANT]
-> Until Mellow has deployments of the vaults available for testing, you may need to use `--ignore-empty-vault` flag to overcome empty-asset errors.
+**Run with auto-detected config file:**
+
+```bash
+# Loads from tq-oracle.toml or ~/.config/tq-oracle/config.toml
+tq-oracle
+```
+
+**Run with explicit vault address:**
+
+```bash
+# Override vault address from config
+tq-oracle 0xYourVaultAddress
+```
+
+**Run with custom config file:**
+
+```bash
+tq-oracle --config path/to/custom-config.toml
+```
+
+**Run with network override:**
+
+```bash
+tq-oracle --network sepolia 0xYourVaultAddress
+```
+
+**Preview configuration without running:**
+
+```bash
+tq-oracle --show-config
+```
+
+**Increase verbosity for debugging:**
+
+```bash
+tq-oracle --log-level DEBUG
+```
 
 **Common Usage Patterns:**
 
 - **Dry-run on mainnet**: Preview report generation without submitting to chain
-- **Custom subvault**: Specify Hyperliquid subvault address for cross-chain asset tracking
 - **Testnet execution**: Run against testnet with Safe multi-sig for testing
 - **Pre-deployment testing**: Test with empty vaults using ignore flags
 
@@ -155,20 +172,15 @@ src/tq_oracle/
 Before processing TVL data, TQ Oracle runs automated pre-flight validation checks to ensure data integrity:
 
 - **Safe State Validation**: Ensures no duplicate or pending reports exist
-- **CCTP Bridge Detection**: Identifies in-flight USDC transfers between L1 and Hyperliquid
 - **Check Retry Logic**: Automatically retries failed checks with exponential backoff when recommended
 
-These checks prevent race conditions and ensure accurate TVL snapshots by detecting ongoing cross-chain transfers that could affect asset balances.
-
-### Testing CCTP Bridge Detection
-
-A standalone test script is available in `scripts/check_cctp_inflight.py` to verify CCTP bridge in-flight detection with L1 and Hyperliquid subvault addresses.
+These checks prevent race conditions and ensure accurate TVL snapshots by detecting ongoing cross-chain transfers that could affect asset balances. You can bypass individual guards when needed via the CLI flags `--ignore-empty-vault`, `--ignore-timeout-check/--enforce-timeout-check`, and `--ignore-active-proposal-check/--enforce-active-proposal-check`.
 
 ## Adding New Adapters
 
 ### Asset Adapters
 
-Asset adapters fetch asset holdings from specific protocols (e.g., Hyperliquid, Aave, Lido).
+Asset adapters fetch asset holdings from specific protocols (e.g., Aave, Lido).
 
 Quick overview:
 
@@ -181,14 +193,12 @@ The adapter name in the registry is used in the `[[subvault_adapters]]` configur
 
 ### Price Adapters
 
-Price adapters fetch USD prices for assets from price oracles (e.g., Chainlink, Pyth).
+Price adapters fetch USD prices for assets from price oracles (e.g., Pyth).
 
 1. **Create adapter file** in `src/tq_oracle/adapters/price_adapters/` implementing `BasePriceAdapter`
 2. **Register adapter** in `src/tq_oracle/adapters/price_adapters/__init__.py`'s `PRICE_ADAPTERS` list
 3. **Implement async `fetch_prices()` method** to query oracle and return price data
 4. **Write unit tests** in `tests/adapters/price_adapters/`
-
-> **Note:** `ChainlinkAdapter` is exported for use in price validators but not used directly in the main pricing pipeline.
 
 ### Price Validators
 
@@ -201,8 +211,9 @@ Price validators cross-check prices from the main price adapters against referen
 5. **Write unit tests** in `tests/adapters/price_validators/`
 
 Validators respect tolerance thresholds configured in `settings.py`:
-- `chainlink_price_warning_tolerance_percentage` (default: 0.5%) - Issues warnings
-- `chainlink_price_failure_tolerance_percentage` (default: 1.0%) - Halts execution
+
+- `price_warning_tolerance_percentage` (default: 0.5%) - Issues warnings
+- `price_failure_tolerance_percentage` (default: 1.0%) - Halts execution
 
 ## Development
 
@@ -216,6 +227,3 @@ Validators respect tolerance thresholds configured in `settings.py`:
 ## External Links
 
 - `flexible-vaults` [repo](https://github.com/mellow-finance/flexible-vaults)
-- Hyperliquid API [documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint)
-- `cctp-v2` [contracts](https://github.com/circlefin/evm-cctp-contracts/tree/master/src/v2)
-- DeBridge [contracts](https://github.com/debridge-finance/dln-contracts/tree/main/contracts/DLN)

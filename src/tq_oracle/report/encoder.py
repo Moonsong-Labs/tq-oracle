@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from eth_typing.evm import ChecksumAddress
 from web3 import Web3
 
 from ..abi import load_oracle_abi
@@ -33,10 +34,14 @@ def encode_submit_reports(
 
     checksum_address = w3.to_checksum_address(oracle_address)
     contract = w3.eth.contract(address=checksum_address, abi=abi)
+    base_asset = w3.to_checksum_address(report.base_asset)
 
-    reports_array = [
+    reports_array: list[tuple[ChecksumAddress, int]] = [
         (w3.to_checksum_address(asset_addr), price_d18)
-        for asset_addr, price_d18 in report.final_prices.items()
+        for asset_addr, price_d18 in sorted(
+            report.final_prices.items(),
+            key=lambda x: 0 if w3.to_checksum_address(x[0]) == base_asset else 1,
+        )
     ]
 
     logger.info("Encoding submitReports() with %d report(s):", len(reports_array))

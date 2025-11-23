@@ -15,34 +15,27 @@ from ...abi import (
 )
 from ...logger import get_logger
 from ...settings import OracleSettings
-from .base import AdapterChain, AssetData, BaseAssetAdapter
+from .base import AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
 
 
 class IdleBalancesAdapter(BaseAssetAdapter):
-    """Adapter for querying Idle Balances assets from L1 or Hyperliquid chain."""
+    """Adapter for querying idle balances on the vault chain."""
 
     eth_address: str
     usdc_address: str
 
-    def __init__(self, config: OracleSettings, chain: str = "vault_chain"):
+    def __init__(self, config: OracleSettings):
         """Initialize the adapter.
 
         Args:
             config: Oracle configuration
-            chain: Which chain to query - "vault_chain" or "hyperliquid"
         """
-        super().__init__(config, chain=chain)
+        super().__init__(config)
 
-        if chain == "hyperliquid":
-            if not config.hl_rpc:
-                raise ValueError("hl_rpc must be configured to use hyperliquid chain")
-            self.w3 = Web3(Web3.HTTPProvider(config.hl_rpc))
-            self.block_number = config.hl_block_number_required
-        else:
-            self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
-            self.block_number = config.block_number_required
+        self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc_required))
+        self.block_number = config.block_number_required
 
         assets = config.assets
         logger.debug(f"Assets available: {assets}")
@@ -54,6 +47,43 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         if usdc_address is None:
             raise ValueError("USDC address is required for IdleBalances adapter")
         self.usdc_address = usdc_address
+
+        idle_cfg = config.adapters.idle_balances
+
+        self._additional_assets_by_symbol: dict[str, str] = {
+            symbol: self.w3.to_checksum_address(address)
+            for symbol, address in idle_cfg.extra_tokens.items()
+            if address
+        }
+        self._additional_assets: list[str] = list(
+            self._additional_assets_by_symbol.values()
+        )
+        self._additional_asset_lookup: set[str] = {
+            addr.lower() for addr in self._additional_assets
+        }
+        if self._additional_assets:
+            logger.debug(
+                "Idle balances additional tokens configured: %s",
+                self._additional_assets_by_symbol,
+            )
+
+        extra_address_candidates = [
+            self.w3.to_checksum_address(address)
+            for address in idle_cfg.extra_addresses
+            if address
+        ]
+
+        deduped_addresses: dict[str, str] = {}
+        for checksum in extra_address_candidates:
+            deduped_addresses.setdefault(checksum.lower(), checksum)
+
+        self._extra_addresses = list(deduped_addresses.values())
+        self._extra_addresses_lookup = set(deduped_addresses.keys())
+        if self._extra_addresses:
+            logger.debug(
+                "Idle balances extra addresses configured: %s",
+                self._extra_addresses,
+            )
 
         self._rpc_sem = asyncio.Semaphore(getattr(self.config, "max_calls", 5))
         self._rpc_delay = getattr(self.config, "rpc_delay", 0.15)  # seconds
@@ -76,14 +106,6 @@ class IdleBalancesAdapter(BaseAssetAdapter):
     def adapter_name(self) -> str:
         return "idle_balances"
 
-    @property
-    def chain(self) -> AdapterChain:
-        return (
-            AdapterChain.HYPERLIQUID
-            if self._chain == "hyperliquid"
-            else AdapterChain.VAULT_CHAIN
-        )
-
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         """Fetch idle balances for the given subvault on the configured chain.
 
@@ -93,24 +115,6 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         Returns:
             List of AssetData objects containing asset addresses and balances
         """
-        if self._chain == "hyperliquid":
-            logger.debug(
-                "Fetching HL USDC idle balance for subvault %s",
-                subvault_address,
-            )
-            if self.config.hyperliquid_usdc_address is None:
-                raise ValueError("hyperliquid_usdc_address must be set in config")
-            usdc_address = self.config.hyperliquid_usdc_address
-            usdc_asset = await self._fetch_asset_balance(
-                self.w3, subvault_address, usdc_address
-            )
-            # For reporting purposes, we translate the Hyperliquid USDC address to the canonical L1 USDC address.
-            # This ensures consistency in asset reporting across chains.
-            usdc_asset = AssetData(
-                asset_address=self.usdc_address, amount=usdc_asset.amount
-            )
-            return [usdc_asset]
-
         supported_assets = await self._fetch_supported_assets()
 
         logger.debug(
@@ -120,7 +124,12 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         )
 
         asset_tasks = [
-            self._fetch_asset_balance(self.w3, subvault_address, asset_addr)
+            self._fetch_asset_balance(
+                self.w3,
+                subvault_address,
+                asset_addr,
+                asset_addr.lower() in self._additional_asset_lookup,
+            )
             for asset_addr in supported_assets
         ]
 
@@ -141,10 +150,16 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         """
         subvault_addresses = await self._fetch_subvault_addresses()
         vault_addresses = [self.config.vault_address_required] + subvault_addresses
+        seen_addresses = {addr.lower() for addr in vault_addresses}
+        for extra_address in self._extra_addresses:
+            normalized = extra_address.lower()
+            if normalized not in seen_addresses:
+                vault_addresses.append(extra_address)
+                seen_addresses.add(normalized)
         logger.info(
-            "Fetching %s idle balances for main vault + %d subvaults",
-            self._chain,
+            "Fetching vault-chain idle balances for main vault + %d subvaults + %d extra addresses",
             len(subvault_addresses),
+            len(vault_addresses) - 1 - len(subvault_addresses),
         )
 
         asset_results = await asyncio.gather(
@@ -230,7 +245,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
         oracle_address = get_oracle_address_from_vault(
             self.config.vault_address_required, self.config.vault_rpc_required
         )
-        return await self._fetch_contract_list(
+        raw_assets = await self._fetch_contract_list(
             contract_address=oracle_address,
             abi=oracle_abi,
             count_function="supportedAssets",
@@ -238,8 +253,41 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             item_type="supported asset",
         )
 
+        base_assets: list[str] = []
+        for asset in raw_assets:
+            try:
+                checksum = self.w3.to_checksum_address(asset)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Skipping unsupported asset address %r from oracle contract",
+                    asset,
+                )
+                continue
+            base_assets.append(checksum)
+        return self._merge_supported_assets(base_assets)
+
+    def _merge_supported_assets(self, base_assets: list[str]) -> list[str]:
+        """Merge contract supported assets with configured additional assets."""
+        combined: list[str] = []
+        seen: set[str] = set()
+
+        for address in [*base_assets, *self._additional_assets]:
+            if not isinstance(address, str):
+                continue
+            normalized = address.lower()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            combined.append(address)
+
+        return combined
+
     async def _fetch_asset_balance(
-        self, w3: Web3, subvault_address: str, asset_address: str
+        self,
+        w3: Web3,
+        subvault_address: str,
+        asset_address: str,
+        tvl_only: bool = False,
     ) -> AssetData:
         """Fetch the balance of an asset for the given subvault."""
         checksum_subvault_address = w3.to_checksum_address(subvault_address)
@@ -261,4 +309,8 @@ class IdleBalancesAdapter(BaseAssetAdapter):
                 block_identifier=self.block_number,
             )
 
-        return AssetData(asset_address=asset_address, amount=balance)
+        return AssetData(
+            asset_address=asset_address,
+            amount=balance,
+            tvl_only=tvl_only,
+        )

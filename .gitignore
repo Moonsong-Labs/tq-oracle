@@ -28,6 +28,5 @@ CLAUDE.md
 
 .env
 
-test.toml
-config.toml
-tq-oracle.toml
+**/*.toml
+!py_project.toml

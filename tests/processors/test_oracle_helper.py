@@ -58,6 +58,62 @@ def test_encode_asset_prices_overwrites_base_asset_to_zero():
     assert prices_dict[ETH_ASSET] == 0
 
 
+@pytest.mark.asyncio
+async def test_derive_final_prices_excludes_tvl_only_assets(monkeypatch):
+    captured_asset_prices: dict[str, list[tuple[str, int]]] = {}
+
+    class FakeCall:
+        def __init__(self, asset_prices: list[tuple[str, int]]):
+            self._asset_prices = asset_prices
+
+        def call(self, block_identifier: int):
+            captured_asset_prices["asset_prices"] = self._asset_prices
+            return [42] * len(self._asset_prices)
+
+    class FakeContract:
+        def __init__(self):
+            self.functions = self
+
+        def getPricesD18(self, _vault, _total_assets, asset_prices):
+            return FakeCall(asset_prices)
+
+    monkeypatch.setattr(
+        "tq_oracle.processors.oracle_helper.get_oracle_helper_contract",
+        lambda _config: FakeContract(),
+    )
+
+    config = OracleSettings(
+        vault_address="0x0000000000000000000000000000000000000001",
+        oracle_helper_address="0x0000000000000000000000000000000000000002",
+        vault_rpc="https://example.com",
+        block_number=123,
+    )
+
+    price_data = PriceData(
+        base_asset="0x0000000000000000000000000000000000000001",
+        prices={
+            "0x0000000000000000000000000000000000000003": 10**18,
+            "0x0000000000000000000000000000000000000004": 2 * 10**18,
+        },
+    )
+
+    excluded = {"0x0000000000000000000000000000000000000003"}
+
+    result = await derive_final_prices(
+        config,
+        total_assets=100,
+        price_data=price_data,
+        excluded_assets=excluded,
+    )
+
+    assert captured_asset_prices["asset_prices"] == [
+        ("0x0000000000000000000000000000000000000004", 2 * 10**18)
+    ]
+    assert result.prices == {
+        "0x0000000000000000000000000000000000000004": 42,
+    }
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_prices_d18_integration_via_derive_final_prices():
@@ -76,13 +132,8 @@ async def test_get_prices_d18_integration_via_derive_final_prices():
         oracle_helper_address=oracle_helper,
         vault_rpc=provider,
         block_number=23690139,
-        l1_subvault_address=None,
         safe_address=None,
         safe_txn_srvc_api_key=None,
-        hl_rpc=None,
-        hl_subvault_address=None,
-        hyperliquid_env="mainnet",
-        cctp_env="mainnet",
         dry_run=True,
         private_key=None,
     )

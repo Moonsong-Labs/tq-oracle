@@ -12,6 +12,13 @@ class NetworkAssets(TypedDict):
     WSTETH: Optional[str]
 
 
+class StakewiseAddresses(TypedDict):
+    """Hard-coded StakeWise contract addresses per network."""
+
+    os_token: str
+    os_token_vault_escrow: str
+    vault: str
+
 STRETH = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
 MULTICALL_ADDRESSES = "0xcA11bde05977b3631167028862bE2a173976CA11"
 
@@ -44,29 +51,9 @@ BASE_ASSETS: NetworkAssets = {
     "WSTETH": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
 }
 
-# Chainlink Price Feeds
-PRICE_FEED_USDC_ETH = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
-PRICE_FEED_USDT_ETH = "0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46"
-PRICE_FEED_USDS_USD = "0xfF30586cD0F29eD462364C7e81375FC0C71219b1"
-PRICE_FEED_ETH_USD = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-PRICE_FEED_WSTETH_ETH_BASE = "0x43a5C292A453A3bF3606fa856197f09D7B74251a"
-
+# Hardcoded overrides, if required
 # https://docs.pyth.network/price-feeds/core/price-feeds/price-feed-ids
-PYTH_PRICE_FEED_IDS: dict[str, str] = {
-    "ETH/USD": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
-    "USDC/USD": "0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
-    "USDT/USD": "0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b",
-    "WSTETH/USD": "0x6df640f3b8963d8f8358f791f352b8364513f6ab1cca5ed3f1f7b5448980e784",
-}
-
-USDC_HL_MAINNET = "0xb88339CB7199b77E23DB6E890353E22632Ba630f"
-USDC_HL_TESTNET = "0x2B3370eE501B4a559b57D449569354196457D8Ab"
-
-HL_MAINNET_API_URL = "https://api.hyperliquid.xyz"
-HL_TESTNET_API_URL = "https://api.hyperliquid-testnet.xyz"
-
-HL_PROD_EVM_RPC = "https://rpc.hyperliquid.xyz/evm"
-HL_TEST_EVM_RPC = "https://rpc.hyperliquid-testnet.xyz/evm"
+PYTH_PRICE_FEED_IDS: dict[str, str] = {}
 
 DEFAULT_MAINNET_RPC_URL = "https://eth.drpc.org"
 DEFAULT_SEPOLIA_RPC_URL = "https://sepolia.drpc.org"
@@ -76,26 +63,28 @@ MAINNET_ORACLE_HELPER = "0x000000005F543c38d5ea6D0bF10A50974Eb55E35"
 SEPOLIA_ORACLE_HELPER = "0x65464fe20562C22B2802B4094d3E042E18b5dfC2"
 BASE_ORACLE_HELPER = "0x9bB327889402AC19BF2D164eA79CcfE46c16a37B"
 
+STAKEWISE_MAINNET_ADDRESSES: StakewiseAddresses = {
+    "os_token": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
+    "os_token_vault_escrow": "0x09e84205DF7c68907e619D07aFD90143c5763605",
+    "vault": "0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08",
+}
+
+STAKEWISE_ADDRESSES: dict[str, StakewiseAddresses] = {
+    "mainnet": STAKEWISE_MAINNET_ADDRESSES,
+}
+
+
+STAKEWISE_EXIT_LOG_CHUNK = 1_000
+STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS = 28_800  # ~4 days on 12s blocks
 
 TOKEN_MESSENGER_V2_PROD = "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"
 TOKEN_MESSENGER_V2_TEST = "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
 
-CCTP_FINALITY_THRESHOLD_INSTANT = 1000  # ~8 seconds
-CCTP_FINALITY_THRESHOLD_SLOW = 2000  # ~15 minutes
-
-CCTP_LOOKBACK_BLOCKS = 80
-CCTP_RATE_LIMITED_LOOKBACK_BLOCKS = 80  # 24 hours
 RPC_RATE_LIMIT_DELAY = (
     5  # Delay in seconds between RPC calls to avoid rate limits with get_logs()
 )
-HL_BLOCK_TIME = 1  # Hyperliquid block time in seconds
 L1_BLOCK_TIME = 12  # Ethereum L1 block time in seconds
 
 # Retry Configuration for Post-Checks
 MAX_RETRY_ATTEMPTS = 5
 RETRY_DELAY_SECONDS = 120  # 2 minutes
-
-
-# Maximum allowed staleness (in seconds) for Hyperliquid portfolio values.
-# Reject portfolio values older than this threshold.
-HL_MAX_PORTFOLIO_STALENESS_SECONDS = 120  # 2 minutes

@@ -38,7 +38,7 @@ class BasePriceValidator(ABC):
         """Calculate the percentage deviation between two prices.
 
         Args:
-            reference_price: The reference price (e.g., from Chainlink)
+            reference_price: The reference price (e.g., from Pyth)
             actual_price: The actual price being validated
 
         Returns:

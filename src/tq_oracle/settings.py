@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 try:
     import tomllib  # py311+
@@ -13,7 +13,14 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
 from dotenv import load_dotenv
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -31,8 +38,33 @@ class Network(str, Enum):
     BASE = "base"
 
 
-HyperliquidEnv = Literal["mainnet", "testnet"]
-CCTPEnv = Literal["mainnet", "testnet"]
+class IdleBalancesAdapterSettings(BaseModel):
+    """Configuration options for idle balance collection."""
+
+    extra_tokens: dict[str, str] = Field(default_factory=dict)
+    extra_addresses: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class StakewiseAdapterSettings(BaseModel):
+    """Configuration options for StakeWise adapter defaults."""
+
+    stakewise_vault_addresses: list[str] = Field(default_factory=list)
+    stakewise_exit_queue_start_block: int | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class AdapterSettings(BaseModel):
+    stakewise: StakewiseAdapterSettings = Field(
+        default_factory=StakewiseAdapterSettings
+    )
+    idle_balances: IdleBalancesAdapterSettings = Field(
+        default_factory=IdleBalancesAdapterSettings
+    )
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class OracleSettings(BaseSettings):
@@ -47,10 +79,6 @@ class OracleSettings(BaseSettings):
     # --- global toggles ---
     dry_run: bool = True
 
-    # --- environment selection ---
-    hyperliquid_env: HyperliquidEnv = "mainnet"
-    cctp_env: CCTPEnv = "mainnet"
-
     # --- core addresses / endpoints ---
     vault_address: str | None = None
     oracle_helper_address: str | None = None
@@ -58,17 +86,6 @@ class OracleSettings(BaseSettings):
     eth_mainnet_rpc: str | None = None  # Needed for when vault is not on mainnet
     network: Network = Network.MAINNET
     block_number: int | None = None
-
-    # --- hyperliquid ---
-    hl_subvault_address: str | None = None
-    hl_rpc: str | None = None
-    hl_block_number: int | None = None
-    l1_subvault_address: str | None = None
-
-    # --- computed/derived values (set by validator) ---
-    hyperliquid_api_url: str | None = None
-    hyperliquid_usdc_address: str | None = None
-    cctp_token_messenger_address: str | None = None
 
     # --- safe / signing ---
     safe_address: str | None = None
@@ -91,6 +108,7 @@ class OracleSettings(BaseSettings):
     pyth_hermes_endpoint: str = "https://hermes.pyth.network"
     pyth_staleness_threshold: int = 60
     pyth_max_confidence_ratio: float = 0.03
+    pyth_dynamic_discovery_enabled: bool = True
 
     # --- RPC settings ---
     max_calls: int = 3
@@ -101,8 +119,13 @@ class OracleSettings(BaseSettings):
     # --- logging ---
     log_level: str = "INFO"
 
-    # --- subvault adapters (from config file only) ---
+    # --- adapters (from config file only) ---
     subvault_adapters: list[dict[str, Any]] = []
+    adapters: AdapterSettings = Field(default_factory=AdapterSettings)
+
+    # --- stakewise shared addresses ---
+    stakewise_os_token_address: str | None = None
+    stakewise_os_token_vault_escrow: str | None = None
 
     # --- runtime computed values ---
     using_default_rpc: bool = False
@@ -130,45 +153,6 @@ class OracleSettings(BaseSettings):
         This centralizes all environment selection logic in one place,
         removing the need for if/else checks throughout the codebase.
         """
-        from .constants import (
-            HL_MAINNET_API_URL,
-            HL_PROD_EVM_RPC,
-            HL_TEST_EVM_RPC,
-            HL_TESTNET_API_URL,
-            TOKEN_MESSENGER_V2_PROD,
-            TOKEN_MESSENGER_V2_TEST,
-            USDC_HL_MAINNET,
-            USDC_HL_TESTNET,
-        )
-
-        if self.hyperliquid_api_url is None:
-            self.hyperliquid_api_url = (
-                HL_TESTNET_API_URL
-                if self.hyperliquid_env == "testnet"
-                else HL_MAINNET_API_URL
-            )
-
-        if self.hl_rpc is None:
-            self.hl_rpc = (
-                HL_TEST_EVM_RPC
-                if self.hyperliquid_env == "testnet"
-                else HL_PROD_EVM_RPC
-            )
-
-        if self.hyperliquid_usdc_address is None:
-            self.hyperliquid_usdc_address = (
-                USDC_HL_TESTNET
-                if self.hyperliquid_env == "testnet"
-                else USDC_HL_MAINNET
-            )
-
-        if self.cctp_token_messenger_address is None:
-            self.cctp_token_messenger_address = (
-                TOKEN_MESSENGER_V2_TEST
-                if self.cctp_env == "testnet"
-                else TOKEN_MESSENGER_V2_PROD
-            )
-
         return self
 
     @classmethod
@@ -188,11 +172,39 @@ class OracleSettings(BaseSettings):
             def __init__(self, settings_cls: type[BaseSettings], path: Path | None):
                 super().__init__(settings_cls)
                 self._path = path
+                self._root_keys = {
+                    name
+                    for name in settings_cls.model_fields.keys()
+                    if not name.startswith("_")
+                    and name not in {"subvault_adapters", "using_default_rpc"}
+                }
 
             def get_field_value(
                 self, field: Any, field_name: str
             ) -> tuple[Any, str, bool]:
                 return None, "", False
+
+            def _promote_root_keys(self, body: dict[str, Any]) -> None:
+                """Promote misplaced root-level settings from subvault adapters."""
+                adapters = body.get("subvault_adapters")
+                if not isinstance(adapters, list):
+                    return
+
+                cleaned_adapters: list[Any] = []
+                for adapter in adapters:
+                    if not isinstance(adapter, dict):
+                        cleaned_adapters.append(adapter)
+                        continue
+
+                    cleaned_entry: dict[str, Any] = {}
+                    for key, value in adapter.items():
+                        if key in self._root_keys:
+                            body.setdefault(key, value)
+                        else:
+                            cleaned_entry[key] = value
+                    cleaned_adapters.append(cleaned_entry)
+
+                body["subvault_adapters"] = cleaned_adapters
 
             def __call__(self) -> dict[str, Any]:
                 if not self._path:
@@ -214,6 +226,8 @@ class OracleSettings(BaseSettings):
                 body = data.get("tq_oracle", data)
                 if not isinstance(body, dict):
                     return {}
+
+                self._promote_root_keys(body)
 
                 # Check for secrets in config file
                 secret_fields = {"private_key", "safe_txn_srvc_api_key"}
@@ -262,25 +276,11 @@ class OracleSettings(BaseSettings):
         return self.block_number
 
     @property
-    def hl_block_number_required(self) -> int:
-        """Get hl_block_number, raising ValueError if not set."""
-        if self.hl_block_number is None:
-            raise ValueError("hl_block_number must be configured")
-        return self.hl_block_number
-
-    @property
     def vault_rpc_required(self) -> str:
         """Get vault_rpc, raising ValueError if not set."""
         if self.vault_rpc is None:
             raise ValueError("vault_rpc must be configured")
         return self.vault_rpc
-
-    @property
-    def hl_rpc_required(self) -> str:
-        """Get hl_rpc, raising ValueError if not set."""
-        if self.hl_rpc is None:
-            raise ValueError("hl_rpc must be configured")
-        return self.hl_rpc
 
     @property
     def chain_id(self) -> int:

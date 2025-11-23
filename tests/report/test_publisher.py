@@ -19,6 +19,7 @@ def sample_report() -> OracleReport:
     """Provides a sample OracleReport for testing."""
     return OracleReport(
         vault_address="0x3234567890123456789012345678901234567890",
+        base_asset="0x1234567890123456789012345678901234567890",
         total_assets={
             "0x1234567890123456789012345678901234567890": 1000000000000000000
         },
@@ -33,12 +34,7 @@ def broadcast_config() -> OracleSettings:
         vault_address="0x1234567890123456789012345678901234567890",
         oracle_helper_address="0x3234567890123456789012345678901234567890",
         vault_rpc="http://localhost:8545",
-        l1_subvault_address=None,
         safe_address="0x3234567890123456789012345678901234567890",
-        hl_rpc=None,
-        hl_subvault_address=None,
-        hyperliquid_env="mainnet",
-        cctp_env="mainnet",
         dry_run=False,
         private_key="0x" + "a" * 64,
         safe_txn_srvc_api_key="0xSAFE",

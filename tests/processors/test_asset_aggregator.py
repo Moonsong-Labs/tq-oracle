@@ -94,3 +94,18 @@ async def test_protocol_with_empty_assets():
     result = await compute_total_aggregated_assets(protocol_assets)
 
     assert result.assets == {"0xUSDC": 1500}
+
+
+@pytest.mark.asyncio
+async def test_tvl_only_assets_tracked():
+    """TVL-only assets should be tracked separately from totals."""
+    extra_asset = AssetData("0xEXTRA", 250, tvl_only=True)
+    protocol_assets = [
+        [AssetData("0xUSDC", 1000), extra_asset],
+        [AssetData("0xUSDC", 500)],
+    ]
+
+    result = await compute_total_aggregated_assets(protocol_assets)
+
+    assert result.assets == {"0xUSDC": 1500, "0xEXTRA": 250}
+    assert result.tvl_only_assets == {"0xEXTRA"}
