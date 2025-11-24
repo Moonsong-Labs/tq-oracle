@@ -32,6 +32,7 @@ async def generate_report(
 
     Args:
         vault_address: The vault contract address
+        base_asset: The address of the base asset used for reporting
         tvl_in_base_asset: Total value locked expressed in the base asset (18 decimals)
         aggregated_assets: Aggregated asset balances per asset address
         final_prices: Final oracle prices
