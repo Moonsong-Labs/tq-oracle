@@ -1,19 +1,61 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from urllib.parse import urlencode
 
+import backoff
 import requests
+from decimal import Decimal
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 from web3 import Web3
 
+from tq_oracle.abi import load_erc20_abi
 from tq_oracle.constants import PYTH_PRICE_FEED_IDS
 from tq_oracle.settings import OracleSettings
 
 from .base import BasePriceAdapter, PriceData
 
 logger = logging.getLogger(__name__)
+
+
+class HermesPrice(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    price: int
+    expo: int
+    publish_time: int
+    conf: int = 0
+
+    @field_validator("price", "expo", "publish_time", "conf", mode="before")
+    @classmethod
+    def _ints_from_str(cls, value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise ValueError("value must be an integer")
+
+
+class HermesFeed(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    price: HermesPrice
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _non_empty_id(cls, value) -> str:
+        if value is None:
+            raise ValueError("feed id must be non-empty")
+        as_str = str(value)
+        if not as_str:
+            raise ValueError("feed id must be non-empty")
+        return as_str
+
+
+class HermesResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    parsed: list[HermesFeed]
 
 
 class PythAdapter(BasePriceAdapter):
@@ -24,9 +66,12 @@ class PythAdapter(BasePriceAdapter):
         self.hermes_endpoint = config.pyth_hermes_endpoint
         self.staleness_threshold = config.pyth_staleness_threshold
         self.max_confidence_ratio = config.pyth_max_confidence_ratio
+        self.vault_rpc = config.vault_rpc_required
+        self.last_missing_feeds: set[str] = set()
+        self.last_stale_feeds: set[str] = set()
 
         self._address_to_symbol: dict[str, str] = {
-            self._canonical_address(addr): sym
+            Web3.to_checksum_address(addr): sym
             for sym, addr in config.assets.items()
             if isinstance(addr, str) and addr
         }
@@ -36,31 +81,26 @@ class PythAdapter(BasePriceAdapter):
     def adapter_name(self) -> str:
         return "pyth"
 
-    def _canonical_address(self, address: str) -> str:
-        try:
-            return Web3.to_checksum_address(address)
-        except ValueError:
-            return address.lower()
+    def _to_decimal(self, price_obj: HermesPrice) -> Decimal:
+        return Decimal(price_obj.price) * (Decimal(10) ** price_obj.expo)
 
-    def _scale_to_18(self, value: int, expo: int) -> int:
-        """Scale an integer `value * 10**expo` to 18-decimal fixed point.
-
-        Raises:
-            ValueError: If value is negative, expo is out of range |24|.
-        """
-        if value < 0:
-            raise ValueError(f"Price value must be non-negative, got {value}")
-        if not (-24 <= expo <= 24):
-            raise ValueError(f"Exponent {expo} out of supported range [-24, 24]")
-
-        shift = 18 + expo
-        scaled = value * (10**shift) if shift >= 0 else value // (10**-shift)
-        return scaled
-
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.exceptions.RequestException, requests.exceptions.HTTPError),
+        max_tries=5,
+        giveup=lambda e: (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code not in {429, 500, 502, 503, 504}
+        ),
+        jitter=backoff.full_jitter,
+    )
     async def _http_get(self, url: str, *, params: dict | None = None):
-        return await asyncio.to_thread(
-            lambda: requests.get(url, params=params, timeout=2.0)
+        response = await asyncio.to_thread(
+            lambda: requests.get(url, params=params, timeout=10.0)
         )
+        response.raise_for_status()
+        return response
 
     async def _resolve_feed_id(self, symbol: str, quote: str = "USD") -> str | None:
         key = f"{symbol.upper()}/{quote.upper()}"
@@ -92,11 +132,22 @@ class PythAdapter(BasePriceAdapter):
                 params={"query": f"{symbol}/{quote}".lower(), "asset_type": "crypto"},
             )
             r.raise_for_status()
-        except Exception as exc:  # pragma: no cover
-            logger.error("Feed discovery failed for %s/%s: %s", symbol, quote, exc)
+        except requests.RequestException as exc:  # pragma: no cover
+            logger.error(
+                "Network error discovering feed for %s/%s: %s", symbol, quote, exc
+            )
             return None
 
-        feeds = r.json()
+        try:
+            feeds = r.json()
+        except (json.JSONDecodeError, ValueError) as exc:  # pragma: no cover
+            logger.error(
+                "Invalid JSON in feed discovery response for %s/%s: %s",
+                symbol,
+                quote,
+                exc,
+            )
+            return None
         if not isinstance(feeds, list):
             logger.debug(
                 "Unexpected feed discovery payload for %s/%s; skipping dynamic resolution",
@@ -131,26 +182,50 @@ class PythAdapter(BasePriceAdapter):
         )
         return feed_id
 
-    def _check_confidence(self, price_obj: dict, price_18: int, symbol: str) -> None:
-        conf_18 = self._scale_to_18(
-            int(price_obj.get("conf", 0)), int(price_obj.get("expo", 0))
-        )
-        denom = abs(price_18)
+    def _check_confidence(
+        self, price_obj: HermesPrice, price_value: Decimal, symbol: str
+    ) -> None:
+        conf_value = Decimal(price_obj.conf) * (Decimal(10) ** price_obj.expo)
+        denom = abs(price_value)
         if denom == 0:
             raise ValueError(f"{symbol} price is zero")
-        conf_ratio = conf_18 / denom
+        conf_ratio = conf_value / denom
         if conf_ratio > self.max_confidence_ratio:
             raise ValueError(
                 f"{symbol} confidence ratio {conf_ratio:.4f} exceeds maximum {self.max_confidence_ratio}"
             )
 
     def _symbol_for(self, address: str) -> str | None:
-        return self._address_to_symbol.get(self._canonical_address(address))
+        return self._address_to_symbol.get(Web3.to_checksum_address(address))
+
+    async def get_token_decimals(self, token_address: str) -> int:
+        """Fetch token decimals from chain with caching."""
+
+        w3 = Web3(Web3.HTTPProvider(self.vault_rpc))
+        erc20_abi = load_erc20_abi()
+        token_contract = w3.eth.contract(
+            address=w3.to_checksum_address(token_address),
+            abi=erc20_abi,
+        )
+
+        decimals = await asyncio.to_thread(
+            lambda: int(
+                token_contract.functions.decimals().call(
+                    block_identifier=self.config.block_number_required
+                )
+            )
+        )
+
+        return decimals
 
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
     ) -> PriceData:
-        base_address = self._canonical_address(prices_accumulator.base_asset)
+        self.last_missing_feeds = set()
+        self.last_stale_feeds = set()
+
+        base_address = Web3.to_checksum_address(prices_accumulator.base_asset)
+        prices_accumulator.decimals.setdefault(base_address, 18)
         base_symbol = self._symbol_for(base_address)
         if not base_symbol:
             raise ValueError(
@@ -165,7 +240,7 @@ class PythAdapter(BasePriceAdapter):
 
         canonical_to_original: dict[str, str] = {}
         for address in asset_addresses:
-            canonical_address = self._canonical_address(address)
+            canonical_address = Web3.to_checksum_address(address)
             if canonical_address != base_address:
                 canonical_to_original.setdefault(canonical_address, address)
 
@@ -203,6 +278,7 @@ class PythAdapter(BasePriceAdapter):
                 )
             else:
                 logger.warning("Could not resolve feed ID for %s/USD, skipping", symbol)
+                self.last_missing_feeds.add(canonical_to_original[canonical])
 
         if not resolved_assets:
             return prices_accumulator
@@ -213,57 +289,97 @@ class PythAdapter(BasePriceAdapter):
 
         response = await self._http_get(url)
         response.raise_for_status()
-        parsed_feeds = response.json().get("parsed", [])
-        feeds_by_id = {feed.get("id"): feed for feed in parsed_feeds}
-        logger.debug("Received %d price feeds", len(parsed_feeds))
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON from Pyth Hermes: {e}")
+
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected dict from Pyth, got {type(data).__name__}")
+
+        if "parsed" not in data:
+            raise ValueError("Missing 'parsed' field in Pyth response")
+
+        parsed_feeds = data["parsed"]
+        if not isinstance(parsed_feeds, list):
+            raise ValueError(
+                f"Expected list for 'parsed' field, got {type(parsed_feeds).__name__}"
+            )
+
+        for i, feed in enumerate(parsed_feeds):
+            if not isinstance(feed, dict):
+                raise ValueError(
+                    f"Invalid feed item at index {i}: expected dict, got {type(feed).__name__}"
+                )
+
+        try:
+            parsed_response = HermesResponse.model_validate(data)
+        except ValidationError as e:
+            raise ValueError(f"Invalid Pyth Hermes response: {e}") from e
+
+        feeds_by_id = {feed.id: feed for feed in parsed_response.parsed}
+        logger.debug("Received %d price feeds", len(parsed_response.parsed))
 
         base_feed = feeds_by_id.get(base_feed_id.removeprefix("0x"))
         if not base_feed:
             raise ValueError(f"{base_symbol}/USD price feed not in Pyth response")
 
-        base_price_obj = base_feed.get("price", {}) or {}
-        base_publish_time = int(base_price_obj.get("publish_time", 0))
+        base_price_obj = base_feed.price
+        base_publish_time = base_price_obj.publish_time
         now = int(time.time())
         if (now - base_publish_time) > self.staleness_threshold:
             raise ValueError(
                 f"{base_symbol}/USD price is stale (age: {now - base_publish_time}s)"
             )
 
-        base_usd_price_18 = self._scale_to_18(
-            int(base_price_obj.get("price", 0)), int(base_price_obj.get("expo", 0))
-        )
-        self._check_confidence(base_price_obj, base_usd_price_18, f"{base_symbol}/USD")
-        logger.debug("%s/USD price: $%.6f", base_symbol, base_usd_price_18 / 10**18)
+        base_usd_price = self._to_decimal(base_price_obj)
+        self._check_confidence(base_price_obj, base_usd_price, f"{base_symbol}/USD")
+        logger.debug("%s/USD price: $%.6f", base_symbol, base_usd_price)
 
         for original_address, symbol, feed_id in resolved_assets.values():
             feed = feeds_by_id.get(feed_id.removeprefix("0x"))
             if not feed:
                 logger.warning("Price feed for %s/USD not found", symbol)
+                self.last_missing_feeds.add(original_address)
                 continue
 
-            price_obj = feed.get("price", {}) or {}
-            publish_time = int(price_obj.get("publish_time", 0))
+            price_obj = feed.price
+            publish_time = price_obj.publish_time
             if (now - publish_time) > self.staleness_threshold:
                 logger.warning(
                     "%s/USD price is stale (age: %ss), skipping",
                     symbol,
                     now - publish_time,
                 )
+                self.last_stale_feeds.add(original_address)
                 continue
 
-            asset_usd_price_18 = self._scale_to_18(
-                int(price_obj.get("price", 0)), int(price_obj.get("expo", 0))
-            )
-            self._check_confidence(price_obj, asset_usd_price_18, f"{symbol}/USD")
+            asset_usd_price = self._to_decimal(price_obj)
+            self._check_confidence(price_obj, asset_usd_price, f"{symbol}/USD")
 
-            asset_price_18 = (asset_usd_price_18 * 10**18) // base_usd_price_18
-            prices_accumulator.prices[original_address] = asset_price_18
+            # Convert to ETH per base unit (token atom) in D18 fixed point
+            asset_per_base_token = (
+                asset_usd_price / base_usd_price
+            )  # ETH per whole token
+            decimals = prices_accumulator.decimals.get(original_address)
+            if decimals is None:
+                decimals = await self.get_token_decimals(original_address)
+
+            price_per_base_unit_d18 = (
+                asset_per_base_token * Decimal(10**18) / Decimal(10**decimals)
+            )
+
+            prices_accumulator.prices[original_address] = price_per_base_unit_d18
+            prices_accumulator.decimals[original_address] = decimals
             logger.debug(
-                "%s: $%.6f = %s %s",
+                "%s/%s | $%.6f  |  %.9f %s per base unit (decimals=%d)",
                 symbol,
-                asset_usd_price_18 / 10**18,
-                asset_price_18,
                 base_symbol,
+                asset_usd_price,
+                price_per_base_unit_d18,
+                base_symbol,
+                decimals,
             )
 
         self.validate_prices(prices_accumulator)

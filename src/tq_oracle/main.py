@@ -132,7 +132,13 @@ def report(
         bool | None,
         typer.Option(
             "--allow-dangerous/--disallow-dangerous",
-            help="Enable dangerous operations (required for skip_subvault_existence_check)",
+            help="Enable dangerous operations (required for skip_subvault_existence_check)",),
+    ] = None,
+    global_timeout_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--global-timeout-seconds",
+            help="Maximum seconds allowed for the entire pipeline (set 0 to disable).",
         ),
     ] = None,
     show_config: Annotated[
@@ -151,7 +157,7 @@ def report(
     if config_path:
         os.environ["TQ_ORACLE_CONFIG"] = str(config_path)
 
-    init_kwargs: dict[str, Network | bool | int | str] = {}
+    init_kwargs: dict[str, Network | bool | int | float | str] = {}
     if network is not None:
         init_kwargs["network"] = network
     if block_number is not None:
@@ -170,6 +176,8 @@ def report(
         init_kwargs["log_level"] = log_level.upper()
     if allow_dangerous is not None:
         init_kwargs["allow_dangerous"] = allow_dangerous
+    if global_timeout_seconds is not None:
+        init_kwargs["global_timeout_seconds"] = global_timeout_seconds
 
     settings = OracleSettings(**init_kwargs)
 

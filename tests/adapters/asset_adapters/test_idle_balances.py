@@ -163,7 +163,11 @@ async def test_fetch_all_assets_includes_extra_addresses(config, monkeypatch):
 
     recorded: list[str] = []
 
-    async def fake_fetch_assets(address):
+    async def fake_fetch_supported_assets():
+        return ["0xToken"]
+
+    async def fake_fetch_assets(address, *, supported_assets=None):
+        assert supported_assets == ["0xToken"]
         recorded.append(adapter.w3.to_checksum_address(address))
         return [AssetData(asset_address="0xToken", amount=1)]
 
@@ -172,6 +176,7 @@ async def test_fetch_all_assets_includes_extra_addresses(config, monkeypatch):
         "_fetch_subvault_addresses",
         fake_fetch_subvault_addresses,
     )
+    monkeypatch.setattr(adapter, "_fetch_supported_assets", fake_fetch_supported_assets)
     monkeypatch.setattr(adapter, "fetch_assets", fake_fetch_assets)
 
     await adapter.fetch_all_assets()
