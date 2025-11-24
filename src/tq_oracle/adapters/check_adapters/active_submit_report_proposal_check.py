@@ -103,7 +103,9 @@ class ActiveSubmitReportProposalCheck(BaseCheckAdapter):
         safe_checksum = Web3.to_checksum_address(self._config.safe_address)
 
         safe_api_url = f"{tx_service.base_url}/api/v1/safes/{safe_checksum}/"
-        safe_info_response = await asyncio.to_thread(requests.get, safe_api_url)
+        safe_info_response = await asyncio.to_thread(
+            requests.get, safe_api_url, timeout=10.0
+        )
         safe_info_response.raise_for_status()
         safe_info_data = safe_info_response.json()
         current_nonce = int(safe_info_data.get("nonce", 0))

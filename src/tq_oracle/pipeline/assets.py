@@ -33,14 +33,19 @@ async def _fetch_subvault_addresses(state: AppState) -> list[str]:
     vault_abi = load_vault_abi()
     vault_address = w3.to_checksum_address(s.vault_address_required)
     contract = w3.eth.contract(address=vault_address, abi=vault_abi)
+    block_number = s.block_number_required
 
-    count = await asyncio.to_thread(contract.functions.subvaults().call)
+    count = await asyncio.to_thread(
+        contract.functions.subvaults().call, block_identifier=block_number
+    )
     log.debug("Vault has %d subvaults", count)
 
     # Fetch all subvault addresses in parallel to avoid thread pool exhaustion
     subvault_addresses = await asyncio.gather(
         *[
-            asyncio.to_thread(contract.functions.subvaultAt(i).call)
+            asyncio.to_thread(
+                contract.functions.subvaultAt(i).call, block_identifier=block_number
+            )
             for i in range(count)
         ]
     )

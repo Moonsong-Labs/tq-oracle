@@ -6,6 +6,8 @@ from pathlib import Path
 from eth_typing import URI, ChecksumAddress
 from web3 import Web3
 
+from tq_oracle.settings import OracleSettings
+
 ABIS_DIR = Path(__file__).parent / "abis"
 
 CORE_VAULTS_COLLECTOR_PATH = ABIS_DIR / "CoreVaultsCollector.json"
@@ -103,7 +105,7 @@ def load_stakewise_os_token_vault_escrow_abi() -> list[dict]:
     return load_abi(STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH)
 
 
-def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumAddress:
+def get_oracle_address_from_vault(settings: OracleSettings) -> ChecksumAddress:
     """Fetch the oracle address from the vault contract.
 
     Args:
@@ -117,6 +119,9 @@ def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumA
         ConnectionError: If RPC connection fails
         ValueError: If contract call fails
     """
+    rpc_url = settings.vault_rpc_required
+    vault_address = settings.vault_address_required
+    block_number = settings.block_number_required
     w3 = Web3(Web3.HTTPProvider(URI(rpc_url)))
     if not w3.is_connected():
         raise ConnectionError(f"Failed to connect to RPC: {rpc_url}")
@@ -126,7 +131,9 @@ def get_oracle_address_from_vault(vault_address: str, rpc_url: str) -> ChecksumA
     vault_contract = w3.eth.contract(address=checksum_vault, abi=vault_abi)
 
     try:
-        oracle_addr: ChecksumAddress = vault_contract.functions.oracle().call()
+        oracle_addr: ChecksumAddress = vault_contract.functions.oracle().call(
+            block_identifier=block_number
+        )
         return oracle_addr
     except Exception as e:
         raise ValueError(f"Failed to fetch oracle address from vault: {e}") from e
