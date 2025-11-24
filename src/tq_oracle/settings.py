@@ -380,6 +380,6 @@ class OracleSettings(BaseSettings):
 
     @property
     def multicall(self) -> str:
-        from .constants import MULTICALL_ADDRESSES
+        from .constants import MULTICALL_ADDRESS
 
-        return MULTICALL_ADDRESSES
+        return MULTICALL_ADDRESS

@@ -44,13 +44,6 @@ def load_abi(path: str | Path) -> list[dict]:
     return data["abi"]
 
 
-def load_bytecode(path: str | Path) -> str:
-    p = Path(path)
-    with p.open() as f:
-        data = json.load(f)
-    return data["bytecode"]["object"]
-
-
 def load_core_vaults_collector_abi() -> list[dict]:
     return load_abi(CORE_VAULTS_COLLECTOR_PATH)
 

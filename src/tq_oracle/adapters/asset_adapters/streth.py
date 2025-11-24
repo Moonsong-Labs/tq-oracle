@@ -31,14 +31,13 @@ class StrETHAdapter(BaseAssetAdapter):
 
         Args:
             config: Oracle configuration
-            chain: Which chain to query - always "vault_chain"
         """
         super().__init__(config)
 
-        self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc))
+        self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc_required))
         self.block_number = config.block_number_required
 
-        self.vault_address = Web3.to_checksum_address(config.vault_address)
+        self.vault_address = Web3.to_checksum_address(config.vault_address_required)
         self.streth_address = Web3.to_checksum_address(config.streth)
         self.core_vaults_collector = Web3.to_checksum_address(
             config.core_vaults_collector
