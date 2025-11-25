@@ -20,6 +20,7 @@ def sample_report() -> OracleReport:
     return OracleReport(
         vault_address="0x3234567890123456789012345678901234567890",
         base_asset="0x1234567890123456789012345678901234567890",
+        tvl_in_base_asset=1000000000000000000,
         total_assets={
             "0x1234567890123456789012345678901234567890": 1000000000000000000
         },

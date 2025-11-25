@@ -12,6 +12,7 @@ class OracleReport:
 
     vault_address: str
     base_asset: str
+    tvl_in_base_asset: int
     total_assets: dict[str, int]
     final_prices: dict[str, int]
 
@@ -23,6 +24,7 @@ class OracleReport:
 async def generate_report(
     vault_address: str,
     base_asset: str,
+    tvl_in_base_asset: int,
     aggregated_assets: AggregatedAssets,
     final_prices: FinalPrices,
 ) -> OracleReport:
@@ -30,7 +32,9 @@ async def generate_report(
 
     Args:
         vault_address: The vault contract address
-        aggregated_assets: Aggregated asset data
+        base_asset: The address of the base asset used for reporting
+        tvl_in_base_asset: Total value locked expressed in the base asset (18 decimals)
+        aggregated_assets: Aggregated asset balances per asset address
         final_prices: Final oracle prices
 
     Returns:
@@ -41,6 +45,7 @@ async def generate_report(
     return OracleReport(
         vault_address=vault_address,
         base_asset=base_asset,
+        tvl_in_base_asset=tvl_in_base_asset,
         total_assets=aggregated_assets.assets,
         final_prices=final_prices.prices,
     )
