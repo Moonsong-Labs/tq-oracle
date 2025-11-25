@@ -20,6 +20,12 @@ logger = get_logger(__name__)
 ETHERSCAN_API_V2_URL = "https://api.etherscan.io/v2/api"
 
 
+class EtherscanRateLimitError(Exception):
+    """Raised when Etherscan returns a rate limit error."""
+
+    pass
+
+
 class EtherscanLogsResult(TypedDict, total=False):
     """Raw Etherscan API response for a single log entry."""
 
@@ -130,12 +136,12 @@ class EtherscanLogsClient:
                 if message == "no records found":
                     break
                 logger.warning(
-                    "Etherscan log query failed — event=%s filters={%s} blocks=[%d,%d] message=%s",
+                    "Etherscan log query failed — event=%s filters={%s} blocks=[%d,%d] error=%s",
                     event.event_name,
                     filter_desc,
                     from_block,
                     to_block,
-                    payload.get("message"),
+                    payload.get("result") or payload.get("message"),
                 )
                 return None
 
@@ -162,7 +168,7 @@ class EtherscanLogsClient:
 
     @backoff.on_exception(
         backoff.expo,
-        (requests.RequestException, ValueError),
+        (requests.RequestException, ValueError, EtherscanRateLimitError),
         max_time=30,
         jitter=backoff.full_jitter,
     )
@@ -212,6 +218,10 @@ class EtherscanLogsClient:
         payload = response.json()
         if not isinstance(payload, dict):
             raise ValueError("Unexpected Etherscan payload format")
+
+        result = payload.get("result", "")
+        if isinstance(result, str) and "rate limit" in result.lower():
+            raise EtherscanRateLimitError(result)
 
         return payload  # type: ignore[return-value]
 
