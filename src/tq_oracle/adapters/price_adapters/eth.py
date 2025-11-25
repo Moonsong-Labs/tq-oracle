@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from ...settings import OracleSettings
 from .base import BasePriceAdapter, PriceData
@@ -58,12 +59,12 @@ class ETHAdapter(BasePriceAdapter):
         )
 
         if has_eth:
-            prices_accumulator.prices[self.eth_address] = 10**18
+            prices_accumulator.prices[self.eth_address] = Decimal(1.0)
+            prices_accumulator.decimals.setdefault(self.eth_address, 18)
 
         if has_weth:
             assert self.weth_address is not None
-            prices_accumulator.prices[self.weth_address] = 10**18
-
-        self.validate_prices(prices_accumulator)
+            prices_accumulator.prices[self.weth_address] = Decimal(1.0)
+            prices_accumulator.decimals.setdefault(self.weth_address, 18)
 
         return prices_accumulator

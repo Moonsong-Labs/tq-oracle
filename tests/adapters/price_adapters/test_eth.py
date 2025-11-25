@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal
 
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.eth import ETHAdapter
@@ -72,7 +73,7 @@ async def test_fetch_prices_returns_previous_prices_on_unsupported_asset(
     unsupported_address = "0xUnsupported"
     result = await adapter.fetch_prices(
         [unsupported_address],
-        PriceData(base_asset=eth_address, prices={"0x111": 1}),
+        PriceData(base_asset=eth_address, prices={"0x111": Decimal(1)}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
@@ -87,7 +88,7 @@ async def test_fetch_prices_eth_returns_one(config, eth_address):
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
-    assert result.prices[eth_address] == 10**18
+    assert result.prices[eth_address] == Decimal("1")
 
 
 @pytest.mark.asyncio
@@ -98,7 +99,7 @@ async def test_fetch_prices_weth_returns_one_to_one(config, eth_address, weth_ad
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 1
-    assert result.prices[weth_address] == 10**18
+    assert result.prices[weth_address] == Decimal("1")
 
 
 @pytest.mark.asyncio
@@ -110,8 +111,8 @@ async def test_fetch_prices_all_three_assets(config, eth_address, weth_address):
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
-    assert result.prices[eth_address] == 10**18
-    assert result.prices[weth_address] == 10**18
+    assert result.prices[eth_address] == Decimal("1")
+    assert result.prices[weth_address] == Decimal("1")
 
 
 @pytest.mark.asyncio
@@ -121,12 +122,12 @@ async def test_fetch_prices_preserves_existing_prices(
     adapter = ETHAdapter(config)
     result = await adapter.fetch_prices(
         [weth_address],
-        PriceData(base_asset=eth_address, prices={"0x111": 123}),
+        PriceData(base_asset=eth_address, prices={"0x111": Decimal(123)}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 2
-    assert result.prices["0x111"] == 123
-    assert result.prices[weth_address] == 10**18
+    assert result.prices["0x111"] == Decimal(123)
+    assert result.prices[weth_address] == Decimal("1")
 
 
 @pytest.mark.asyncio
@@ -135,10 +136,10 @@ async def test_fetch_prices_all_assets_integration(config, eth_address, weth_add
     adapter = ETHAdapter(config)
     result = await adapter.fetch_prices(
         [eth_address, weth_address],
-        PriceData(base_asset=eth_address, prices={"0x111": 456}),
+        PriceData(base_asset=eth_address, prices={"0x111": Decimal(456)}),
     )
     assert isinstance(result, PriceData)
     assert len(result.prices) == 3
-    assert result.prices["0x111"] == 456
-    assert result.prices[eth_address] == 10**18
-    assert result.prices[weth_address] == 10**18
+    assert result.prices["0x111"] == Decimal(456)
+    assert result.prices[eth_address] == Decimal("1")
+    assert result.prices[weth_address] == Decimal("1")

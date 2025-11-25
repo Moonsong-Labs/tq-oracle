@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from _decimal import ROUND_DOWN
+
 from ..adapters.price_adapters.base import PriceData
 from ..processors.asset_aggregator import AggregatedAssets
+from decimal import Decimal
 
 
 def calculate_total_assets(
@@ -23,8 +26,10 @@ def calculate_total_assets(
             f"{addr}: {price}" for addr, price in invalid_prices
         )
         raise ValueError(f"Invalid prices for assets: {invalid_details}")
-
-    return sum(
-        aggregated_assets.assets[i] * prices.prices[i] // (10**18)
+    total = sum(
+        Decimal(aggregated_assets.assets[i]) * prices.prices[i]
         for i in aggregated_assets.assets
     )
+    total_int = Decimal(total).to_integral_value(ROUND_DOWN)
+
+    return int(total_int)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from dataclasses import field
+from decimal import Decimal
 
 from ...settings import OracleSettings
 
@@ -11,7 +13,8 @@ class PriceData:
     """Price data from a price adapter."""
 
     base_asset: str
-    prices: dict[str, int]  # asset_address -> price_wei (18 decimals)
+    prices: dict[str, Decimal]  # asset_address -> price (D18) per base unit
+    decimals: dict[str, int] = field(default_factory=dict)
 
 
 class BasePriceAdapter(ABC):
