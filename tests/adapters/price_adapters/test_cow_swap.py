@@ -438,7 +438,9 @@ async def test_fetch_native_price_valid_string_price(monkeypatch, config):
 
 
 @pytest.mark.asyncio
-async def test_fetch_prices_skips_oseth(monkeypatch, config, eth_address, oseth_address):
+async def test_fetch_prices_skips_oseth(
+    monkeypatch, config, eth_address, oseth_address
+):
     adapter = CowSwapAdapter(config)
 
     async def fail_native_price(_):

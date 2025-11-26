@@ -113,7 +113,9 @@ class ETHAdapter(BasePriceAdapter):
             assert self._oseth_address is not None
             oseth_price = await self._get_oseth_price()
             # Convert wei price to Decimal ratio (price / 1e18)
-            prices_accumulator.prices[self._oseth_address] = Decimal(oseth_price) / Decimal(10**18)
+            prices_accumulator.prices[self._oseth_address] = Decimal(
+                oseth_price
+            ) / Decimal(10**18)
             prices_accumulator.decimals.setdefault(self._oseth_address, 18)
             logger.debug("osETH price: %d wei per osETH", oseth_price)
 
