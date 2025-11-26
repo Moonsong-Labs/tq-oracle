@@ -8,6 +8,7 @@ from ..adapters.asset_adapters import get_adapter_class
 from ..adapters.asset_adapters.base import AssetData
 from ..adapters.asset_adapters.idle_balances import IdleBalancesAdapter
 from ..adapters.asset_adapters.stakewise import StakeWiseAdapter
+from ..adapters.asset_adapters.streth import StrETHAdapter
 from ..processors import compute_total_aggregated_assets
 from .context import PipelineContext
 
@@ -152,6 +153,19 @@ async def collect_assets(ctx: PipelineContext) -> None:
         )
 
     # 3. Add additional adapters per subvault
+    should_run_streth = any(
+        not get_subvault_config(addr).get("skip_streth", False)
+        for addr in subvault_addresses
+    )
+
+    if should_run_streth:
+        streth_adapter = StrETHAdapter(s)
+        asset_fetch_tasks.append(
+            ("streth_vault_chain", streth_adapter._fetch_assets(subvault_addresses))
+        )
+        log.debug("Added default vault_chain strETH adapter")
+
+    # 4. Add additional adapters per subvault
     def create_adapter_task(
         subvault_addr: str, adapter_name: str
     ) -> tuple[str, Any, str] | None:
