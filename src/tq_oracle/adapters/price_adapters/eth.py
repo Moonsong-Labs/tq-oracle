@@ -1,6 +1,6 @@
-from __future__ import annotations
-
+import asyncio
 import logging
+from typing import cast
 
 from eth_typing import URI
 from web3 import Web3
@@ -9,7 +9,6 @@ from ...abi import load_ostoken_vault_controller_abi
 from ...constants import STAKEWISE_ADDRESSES
 from ...settings import Network, OracleSettings
 from .base import BasePriceAdapter, PriceData
-from typing import cast
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class ETHAdapter(BasePriceAdapter):
     def adapter_name(self) -> str:
         return "eth"
 
-    def _get_oseth_price(self) -> int:
+    async def _get_oseth_price(self) -> int:
         """Get osETH price in ETH by calling convertToAssets(1e18) on the controller.
 
         Returns:
@@ -58,10 +57,11 @@ class ETHAdapter(BasePriceAdapter):
         )
 
         # Get price for 1 osETH (1e18 shares)
-        price = controller.functions.convertToAssets(10**18).call(
-            block_identifier=self._block_number
+        price = await asyncio.to_thread(
+            controller.functions.convertToAssets(10**18).call,
+            block_identifier=self._block_number,
         )
-        return int(price)
+        return price
 
     async def fetch_prices(
         self, asset_addresses: list[str], prices_accumulator: PriceData
@@ -96,8 +96,7 @@ class ETHAdapter(BasePriceAdapter):
             prices_accumulator.prices[self.weth_address] = 10**18
 
         if self._oseth_address and self._oseth_address.lower() in asset_addresses_lower:
-            assert self._oseth_address is not None
-            oseth_price = self._get_oseth_price()
+            oseth_price = await self._get_oseth_price()
             prices_accumulator.prices[self._oseth_address] = oseth_price
             logger.debug("osETH price: %d wei per osETH", oseth_price)
 
