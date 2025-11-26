@@ -50,6 +50,13 @@ def usds_address(config):
     return address
 
 
+@pytest.fixture
+def oseth_address(config):
+    address = config.assets["OSETH"]
+    assert address is not None
+    return address
+
+
 @pytest.mark.asyncio
 async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(
     config, eth_address
@@ -74,6 +81,11 @@ async def test_fetch_prices_raises_on_unsupported_base_asset(config, eth_address
         await adapter.fetch_prices(
             [unsupported_address], PriceData(base_asset=unsupported_address, prices={})
         )
+
+
+def test_oseth_is_skipped(config, oseth_address):
+    adapter = CowSwapAdapter(config)
+    assert oseth_address.lower() in adapter.skipped_assets
 
 
 @pytest.mark.asyncio
@@ -248,3 +260,23 @@ async def test_fetch_prices_preserves_precision(mocker, config, eth_address):
     assert test_asset_address in result.prices
     assert result.prices[test_asset_address] == expected_price_wei_normalized
     assert isinstance(result.prices[test_asset_address], int)
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_skips_oseth(mocker, config, eth_address, oseth_address):
+    adapter = CowSwapAdapter(config)
+    mocker.patch.object(
+        adapter,
+        "fetch_native_price",
+        side_effect=AssertionError("osETH should not be priced via CowSwap"),
+    )
+    mocker.patch.object(
+        adapter,
+        "get_token_decimals",
+        side_effect=AssertionError("osETH decimals should not be fetched via CowSwap"),
+    )
+
+    prices_accumulator = PriceData(base_asset=eth_address, prices={})
+    result = await adapter.fetch_prices([oseth_address], prices_accumulator)
+
+    assert oseth_address not in result.prices
