@@ -19,7 +19,6 @@ from ...abi import (
 from ...constants import (
     STAKEWISE_ADDRESSES,
     STAKEWISE_EXIT_LOG_CHUNK,
-    STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS,
 )
 from ...logger import get_logger
 from ...settings import OracleSettings
@@ -84,6 +83,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
         stakewise_vault_address: str | None = None,
         stakewise_vault_addresses: list[str] | None = None,
         stakewise_exit_queue_start_block: int | None = None,
+        stakewise_exit_max_lookback_blocks: int | None = None,
     ):
         super().__init__(config)
 
@@ -124,9 +124,11 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self._exit_queue_start_block = (
             stakewise_exit_queue_start_block
             or adapter_config.stakewise_exit_queue_start_block
-            or 0
         )
-        self._exit_max_lookback_blocks = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
+        self._exit_max_lookback_blocks = (
+            stakewise_exit_max_lookback_blocks
+            or adapter_config.stakewise_exit_max_lookback_blocks
+        )
         self._rpc_sem = asyncio.Semaphore(getattr(config, "max_calls", 5))
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
         self._rpc_jitter = getattr(config, "rpc_jitter", 0.10)
@@ -287,7 +289,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         iterations = 0
         logger.info(
-            f"StakeWise exit queue scan start for {context.address}, this might take some time..."
+            f"StakeWise exit queue scan start for {context.address} from block {min_block}, this might take some time..."
         )
         for from_block, to_block in self._block_ranges(
             self.block_identifier, min_block
@@ -393,12 +395,37 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 )
                 if escrow_state is None:
                     continue
-                os_shares, exited_assets = escrow_state
+                os_shares, escrow_exited_assets = escrow_state
                 escrow_os_shares += os_shares
-                eth_claimable += exited_assets
-                pending_queue = max(ticket_assets - exited_assets, 0)
-                if pending_queue:
-                    eth_in_queue += pending_queue
+                eth_claimable += escrow_exited_assets
+
+                exit_queue_index = await self._fetch_exit_queue_index(
+                    context.contract, ticket.ticket
+                )
+                if exit_queue_index is None or exit_queue_index < 0:
+                    eth_in_queue += ticket_assets
+                else:
+                    (
+                        left_tickets,
+                        _,
+                        vault_exit_assets,
+                    ) = await self._calculate_exited_assets(
+                        context.contract,
+                        ticket.receiver,
+                        ticket.ticket,
+                        ticket.timestamp,
+                        exit_queue_index,
+                    )
+                    # Assets processed by vault but not yet claimed by escrow
+                    eth_claimable += vault_exit_assets
+                    if left_tickets > 0:
+                        queue_assets = await self._rpc(
+                            context.contract.functions.convertToAssets(
+                                left_tickets
+                            ).call,
+                            block_identifier=self.block_identifier,
+                        )
+                        eth_in_queue += int(queue_assets)
                 continue
 
             exit_queue_index = await self._fetch_exit_queue_index(
@@ -408,18 +435,32 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 eth_in_queue += ticket_assets
                 continue
 
-            exited_assets = min(
-                ticket_assets,
-                await self._calculate_exited_assets(
-                    context.contract,
-                    ticket.receiver,
-                    ticket.ticket,
-                    ticket.timestamp,
-                    exit_queue_index,
-                ),
+            (
+                left_tickets,
+                exited_tickets,
+                exit_assets,
+            ) = await self._calculate_exited_assets(
+                context.contract,
+                ticket.receiver,
+                ticket.ticket,
+                ticket.timestamp,
+                exit_queue_index,
             )
-            eth_claimable += exited_assets
-            eth_in_queue += ticket_assets - exited_assets
+            if left_tickets == 0 and exited_tickets == 0 and exit_assets == 0:
+                logger.debug(
+                    "StakeWise skipping claimed ticket — ticket=%d receiver=%s",
+                    ticket.ticket,
+                    ticket.receiver,
+                )
+                continue
+
+            eth_claimable += exit_assets
+            if left_tickets > 0:
+                queue_assets = await self._rpc(
+                    context.contract.functions.convertToAssets(left_tickets).call,
+                    block_identifier=self.block_identifier,
+                )
+                eth_in_queue += int(queue_assets)
 
         os_liabilities = user_state.os_shares + escrow_os_shares
         return ExitExposure(
@@ -454,9 +495,13 @@ class StakeWiseAdapter(BaseAssetAdapter):
         ticket: int,
         timestamp: int,
         exit_queue_index: int,
-    ) -> int:
+    ) -> tuple[int, int, int]:
+        """Return (left_tickets, exited_tickets, exited_assets).
+
+        If all three are zero, the ticket was already claimed or never existed.
+        """
         try:
-            _, _, exit_assets = await self._rpc(
+            left_tickets, exited_tickets, exit_assets = await self._rpc(
                 vault_contract.functions.calculateExitedAssets(
                     receiver,
                     ticket,
@@ -465,7 +510,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 ).call,
                 block_identifier=self.block_identifier,
             )
-            return int(exit_assets)
+            return int(left_tickets), int(exited_tickets), int(exit_assets)
         except (ContractLogicError, ValueError):  # pragma: no cover - defensive
             logger.debug(
                 "StakeWise calculateExitedAssets failed — receiver=%s ticket=%d index=%d",
@@ -473,11 +518,12 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 ticket,
                 exit_queue_index,
             )
-            return 0
+            return 0, 0, 0
 
     async def _fetch_escrow_state(
         self, vault_address: str, ticket: int
     ) -> tuple[int, int] | None:
+        """Return (os_token_shares, exited_assets) or None if position invalid/claimed."""
         try:
             owner, exited_assets, os_token_shares = await self._rpc(
                 self.os_token_vault_escrow.functions.getPosition(
@@ -488,6 +534,15 @@ class StakeWiseAdapter(BaseAssetAdapter):
         except (ContractLogicError, ValueError):  # pragma: no cover - defensive
             logger.warning(
                 "StakeWise exit escrow lookup failed — ticket=%d",
+                ticket,
+            )
+            return None
+
+        is_zero_owner = not owner or owner == ZERO_ADDRESS
+        if is_zero_owner and os_token_shares == 0 and exited_assets == 0:
+            logger.debug(
+                "StakeWise skipping claimed escrow position — vault=%s ticket=%d",
+                vault_address,
                 ticket,
             )
             return None

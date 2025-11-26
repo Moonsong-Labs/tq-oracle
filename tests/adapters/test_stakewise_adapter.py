@@ -166,7 +166,9 @@ async def test_stakewise_adapter_exit_queue_direct_receiver(dummy_web3):
     adapter._fetch_exit_queue_index = fake_index.__get__(adapter, StakeWiseAdapter)
 
     async def fake_exited(self, _contract, receiver, ticket, timestamp, index):
-        return 4
+        # Returns (left_tickets, exited_tickets, exited_assets)
+        # left_tickets=3 shares (6 assets at 2x rate), exited_assets=4
+        return (3, 2, 4)
 
     adapter._calculate_exited_assets = fake_exited.__get__(adapter, StakeWiseAdapter)
 
@@ -231,9 +233,23 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
     adapter._rpc = direct_rpc.__get__(adapter, StakeWiseAdapter)
 
     async def fake_escrow(self, _vault_address, ticket):
+        # Returns (os_token_shares, exited_assets)
+        # os_token_shares=8 liability, exited_assets=6 already in escrow
         return (8, 6)
 
     adapter._fetch_escrow_state = fake_escrow.__get__(adapter, StakeWiseAdapter)
+
+    async def fake_index(self, _contract, ticket):
+        return 5
+
+    adapter._fetch_exit_queue_index = fake_index.__get__(adapter, StakeWiseAdapter)
+
+    async def fake_exited(self, _contract, receiver, ticket, timestamp, index):
+        # Returns (left_tickets, exited_tickets, exited_assets)
+        # left_tickets=4 shares (8 assets at 2x), vault_exit_assets=1 (ready in vault)
+        return (4, 1, 1)
+
+    adapter._calculate_exited_assets = fake_exited.__get__(adapter, StakeWiseAdapter)
 
     shares_map = {"0xuser": 10}
     os_token_shares_map = {"0xuser": 4}
@@ -260,7 +276,8 @@ async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
 
     assets = await adapter.fetch_assets("0xuser")
 
-    # staked=20, escrow ready=6, queue still 9 → collateral 35, liabilities include user (4) + escrow (8)
+    # staked=20, claimable=6 (escrow) + 1 (vault) = 7, queue=8 → collateral=35
+    # liabilities: user os_shares=4 + escrow os_shares=8 = 12
     assert any(
         asset.asset_address == adapter.eth_asset and asset.amount == 35
         for asset in assets
