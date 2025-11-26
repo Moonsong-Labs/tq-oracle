@@ -100,7 +100,9 @@ class ETHAdapter(BasePriceAdapter):
 
         if self._oseth_address and self._oseth_address.lower() in asset_addresses_lower:
             oseth_price = await self._get_oseth_price()
-            prices_accumulator.prices[self._oseth_address] = Decimal(oseth_price).scaleb(-18)
+            prices_accumulator.prices[self._oseth_address] = Decimal(
+                oseth_price
+            ).scaleb(-18)
             prices_accumulator.decimals.setdefault(self._oseth_address, 18)
             logger.debug("osETH price: %d wei per osETH", oseth_price)
 

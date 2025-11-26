@@ -3,7 +3,6 @@ import json
 from unittest.mock import Mock
 from decimal import Decimal
 
-from decimal import Decimal
 from tq_oracle.adapters.price_adapters.base import PriceData
 from tq_oracle.adapters.price_adapters.cow_swap import CowSwapAdapter
 from tq_oracle.settings import OracleSettings
