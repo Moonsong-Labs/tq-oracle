@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tq_oracle.constants import STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
+
 import os
 from enum import Enum
 from pathlib import Path
@@ -51,7 +53,8 @@ class StakewiseAdapterSettings(BaseModel):
     """Configuration options for StakeWise adapter defaults."""
 
     stakewise_vault_addresses: list[str] = Field(default_factory=list)
-    stakewise_exit_queue_start_block: int | None = None
+    stakewise_exit_queue_start_block: int = 0
+    stakewise_exit_max_lookback_blocks: int = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
 
     model_config = ConfigDict(extra="ignore")
 

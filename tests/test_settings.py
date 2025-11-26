@@ -87,6 +87,7 @@ def test_stakewise_adapter_defaults_loaded(tmp_path, monkeypatch):
             [adapters.stakewise]
             stakewise_vault_addresses = ["0x1111111111111111111111111111111111111111"]
             stakewise_exit_queue_start_block = 123
+            stakewise_exit_max_lookback_blocks = 50000
             """
         ).strip()
     )
@@ -99,6 +100,7 @@ def test_stakewise_adapter_defaults_loaded(tmp_path, monkeypatch):
         "0x1111111111111111111111111111111111111111"
     ]
     assert settings.adapters.stakewise.stakewise_exit_queue_start_block == 123
+    assert settings.adapters.stakewise.stakewise_exit_max_lookback_blocks == 50000
 
 
 def test_additional_asset_support_toggle(tmp_path, monkeypatch):
