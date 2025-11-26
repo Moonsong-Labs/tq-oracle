@@ -122,7 +122,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self._skip_exit_queue_scan = (
             skip_exit_queue_scan
             if skip_exit_queue_scan is not None
-            else adapter_config.skip_exit_queue_scan
+            else stakewise_defaults.skip_exit_queue_scan
         )
         self._rpc_sem = asyncio.Semaphore(getattr(config, "max_calls", 5))
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
@@ -131,7 +131,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         extra_address_candidates = [
             self.w3.to_checksum_address(addr)
-            for addr in adapter_config.extra_addresses
+            for addr in stakewise_defaults.extra_addresses
             if addr
         ]
         deduped: dict[str, str] = {}
