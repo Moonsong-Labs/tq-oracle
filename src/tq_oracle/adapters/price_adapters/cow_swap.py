@@ -42,6 +42,7 @@ class CowSwapAdapter(BasePriceAdapter):
         if eth_address is None:
             raise ValueError("ETH address is required for CowSwap adapter")
         self.eth_address = eth_address
+        self._oseth_address = assets.get("OSETH")
 
         self._decimals_cache: dict[str, int] = {}
 
@@ -50,6 +51,7 @@ class CowSwapAdapter(BasePriceAdapter):
             for addr in [
                 assets["ETH"],
                 assets["WETH"],
+                self._oseth_address,
             ]
             if addr is not None
         }

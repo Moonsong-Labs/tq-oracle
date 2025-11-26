@@ -62,6 +62,13 @@ def stub_decimals(monkeypatch):
     monkeypatch.setattr(CowSwapAdapter, "get_token_decimals", _decimals)
 
 
+@pytest.fixture
+def oseth_address(config):
+    address = config.assets["OSETH"]
+    assert address is not None
+    return address
+
+
 @pytest.mark.asyncio
 async def test_fetch_prices_returns_empty_prices_on_unsupported_asset(
     config, eth_address
@@ -86,6 +93,11 @@ async def test_fetch_prices_raises_on_unsupported_base_asset(config, eth_address
         await adapter.fetch_prices(
             [unsupported_address], PriceData(base_asset=unsupported_address, prices={})
         )
+
+
+def test_oseth_is_skipped(config, oseth_address):
+    adapter = CowSwapAdapter(config)
+    assert oseth_address.lower() in adapter.skipped_assets
 
 
 @pytest.mark.asyncio
@@ -423,3 +435,24 @@ async def test_fetch_native_price_valid_string_price(monkeypatch, config):
     result = await adapter.fetch_native_price(test_token)
     assert result == Decimal("123.456")
     assert isinstance(result, Decimal)
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_skips_oseth(
+    monkeypatch, config, eth_address, oseth_address
+):
+    adapter = CowSwapAdapter(config)
+
+    async def fail_native_price(_):
+        raise AssertionError("osETH should not be priced via CowSwap")
+
+    async def fail_decimals(_):
+        raise AssertionError("osETH decimals should not be fetched via CowSwap")
+
+    monkeypatch.setattr(adapter, "fetch_native_price", fail_native_price)
+    monkeypatch.setattr(adapter, "get_token_decimals", fail_decimals)
+
+    prices_accumulator = PriceData(base_asset=eth_address, prices={})
+    result = await adapter.fetch_prices([oseth_address], prices_accumulator)
+
+    assert oseth_address not in result.prices
