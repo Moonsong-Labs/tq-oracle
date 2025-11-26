@@ -188,7 +188,10 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self._append_asset(assets, self.eth_asset, aggregated.eth_collateral)
         if aggregated.os_shares_liability:
             self._append_asset(
-                assets, self.os_token_address, -aggregated.os_shares_liability
+                assets,
+                self.os_token_address,
+                -aggregated.os_shares_liability,
+                tvl_only=True,
             )
 
         self._log_summary(user, aggregated)
@@ -215,10 +218,8 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         values = {
             "stakewise_vault_address": override_vault or defaults.get("vault"),
-            "stakewise_os_token_vault_escrow": config.stakewise_os_token_vault_escrow
-            or defaults.get("os_token_vault_escrow"),
-            "stakewise_os_token_address": config.stakewise_os_token_address
-            or defaults.get("os_token"),
+            "stakewise_os_token_vault_escrow": defaults["os_token_vault_escrow"],
+            "stakewise_os_token_address": defaults["os_token"],
         }
         missing = [name for name, value in values.items() if not value]
         if missing:
@@ -519,9 +520,13 @@ class StakeWiseAdapter(BaseAssetAdapter):
         return max(lookback_floor, configured_floor)
 
     @staticmethod
-    def _append_asset(assets: list[AssetData], address: str, amount: int) -> None:
+    def _append_asset(
+        assets: list[AssetData], address: str, amount: int, *, tvl_only: bool = False
+    ) -> None:
         if amount:
-            assets.append(AssetData(asset_address=address, amount=amount))
+            assets.append(
+                AssetData(asset_address=address, amount=amount, tvl_only=tvl_only)
+            )
 
     def _log_summary(self, user: str, exposure: ExitExposure) -> None:
         logger.debug(

@@ -78,6 +78,7 @@ class OracleSettings(BaseSettings):
 
     # --- global toggles ---
     dry_run: bool = True
+    additional_asset_support: bool = True
 
     # --- core addresses / endpoints ---
     vault_address: str | None = None
@@ -127,10 +128,6 @@ class OracleSettings(BaseSettings):
     # --- adapters (from config file only) ---
     subvault_adapters: list[dict[str, Any]] = []
     adapters: AdapterSettings = Field(default_factory=AdapterSettings)
-
-    # --- stakewise shared addresses ---
-    stakewise_os_token_address: str | None = None
-    stakewise_os_token_vault_escrow: str | None = None
 
     # --- runtime computed values ---
     using_default_rpc: bool = False
