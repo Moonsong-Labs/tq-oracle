@@ -12,10 +12,7 @@ from web3.contract.contract import ContractEvent
 from web3.exceptions import ContractLogicError, ProviderConnectionError
 from web3.types import EventData
 
-from ...abi import (
-    load_stakewise_os_token_vault_escrow_abi,
-    load_stakewise_vault_abi,
-)
+from ...abi import load_stakewise_vault_abi
 from ...constants import (
     STAKEWISE_ADDRESSES,
     STAKEWISE_EXIT_LOG_CHUNK,
@@ -25,13 +22,11 @@ from ...settings import OracleSettings
 from .base import AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 @dataclass(frozen=True, slots=True)
 class StakeWiseAddressesResolved:
     vault: str
-    os_token_vault_escrow: str
     os_token: str
 
 
@@ -58,7 +53,6 @@ class ExitExposure:
     eth_in_queue: int = 0
     eth_claimable: int = 0
     os_shares_liability: int = 0
-    escrow_os_shares: int = 0
     ticket_count: int = 0
 
     @property
@@ -99,12 +93,13 @@ class StakeWiseAdapter(BaseAssetAdapter):
         self.block_identifier = config.block_number_required
         self.eth_asset = self._resolve_eth_asset(config)
         self.os_token_address = self.w3.to_checksum_address(resolved.os_token)
-        self.os_token_vault_escrow_address = self.w3.to_checksum_address(
-            resolved.os_token_vault_escrow
+
+        # Explicit list > Adapter config > Single explicit or default
+        resolved_vaults = (
+            stakewise_vault_addresses
+            or default_vaults
+            or [stakewise_vault_address or resolved.vault]
         )
-        resolved_vaults = stakewise_vault_addresses or default_vaults
-        if not resolved_vaults:
-            resolved_vaults = [stakewise_vault_address or resolved.vault]
         if not resolved_vaults:
             raise ValueError("StakeWise adapter requires at least one vault address")
 
@@ -112,10 +107,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
             self._build_vault_context(address) for address in resolved_vaults
         ]
         self.vault_address = self.vault_contexts[0].address
-        self.os_token_vault_escrow: Contract = self._build_contract(
-            self.os_token_vault_escrow_address,
-            load_stakewise_os_token_vault_escrow_abi(),
-        )
 
         self._exit_log_chunk = STAKEWISE_EXIT_LOG_CHUNK
         self._exit_queue_start_block = (
@@ -163,11 +154,20 @@ class StakeWiseAdapter(BaseAssetAdapter):
         total_queue = 0
         total_claimable = 0
         total_os_liabilities = 0
-        total_escrow_shares = 0
         total_tickets = 0
 
         for context in self.vault_contexts:
             user_state = await self._fetch_account_state(context.contract, user)
+
+            # Skip expensive exit queue scan if user has no position
+            if user_state.assets == 0 and user_state.os_shares == 0:
+                logger.debug(
+                    "StakeWise skipping exit queue scan — no position for user=%s vault=%s",
+                    user,
+                    context.address,
+                )
+                continue
+
             tickets = await self._scan_exit_queue_tickets(context, user)
             exposure = await self._compute_exit_exposure(context, user_state, tickets)
 
@@ -175,7 +175,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
             total_queue += exposure.eth_in_queue
             total_claimable += exposure.eth_claimable
             total_os_liabilities += exposure.os_shares_liability
-            total_escrow_shares += exposure.escrow_os_shares
             total_tickets += exposure.ticket_count
 
         aggregated = ExitExposure(
@@ -183,7 +182,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
             eth_in_queue=total_queue,
             eth_claimable=total_claimable,
             os_shares_liability=total_os_liabilities,
-            escrow_os_shares=total_escrow_shares,
             ticket_count=total_tickets,
         )
 
@@ -221,7 +219,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         values = {
             "stakewise_vault_address": override_vault or defaults.get("vault"),
-            "stakewise_os_token_vault_escrow": defaults["os_token_vault_escrow"],
             "stakewise_os_token_address": defaults["os_token"],
         }
         missing = [name for name, value in values.items() if not value]
@@ -233,7 +230,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         return StakeWiseAddressesResolved(
             vault=cast(str, values["stakewise_vault_address"]),
-            os_token_vault_escrow=cast(str, values["stakewise_os_token_vault_escrow"]),
             os_token=cast(str, values["stakewise_os_token_address"]),
         )
 
@@ -376,7 +372,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
     ) -> ExitExposure:
         eth_in_queue = 0
         eth_claimable = 0
-        escrow_os_shares = 0
 
         for ticket in tickets:
             ticket_assets = ticket.assets_hint
@@ -386,45 +381,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
                     block_identifier=self.block_identifier,
                 )
                 ticket_assets = int(ticket_assets)
-
-            if ticket.receiver == self.os_token_vault_escrow_address:
-                escrow_state = await self._fetch_escrow_state(
-                    context.address, ticket.ticket
-                )
-                if escrow_state is None:
-                    continue
-                os_shares, escrow_exited_assets = escrow_state
-                escrow_os_shares += os_shares
-                eth_claimable += escrow_exited_assets
-
-                exit_queue_index = await self._fetch_exit_queue_index(
-                    context.contract, ticket.ticket
-                )
-                if exit_queue_index is None or exit_queue_index < 0:
-                    eth_in_queue += ticket_assets
-                else:
-                    (
-                        left_tickets,
-                        _,
-                        vault_exit_assets,
-                    ) = await self._calculate_exited_assets(
-                        context.contract,
-                        ticket.receiver,
-                        ticket.ticket,
-                        ticket.timestamp,
-                        exit_queue_index,
-                    )
-                    # Assets processed by vault but not yet claimed by escrow
-                    eth_claimable += vault_exit_assets
-                    if left_tickets > 0:
-                        queue_assets = await self._rpc(
-                            context.contract.functions.convertToAssets(
-                                left_tickets
-                            ).call,
-                            block_identifier=self.block_identifier,
-                        )
-                        eth_in_queue += int(queue_assets)
-                continue
 
             exit_queue_index = await self._fetch_exit_queue_index(
                 context.contract, ticket.ticket
@@ -460,13 +416,11 @@ class StakeWiseAdapter(BaseAssetAdapter):
                 )
                 eth_in_queue += int(queue_assets)
 
-        os_liabilities = user_state.os_shares + escrow_os_shares
         return ExitExposure(
             staked_eth=user_state.assets,
             eth_in_queue=eth_in_queue,
             eth_claimable=eth_claimable,
-            os_shares_liability=os_liabilities,
-            escrow_os_shares=escrow_os_shares,
+            os_shares_liability=user_state.os_shares,
             ticket_count=len(tickets),
         )
 
@@ -518,49 +472,6 @@ class StakeWiseAdapter(BaseAssetAdapter):
             )
             return 0, 0, 0
 
-    async def _fetch_escrow_state(
-        self, vault_address: str, ticket: int
-    ) -> tuple[int, int] | None:
-        """Return (os_token_shares, exited_assets) or None if position invalid/claimed."""
-        try:
-            owner, exited_assets, os_token_shares = await self._rpc(
-                self.os_token_vault_escrow.functions.getPosition(
-                    vault_address, ticket
-                ).call,
-                block_identifier=self.block_identifier,
-            )
-        except (ContractLogicError, ValueError):  # pragma: no cover - defensive
-            logger.warning(
-                "StakeWise exit escrow lookup failed — ticket=%d",
-                ticket,
-            )
-            return None
-
-        is_zero_owner = not owner or owner == ZERO_ADDRESS
-        if is_zero_owner and os_token_shares == 0 and exited_assets == 0:
-            logger.debug(
-                "StakeWise skipping claimed escrow position — vault=%s ticket=%d",
-                vault_address,
-                ticket,
-            )
-            return None
-
-        if owner and owner != ZERO_ADDRESS:
-            try:
-                resolved_owner = self.w3.to_checksum_address(owner)
-            except ValueError:  # pragma: no cover - corrupted response
-                resolved_owner = owner
-            if resolved_owner.lower() != self.os_token_vault_escrow_address.lower():
-                logger.warning(
-                    "StakeWise exit ticket owner mismatch — expected escrow=%s owner=%s ticket=%d",
-                    self.os_token_vault_escrow_address,
-                    resolved_owner,
-                    ticket,
-                )
-                return None
-
-        return int(os_token_shares), int(exited_assets)
-
     def _block_ranges(
         self, start_block: int, min_block: int
     ) -> Iterable[tuple[int, int]]:
@@ -586,13 +497,12 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
     def _log_summary(self, user: str, exposure: ExitExposure) -> None:
         logger.debug(
-            "StakeWise summary for %s — eth_collateral=%d (staked=%d, queue=%d, claimable=%d), os_liabilities=%d (escrow_shares=%d) tickets=%d",
+            "StakeWise summary for %s — eth_collateral=%d (staked=%d, queue=%d, claimable=%d), os_liabilities=%d tickets=%d",
             user,
             exposure.eth_collateral,
             exposure.staked_eth,
             exposure.eth_in_queue,
             exposure.eth_claimable,
             exposure.os_shares_liability,
-            exposure.escrow_os_shares,
             exposure.ticket_count,
         )
