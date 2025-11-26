@@ -143,9 +143,9 @@ async def test_fetch_prices_oseth_uses_native_value(
     mocker, config, eth_address, oseth_address
 ):
     adapter = ETHAdapter(config)
-    mock_price = 987654321
+    mock_price_wei = 987654321
     mock_get_oseth_price = mocker.patch.object(
-        adapter, "_get_oseth_price", return_value=mock_price
+        adapter, "_get_oseth_price", return_value=mock_price_wei
     )
 
     result = await adapter.fetch_prices(
@@ -153,7 +153,8 @@ async def test_fetch_prices_oseth_uses_native_value(
     )
 
     mock_get_oseth_price.assert_called_once()
-    assert result.prices[oseth_address] == mock_price
+    expected_price = Decimal(mock_price_wei) / Decimal(10**18)
+    assert result.prices[oseth_address] == expected_price
 
 
 @pytest.mark.asyncio
