@@ -75,8 +75,6 @@ def _build_adapter(dummy_web3) -> StakeWiseAdapter:
         vault_rpc="http://localhost",
         block_number=1,
         vault_address="0x0000000000000000000000000000000000000001",
-        stakewise_os_token_vault_escrow="0x0000000000000000000000000000000000000003",
-        stakewise_os_token_address="0x0000000000000000000000000000000000000004",
         adapters={
             "stakewise": {
                 "stakewise_vault_addresses": [
@@ -204,85 +202,5 @@ async def test_stakewise_adapter_exit_queue_direct_receiver(dummy_web3):
     )
     assert any(
         asset.asset_address == adapter.os_token_address and asset.amount == -4
-        for asset in assets
-    )
-
-
-@pytest.mark.asyncio
-async def test_stakewise_adapter_exit_queue_escrow(dummy_web3):
-    adapter = _build_adapter(dummy_web3)
-
-    escrow_ticket = ExitQueueTicket(
-        ticket=2,
-        shares=0,
-        receiver=adapter.os_token_vault_escrow_address,
-        block_number=12,
-        log_index=0,
-        timestamp=456,
-        assets_hint=15,
-    )
-
-    async def tickets(_self, _context, _user):
-        return [escrow_ticket]
-
-    adapter._scan_exit_queue_tickets = tickets.__get__(adapter, StakeWiseAdapter)
-
-    async def direct_rpc(self, fn, *args, **kwargs):
-        return fn(*args, **kwargs)
-
-    adapter._rpc = direct_rpc.__get__(adapter, StakeWiseAdapter)
-
-    async def fake_escrow(self, _vault_address, ticket):
-        # Returns (os_token_shares, exited_assets)
-        # os_token_shares=8 liability, exited_assets=6 already in escrow
-        return (8, 6)
-
-    adapter._fetch_escrow_state = fake_escrow.__get__(adapter, StakeWiseAdapter)
-
-    async def fake_index(self, _contract, ticket):
-        return 5
-
-    adapter._fetch_exit_queue_index = fake_index.__get__(adapter, StakeWiseAdapter)
-
-    async def fake_exited(self, _contract, receiver, ticket, timestamp, index):
-        # Returns (left_tickets, exited_tickets, exited_assets)
-        # left_tickets=4 shares (8 assets at 2x), vault_exit_assets=1 (ready in vault)
-        return (4, 1, 1)
-
-    adapter._calculate_exited_assets = fake_exited.__get__(adapter, StakeWiseAdapter)
-
-    shares_map = {"0xuser": 10}
-    os_token_shares_map = {"0xuser": 4}
-
-    dummy_contract = cast(
-        Contract,
-        SimpleNamespace(
-            functions=SimpleNamespace(
-                getShares=lambda account: _Call(shares_map.get(account, 0)),
-                convertToAssets=lambda shares: _Call(shares * 2),
-                osTokenPositions=lambda account: _Call(
-                    os_token_shares_map.get(account, 0)
-                ),
-            ),
-            events=DummyEvents(),
-        ),
-    )
-    adapter.vault_contexts = [
-        StakewiseVaultContext(
-            address="0xvault", contract=dummy_contract, exit_events=[]
-        )
-    ]
-    adapter.vault_address = "0xvault"
-
-    assets = await adapter.fetch_assets("0xuser")
-
-    # staked=20, claimable=6 (escrow) + 1 (vault) = 7, queue=8 → collateral=35
-    # liabilities: user os_shares=4 + escrow os_shares=8 = 12
-    assert any(
-        asset.asset_address == adapter.eth_asset and asset.amount == 35
-        for asset in assets
-    )
-    assert any(
-        asset.asset_address == adapter.os_token_address and asset.amount == -12
         for asset in assets
     )
