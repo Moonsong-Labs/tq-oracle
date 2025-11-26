@@ -20,6 +20,7 @@ WSTETH_ABI_PATH = ABIS_DIR / "WstETH.json"
 FEE_MANAGER_ABI_PATH = ABIS_DIR / "FeeManager.json"
 STAKEWISE_VAULT_ABI_PATH = ABIS_DIR / "StakeWiseVault.json"
 STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH = ABIS_DIR / "StakeWiseOsTokenVaultEscrow.json"
+OSTOKEN_VAULT_CONTROLLER_ABI_PATH = ABIS_DIR / "OsTokenVaultController.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -85,6 +86,11 @@ def load_stakewise_vault_abi() -> list[dict]:
 def load_stakewise_os_token_vault_escrow_abi() -> list[dict]:
     """Load the StakeWise osToken vault escrow ABI."""
     return load_abi(STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH)
+
+
+def load_ostoken_vault_controller_abi() -> list[dict]:
+    """Load the OsToken Vault Controller ABI."""
+    return load_abi(OSTOKEN_VAULT_CONTROLLER_ABI_PATH)
 
 
 def get_oracle_address_from_vault(settings: OracleSettings) -> ChecksumAddress:
