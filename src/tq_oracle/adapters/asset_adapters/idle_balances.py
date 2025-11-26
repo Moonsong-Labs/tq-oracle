@@ -8,10 +8,10 @@ from web3 import Web3
 from web3.exceptions import ProviderConnectionError
 
 from ...abi import (
+    fetch_subvault_addresses,
     get_oracle_address_from_vault,
     load_erc20_abi,
     load_oracle_abi,
-    load_vault_abi,
 )
 from ...constants import DEFAULT_ADDITIONAL_ASSETS
 from ...logger import get_logger
@@ -262,14 +262,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
 
     async def _fetch_subvault_addresses(self) -> list[str]:
         """Get the subvault addresses for the given vault."""
-        vault_abi = load_vault_abi()
-        return await self._fetch_contract_list(
-            contract_address=self.config.vault_address_required,
-            abi=vault_abi,
-            count_function="subvaults",
-            item_function="subvaultAt",
-            item_type="subvault",
-        )
+        return await asyncio.to_thread(fetch_subvault_addresses, self.config)
 
     async def _fetch_supported_assets(self) -> list[str]:
         """Get the supported assets for the given vault."""

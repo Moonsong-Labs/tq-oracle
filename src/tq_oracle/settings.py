@@ -55,6 +55,8 @@ class StakewiseAdapterSettings(BaseModel):
     stakewise_vault_addresses: list[str] = Field(default_factory=list)
     stakewise_exit_queue_start_block: int = 0
     stakewise_exit_max_lookback_blocks: int = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
+    extra_addresses: list[str] = Field(default_factory=list)
+    skip_exit_queue_scan: bool = False
 
     model_config = ConfigDict(extra="ignore")
 

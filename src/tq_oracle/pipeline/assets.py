@@ -1,55 +1,15 @@
 """Asset collection from various adapters."""
 
-from __future__ import annotations
-
 import asyncio
 from typing import Any
 
-from web3 import Web3
-
-from ..abi import load_vault_abi
+from ..abi import fetch_subvault_addresses
 from ..adapters.asset_adapters import get_adapter_class
 from ..adapters.asset_adapters.base import AssetData
 from ..adapters.asset_adapters.idle_balances import IdleBalancesAdapter
+from ..adapters.asset_adapters.stakewise import StakeWiseAdapter
 from ..processors import compute_total_aggregated_assets
-from ..state import AppState
 from .context import PipelineContext
-
-
-async def _fetch_subvault_addresses(state: AppState) -> list[str]:
-    """Discover all subvault addresses from the vault contract.
-
-    Args:
-        state: Application state containing settings
-
-    Returns:
-        List of subvault addresses
-    """
-    s = state.settings
-    log = state.logger
-
-    w3 = Web3(Web3.HTTPProvider(s.vault_rpc_required))
-    vault_abi = load_vault_abi()
-    vault_address = w3.to_checksum_address(s.vault_address_required)
-    contract = w3.eth.contract(address=vault_address, abi=vault_abi)
-    block_number = s.block_number_required
-
-    count = await asyncio.to_thread(
-        contract.functions.subvaults().call, block_identifier=block_number
-    )
-    log.debug("Vault has %d subvaults", count)
-
-    # Fetch all subvault addresses in parallel to avoid thread pool exhaustion
-    subvault_addresses = await asyncio.gather(
-        *[
-            asyncio.to_thread(
-                contract.functions.subvaultAt(i).call, block_identifier=block_number
-            )
-            for i in range(count)
-        ]
-    )
-
-    return list(subvault_addresses)
 
 
 def _sanitize_adapter_kwargs(values: dict[str, Any]) -> dict[str, Any]:
@@ -118,7 +78,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
     log = ctx.state.logger
 
     log.info("Discovering subvaults from vault contract...")
-    subvault_addresses = await _fetch_subvault_addresses(ctx.state)
+    subvault_addresses = await asyncio.to_thread(fetch_subvault_addresses, s)
     log.info("Found %d subvaults", len(subvault_addresses))
 
     subvault_config_map = {
@@ -179,7 +139,19 @@ async def collect_assets(ctx: PipelineContext) -> None:
         )
         log.debug("Added default idle_balances adapter (all subvaults)")
 
-    # 2. Add additional adapters per subvault
+    # 2. Add default stakewise adapter (runs against all subvaults + extra_addresses)
+    stakewise_config = s.adapters.stakewise
+    if stakewise_config.stakewise_vault_addresses:
+        stakewise_adapter = StakeWiseAdapter(s)
+        asset_fetch_tasks.append(
+            ("stakewise_all_subvaults", stakewise_adapter.fetch_all_assets())
+        )
+        log.debug(
+            "Added default stakewise adapter (all subvaults + %d extra addresses)",
+            len(stakewise_config.extra_addresses),
+        )
+
+    # 3. Add additional adapters per subvault
     def create_adapter_task(
         subvault_addr: str, adapter_name: str
     ) -> tuple[str, Any, str] | None:

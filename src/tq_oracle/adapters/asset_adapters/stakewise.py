@@ -12,7 +12,7 @@ from web3.contract.contract import ContractEvent
 from web3.exceptions import ContractLogicError, ProviderConnectionError
 from web3.types import EventData
 
-from ...abi import load_stakewise_vault_abi
+from ...abi import fetch_subvault_addresses, load_stakewise_vault_abi
 from ...constants import (
     STAKEWISE_ADDRESSES,
     STAKEWISE_EXIT_LOG_CHUNK,
@@ -78,6 +78,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
         stakewise_vault_addresses: list[str] | None = None,
         stakewise_exit_queue_start_block: int | None = None,
         stakewise_exit_max_lookback_blocks: int | None = None,
+        skip_exit_queue_scan: bool | None = None,
     ):
         super().__init__(config)
 
@@ -118,10 +119,29 @@ class StakeWiseAdapter(BaseAssetAdapter):
             stakewise_exit_max_lookback_blocks
             or stakewise_defaults.stakewise_exit_max_lookback_blocks
         )
+        self._skip_exit_queue_scan = (
+            skip_exit_queue_scan
+            if skip_exit_queue_scan is not None
+            else adapter_config.skip_exit_queue_scan
+        )
         self._rpc_sem = asyncio.Semaphore(getattr(config, "max_calls", 5))
         self._rpc_delay = getattr(config, "rpc_delay", 0.15)
         self._rpc_jitter = getattr(config, "rpc_jitter", 0.10)
         self._block_timestamp_cache: dict[int, int] = {}
+
+        extra_address_candidates = [
+            self.w3.to_checksum_address(addr)
+            for addr in adapter_config.extra_addresses
+            if addr
+        ]
+        deduped: dict[str, str] = {}
+        for checksum in extra_address_candidates:
+            deduped.setdefault(checksum.lower(), checksum)
+        self._extra_addresses = list(deduped.values())
+        if self._extra_addresses:
+            logger.debug(
+                "StakeWise extra addresses configured: %s", self._extra_addresses
+            )
 
     @property
     def adapter_name(self) -> str:
@@ -145,9 +165,10 @@ class StakeWiseAdapter(BaseAssetAdapter):
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
         user = self.w3.to_checksum_address(subvault_address)
         logger.info(
-            "StakeWise adapter collecting balances — user=%s block=%s",
+            "StakeWise adapter collecting balances — user=%s block=%s skip_exit_queue=%s",
             user,
             self.block_identifier,
+            self._skip_exit_queue_scan,
         )
 
         total_staked = 0
@@ -162,10 +183,15 @@ class StakeWiseAdapter(BaseAssetAdapter):
             # Skip expensive exit queue scan if user has no position
             if user_state.assets == 0 and user_state.os_shares == 0:
                 logger.debug(
-                    "StakeWise skipping exit queue scan — no position for user=%s vault=%s",
+                    "StakeWise Adapter skipping — no position for user=%s vault=%s",
                     user,
                     context.address,
                 )
+                continue
+
+            if self._skip_exit_queue_scan:
+                total_staked += user_state.assets
+                total_os_liabilities += user_state.os_shares
                 continue
 
             tickets = await self._scan_exit_queue_tickets(context, user)
@@ -197,6 +223,54 @@ class StakeWiseAdapter(BaseAssetAdapter):
 
         self._log_summary(user, aggregated)
         return assets
+
+    async def fetch_all_assets(self) -> list[AssetData]:
+        """Fetch StakeWise positions for all subvaults plus extra addresses."""
+
+        subvault_addresses = fetch_subvault_addresses(self.config)
+        addresses_to_scan = [self.config.vault_address_required] + subvault_addresses
+
+        seen = {addr.lower() for addr in addresses_to_scan}
+        for extra in self._extra_addresses:
+            if extra.lower() not in seen:
+                addresses_to_scan.append(extra)
+                seen.add(extra.lower())
+
+        logger.info(
+            "StakeWise fetching positions for main vault + %d subvaults + %d extra addresses",
+            len(subvault_addresses),
+            len(addresses_to_scan) - 1 - len(subvault_addresses),
+        )
+
+        results = await asyncio.gather(
+            *[self.fetch_assets(addr) for addr in addresses_to_scan],
+            return_exceptions=True,
+        )
+
+        all_assets: list[AssetData] = []
+        failed: list[tuple[str, BaseException]] = []
+
+        for addr, result in zip(addresses_to_scan, results):
+            if isinstance(result, BaseException):
+                logger.error(
+                    "StakeWise failed to fetch assets for %s: %s", addr, result
+                )
+                failed.append((addr, result))
+            elif isinstance(result, list):
+                all_assets.extend(result)
+
+        if failed:
+            addr_list = ", ".join(addr for addr, _ in failed)
+            raise ValueError(
+                f"StakeWise failed to fetch assets from {len(failed)} address(es): {addr_list}"
+            )
+
+        logger.info(
+            "StakeWise fetched %d total asset entries from %d addresses",
+            len(all_assets),
+            len(addresses_to_scan),
+        )
+        return all_assets
 
     @staticmethod
     def _build_web3(rpc_url: str) -> Web3:
@@ -282,8 +356,8 @@ class StakeWiseAdapter(BaseAssetAdapter):
         min_block = self._resolve_min_block()
 
         iterations = 0
-        logger.info(
-            f"StakeWise exit queue scan start for {context.address} from block {min_block}, this might take some time..."
+        logger.warning(
+            f"StakeWise exit queue scan start for address:{user} StakewiseVault: {context.address} from block {min_block}, this might take some time..."
         )
         for from_block, to_block in self._block_ranges(
             self.block_identifier, min_block
