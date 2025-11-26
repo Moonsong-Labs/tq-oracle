@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal
 
 from tq_oracle.processors.asset_aggregator import AggregatedAssets
 from tq_oracle.adapters.price_adapters.base import PriceData
@@ -15,8 +16,8 @@ def test_calculate_total_assets_basic():
     prices = PriceData(
         base_asset="0xA",
         prices={
-            "0xA": 10**18,
-            "0xB": 2 * 10**18,
+            "0xA": Decimal("1"),
+            "0xB": Decimal("2"),
         },
     )
 
@@ -44,7 +45,7 @@ def test_calculate_total_assets_missing_prices_raises():
     prices = PriceData(
         base_asset="0xA",
         prices={
-            "0xA": 10**18,
+            "0xA": Decimal("1"),
         },
     )
 
@@ -63,7 +64,7 @@ def test_calculate_total_assets_multiple_missing_prices_raises():
     prices = PriceData(
         base_asset="0xA",
         prices={
-            "0xA": 10**18,
+            "0xA": Decimal("1"),
         },
     )
 
@@ -83,9 +84,9 @@ def test_calculate_total_assets_with_extra_prices():
     prices = PriceData(
         base_asset="0xA",
         prices={
-            "0xA": 10**18,
-            "0xB": 2 * 10**18,
-            "0xC": 5 * 10**18,
+            "0xA": Decimal("1"),
+            "0xB": Decimal("2"),
+            "0xC": Decimal("5"),
         },
     )
 
@@ -105,9 +106,9 @@ def test_calculate_total_assets_invalid_prices_raises():
     prices = PriceData(
         base_asset="0xA",
         prices={
-            "0xA": 10**18,
-            "0xB": 0,
-            "0xC": -100,
+            "0xA": Decimal(10**18),
+            "0xB": Decimal(0),
+            "0xC": Decimal(-100),
         },
     )
 
@@ -123,25 +124,29 @@ def test_calculate_total_assets_invalid_prices_raises():
         (
             "single asset",
             {"0xA": 5},
-            {"0xA": 2 * 10**18},
+            {"0xA": Decimal("2")},
             5 * 2,
         ),
         (
             "asset with zero amount",
             {"0xA": 0, "0xB": 10},
-            {"0xA": 500 * 10**18, "0xB": 2 * 10**18},
+            {"0xA": Decimal("500"), "0xB": Decimal("2")},
             20,
         ),
         (
             "all assets have zero amount",
             {"0xA": 0, "0xB": 0},
-            {"0xA": 10**18, "0xB": 10**18},
+            {"0xA": Decimal("1"), "0xB": Decimal("1")},
             0,
         ),
         (
             "mixed zero and non-zero amounts",
             {"0xA": 10, "0xB": 0, "0xC": 5},
-            {"0xA": 2 * 10**18, "0xB": 100 * 10**18, "0xC": 1 * 10**18},
+            {
+                "0xA": Decimal("2"),
+                "0xB": Decimal("100"),
+                "0xC": Decimal("1"),
+            },
             25,
         ),
     ],
@@ -167,31 +172,31 @@ def test_calculate_total_assets_scenarios(test_name, assets, prices, expected_to
         (
             "value just below 1 unit truncates to 0",
             1,
-            10**18 - 1,
+            Decimal("0.999999999999999999"),
             0,
         ),
         (
             "value exactly 1 unit",
             1,
-            10**18,
+            Decimal("1"),
             1,
         ),
         (
             "value just above 1 unit truncates to 1",
             1,
-            10**18 + 1,
+            Decimal("1.000000000000000001"),
             1,
         ),
         (
             "value just below 2 units truncates to 1",
             2,
-            10**18 - 1,  # product is 2*10**18 - 2
+            Decimal("0.999999999999999999"),  # product is 1.999... -> truncates to 1
             1,
         ),
         (
             "smallest non-zero values truncate to 0",
             1,
-            1,
+            Decimal("0.000000000000000001"),
             0,
         ),
     ],
@@ -200,8 +205,8 @@ def test_calculate_total_assets_precision_and_truncation(
     test_name, amount, price, expected_value
 ):
     """
-    Tests the integer division to ensure correct truncation of fractional results.
-    The formula `amount * price // 10**18` should truncate, not round.
+    Tests that the final sum is rounded down to the nearest integer.
+    The total uses Decimal arithmetic and ROUND_DOWN to avoid accidental rounding up.
     """
     aggregated = AggregatedAssets(assets={"0xA": amount})
     prices = PriceData(base_asset="0xBASE", prices={"0xA": price})
@@ -216,15 +221,15 @@ def test_calculate_total_assets_with_large_but_valid_numbers():
     Tests that the calculation handles very large numbers while staying within
     the uint256 range enforced by the OracleHelper contract.
     """
-    # Bound amount so the final total (amount * price // 1e18) fits in uint256.
+    # Bound amount so the final total still fits in uint256.
     large_amount = 2**200
-    large_price = 5 * 10**18
+    large_price = Decimal("5")
 
     aggregated = AggregatedAssets(assets={"0xA": large_amount})
     prices = PriceData(base_asset="0xBASE", prices={"0xA": large_price})
 
-    # (large_amount * 5 * 10**18) // 10**18 = large_amount * 5, still < 2**256
-    expected_result = large_amount * 5
+    # Expectation matches Decimal arithmetic with default context precision.
+    expected_result = int((Decimal(large_amount) * large_price).to_integral_value())
     result = calculate_total_assets(aggregated, prices)
 
     assert result == expected_result

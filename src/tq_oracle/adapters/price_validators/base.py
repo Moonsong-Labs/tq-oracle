@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from decimal import Decimal
 
 from tq_oracle.adapters.check_adapters.base import CheckResult
 from tq_oracle.adapters.price_adapters.base import PriceData
@@ -33,8 +34,8 @@ class BasePriceValidator(ABC):
         pass
 
     def _calculate_price_deviation_percentage(
-        self, reference_price: int, actual_price: int
-    ) -> float:
+        self, reference_price: Decimal, actual_price: Decimal
+    ) -> Decimal:
         """Calculate the percentage deviation between two prices.
 
         Args:
@@ -50,5 +51,4 @@ class BasePriceValidator(ABC):
         if reference_price <= 0:
             raise ValueError("reference_price must be positive")
 
-        deviation_ratio = abs(reference_price - actual_price) / reference_price
-        return deviation_ratio * 100
+        return abs((reference_price - actual_price) / actual_price) * 100

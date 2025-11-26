@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 
+import backoff
 import requests
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
@@ -18,6 +19,38 @@ from ..settings import OracleSettings
 from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (requests.exceptions.RequestException, requests.exceptions.HTTPError),
+    max_tries=5,
+    giveup=lambda e: (
+        isinstance(e, requests.exceptions.HTTPError)
+        and e.response is not None
+        and e.response.status_code not in {429, 500, 502, 503, 504}
+    ),
+    jitter=backoff.full_jitter,
+)
+async def _get_with_retry(url: str):
+    response = await asyncio.to_thread(requests.get, url, timeout=10.0)
+    response.raise_for_status()
+    return response
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (requests.exceptions.RequestException, requests.exceptions.HTTPError),
+    max_tries=5,
+    giveup=lambda e: (
+        isinstance(e, requests.exceptions.HTTPError)
+        and e.response is not None
+        and e.response.status_code not in {429, 500, 502, 503, 504}
+    ),
+    jitter=backoff.full_jitter,
+)
+async def _post_tx_with_retry(tx_service: TransactionServiceApi, safe_tx: SafeTx):
+    return await asyncio.to_thread(tx_service.post_transaction, safe_tx)
 
 
 async def publish_to_stdout(report: OracleReport, oracle_address: str) -> None:
@@ -115,10 +148,7 @@ async def send_to_safe(
 
     safe_api_url = f"{tx_service.base_url}/api/v1/safes/{safe_checksum}/"
     logger.debug("Fetching Safe info from: %s", safe_api_url)
-    safe_info_response = await asyncio.to_thread(
-        requests.get, safe_api_url, timeout=10.0
-    )
-    safe_info_response.raise_for_status()
+    safe_info_response = await _get_with_retry(safe_api_url)
     safe_info_data = safe_info_response.json()
     nonce = int(safe_info_data.get("nonce", 0))
 
@@ -163,7 +193,7 @@ async def send_to_safe(
 
     safe_tx.sign(private_key_str)
 
-    await asyncio.to_thread(tx_service.post_transaction, safe_tx)
+    await _post_tx_with_retry(tx_service, safe_tx)
 
     safe_tx_hash = safe_tx.safe_tx_hash.hex()
     logger.info("Transaction proposed: %s", safe_tx_hash)

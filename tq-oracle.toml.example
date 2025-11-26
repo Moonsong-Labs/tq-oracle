@@ -7,6 +7,9 @@ vault_rpc = "https://ethereum-rpc.publicnode.com"
 dry_run = true
 log_level = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
+# Pipeline timeout (seconds); set to 0 to disable
+global_timeout_seconds = 600
+
 # Configure additional adapters per subvault
 # By default, idle_balances adapter runs on ALL subvaults on the vault chain
 

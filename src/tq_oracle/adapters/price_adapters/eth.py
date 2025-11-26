@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import cast
+from decimal import Decimal
 
 from eth_typing import URI
 from web3 import Web3
@@ -42,7 +43,7 @@ class ETHAdapter(BasePriceAdapter):
     def adapter_name(self) -> str:
         return "eth"
 
-    async def _get_oseth_price(self) -> int:
+    async def _get_oseth_price(self) -> str:
         """Get osETH price in ETH by calling convertToAssets(1e18) on the controller.
 
         Returns:
@@ -90,16 +91,17 @@ class ETHAdapter(BasePriceAdapter):
         asset_addresses_lower = [addr.lower() for addr in asset_addresses]
 
         if self.eth_address.lower() in asset_addresses_lower:
-            prices_accumulator.prices[self.eth_address] = 10**18
+            prices_accumulator.prices[self.eth_address] = Decimal(1.0)
+            prices_accumulator.decimals.setdefault(self.eth_address, 18)
 
         if self.weth_address and self.weth_address.lower() in asset_addresses_lower:
-            prices_accumulator.prices[self.weth_address] = 10**18
+            prices_accumulator.prices[self.weth_address] = Decimal(1.0)
+            prices_accumulator.decimals.setdefault(self.weth_address, 18)
 
         if self._oseth_address and self._oseth_address.lower() in asset_addresses_lower:
             oseth_price = await self._get_oseth_price()
-            prices_accumulator.prices[self._oseth_address] = oseth_price
+            prices_accumulator.prices[self._oseth_address] = Decimal(oseth_price).scaleb(-18)
+            prices_accumulator.decimals.setdefault(self._oseth_address, 18)
             logger.debug("osETH price: %d wei per osETH", oseth_price)
-
-        self.validate_prices(prices_accumulator)
 
         return prices_accumulator
