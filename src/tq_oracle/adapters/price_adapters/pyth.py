@@ -43,9 +43,19 @@ class PythAdapter(BasePriceAdapter):
             return address.lower()
 
     def _scale_to_18(self, value: int, expo: int) -> int:
-        """Scale an integer `value * 10**expo` to 18-decimal fixed point."""
+        """Scale an integer `value * 10**expo` to 18-decimal fixed point.
+
+        Raises:
+            ValueError: If value is negative, expo is out of range |24|.
+        """
+        if value < 0:
+            raise ValueError(f"Price value must be non-negative, got {value}")
+        if not (-24 <= expo <= 24):
+            raise ValueError(f"Exponent {expo} out of supported range [-24, 24]")
+
         shift = 18 + expo
-        return value * (10**shift) if shift >= 0 else value // (10**-shift)
+        scaled = value * (10**shift) if shift >= 0 else value // (10**-shift)
+        return scaled
 
     async def _http_get(self, url: str, *, params: dict | None = None):
         return await asyncio.to_thread(
@@ -127,15 +137,11 @@ class PythAdapter(BasePriceAdapter):
         )
         denom = abs(price_18)
         if denom == 0:
-            logger.warning("%s price is zero; cannot compute confidence ratio", symbol)
-            return
+            raise ValueError(f"{symbol} price is zero")
         conf_ratio = conf_18 / denom
         if conf_ratio > self.max_confidence_ratio:
-            logger.warning(
-                "%s confidence ratio too high: %.4f (max: %s)",
-                symbol,
-                conf_ratio,
-                self.max_confidence_ratio,
+            raise ValueError(
+                f"{symbol} confidence ratio {conf_ratio:.4f} exceeds maximum {self.max_confidence_ratio}"
             )
 
     def _symbol_for(self, address: str) -> str | None:

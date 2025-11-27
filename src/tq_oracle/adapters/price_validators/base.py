@@ -45,9 +45,10 @@ class BasePriceValidator(ABC):
             Absolute percentage deviation between the prices
 
         Raises:
-            ValueError: If actual_price is zero
+            ValueError: If reference_price is zero or negative
         """
-        if actual_price == 0:
-            raise ValueError("actual_price cannot be zero")
+        if reference_price <= 0:
+            raise ValueError("reference_price must be positive")
 
-        return abs((reference_price - actual_price) / actual_price * 100)
+        deviation_ratio = abs(reference_price - actual_price) / reference_price
+        return deviation_ratio * 100

@@ -14,6 +14,7 @@ def sample_report() -> OracleReport:
     return OracleReport(
         vault_address="0xaaa1111111111111111111111111111111111111",
         base_asset="0xbbb2222222222222222222222222222222222222",
+        tvl_in_base_asset=0,
         total_assets={
             "0xbbb2222222222222222222222222222222222222": 1000000000000000000,
             "0xccc3333333333333333333333333333333333333": 2000000000000000000,
@@ -32,6 +33,7 @@ def sample_empty_report() -> OracleReport:
     return OracleReport(
         vault_address="0xaaa1111111111111111111111111111111111111",
         base_asset="0xbbb2222222222222222222222222222222222222",
+        tvl_in_base_asset=0,
         total_assets={},
         final_prices={},
     )
@@ -75,6 +77,7 @@ def test_base_asset_is_first_in_reports_array():
     report = OracleReport(
         vault_address="0xaaa1111111111111111111111111111111111111",
         base_asset="0xddd4444444444444444444444444444444444444",  # Largest numerically
+        tvl_in_base_asset=0,
         total_assets={
             "0xbbb2222222222222222222222222222222222222": 1000000000000000000,
             "0xccc3333333333333333333333333333333333333": 2000000000000000000,
