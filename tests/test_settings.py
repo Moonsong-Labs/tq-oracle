@@ -87,6 +87,9 @@ def test_stakewise_adapter_defaults_loaded(tmp_path, monkeypatch):
             [adapters.stakewise]
             stakewise_vault_addresses = ["0x1111111111111111111111111111111111111111"]
             stakewise_exit_queue_start_block = 123
+            stakewise_exit_max_lookback_blocks = 50000
+            extra_addresses = ["0x2222222222222222222222222222222222222222"]
+            skip_exit_queue_scan = true
             """
         ).strip()
     )
@@ -99,3 +102,25 @@ def test_stakewise_adapter_defaults_loaded(tmp_path, monkeypatch):
         "0x1111111111111111111111111111111111111111"
     ]
     assert settings.adapters.stakewise.stakewise_exit_queue_start_block == 123
+    assert settings.adapters.stakewise.stakewise_exit_max_lookback_blocks == 50000
+    assert settings.adapters.stakewise.extra_addresses == [
+        "0x2222222222222222222222222222222222222222"
+    ]
+    assert settings.adapters.stakewise.skip_exit_queue_scan is True
+
+
+def test_additional_asset_support_toggle(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        dedent(
+            """
+            additional_asset_support = false
+            """
+        ).strip()
+    )
+
+    monkeypatch.setenv("TQ_ORACLE_CONFIG", str(config_path))
+
+    settings = OracleSettings()
+
+    assert settings.additional_asset_support is False
