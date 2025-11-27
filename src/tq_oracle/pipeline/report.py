@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..abi import fetch_total_shares
 from ..report import generate_report
 from ..report import publish_report as publish_report_impl
 from .context import PipelineContext
@@ -19,14 +20,28 @@ async def build_report(ctx: PipelineContext) -> None:
     state = ctx.state
     aggregated = ctx.aggregated_required
     final_prices = ctx.final_prices_required
+    price_data = ctx.price_data_required
+
+    # Fetch total shares from the vault's share manager
+    log.info("Fetching total shares...")
+    try:
+        total_shares = fetch_total_shares(state.settings)
+        ctx.total_shares = total_shares
+        log.debug(f"Total shares: {total_shares}")
+    except Exception as e:
+        log.warning(f"Failed to fetch total shares: {e}")
+        total_shares = 0
+        ctx.total_shares = 0
 
     log.info("Generating report...")
     report = await generate_report(
         state.settings.vault_address_required,
-        ctx.price_data_required.base_asset,
+        price_data.base_asset,
         ctx.total_assets_required,
         aggregated,
         final_prices,
+        price_data=price_data,
+        total_shares=total_shares,
     )
 
     ctx.report = report

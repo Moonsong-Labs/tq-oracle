@@ -138,6 +138,47 @@ def get_oracle_address_from_vault(settings: OracleSettings) -> ChecksumAddress:
         raise ValueError(f"Failed to fetch oracle address from vault: {e}") from e
 
 
+def fetch_total_shares(settings: OracleSettings) -> int:
+    """Fetch total shares from the vault's share manager.
+
+    Args:
+        settings: Oracle settings containing vault_address, vault_rpc, and block_number
+
+    Returns:
+        Total supply of shares from the share manager
+
+    Raises:
+        ConnectionError: If RPC connection fails
+        ValueError: If contract call fails
+    """
+    rpc_url = settings.vault_rpc_required
+    vault_address = settings.vault_address_required
+    block_number = settings.block_number_required
+
+    w3 = Web3(Web3.HTTPProvider(URI(rpc_url)))
+    if not w3.is_connected():
+        raise ConnectionError(f"Failed to connect to RPC: {rpc_url}")
+
+    vault_abi = load_vault_abi()
+    checksum_vault = w3.to_checksum_address(vault_address)
+    vault_contract = w3.eth.contract(address=checksum_vault, abi=vault_abi)
+
+    try:
+        share_manager_addr: ChecksumAddress = (
+            vault_contract.functions.shareManager().call(block_identifier=block_number)
+        )
+
+        erc20_abi = load_erc20_abi()
+        share_manager = w3.eth.contract(address=share_manager_addr, abi=erc20_abi)
+
+        total_supply: int = share_manager.functions.totalSupply().call(
+            block_identifier=block_number
+        )
+        return total_supply
+    except Exception as e:
+        raise ValueError(f"Failed to fetch total shares from vault: {e}") from e
+
+
 def fetch_subvault_addresses(settings: OracleSettings) -> list[str]:
     """Fetch all subvault addresses from the vault contract.
 

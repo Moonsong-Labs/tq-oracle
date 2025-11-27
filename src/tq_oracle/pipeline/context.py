@@ -18,6 +18,7 @@ class PipelineContext:
     price_data: PriceData | None = None
     total_assets: int | None = None
     final_prices: FinalPrices | None = None
+    total_shares: int | None = None
     report: OracleReport | None = None
 
     @property

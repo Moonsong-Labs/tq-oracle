@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import requests
 
-from tq_oracle.settings import OracleSettings
+from tq_oracle.settings import OracleSettings, DryRunFormat
 from tq_oracle.report.generator import OracleReport
 from tq_oracle.report.publisher import (
     build_transaction,
@@ -48,11 +48,15 @@ async def test_publish_to_stdout_prints_correct_json(
 ):
     """
     Verify that publish_to_stdout correctly serializes the report
-    to JSON and prints it to standard output.
+    to JSON and prints it to standard output when using JSON format.
     """
     expected_dict = sample_report.to_dict()
 
-    await publish_to_stdout(sample_report, "0x2234567890123456789012345678901234567890")
+    await publish_to_stdout(
+        sample_report,
+        "0x2234567890123456789012345678901234567890",
+        dry_run_format=DryRunFormat.JSON,
+    )
 
     captured = capsys.readouterr()
     assert captured.err == ""
@@ -61,6 +65,28 @@ async def test_publish_to_stdout_prints_correct_json(
         "report": expected_dict,
         "encoded_calldata": "8f88cbfb00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000123456789012345678901234567890123456789000000000000000000000000000000000000000000000006c6b935b8bbd400000",
     }
+
+
+@pytest.mark.asyncio
+async def test_publish_to_stdout_prints_table_by_default(
+    capsys, sample_report: OracleReport
+):
+    """
+    Verify that publish_to_stdout outputs a rich table format by default.
+    """
+    await publish_to_stdout(
+        sample_report,
+        "0x2234567890123456789012345678901234567890",
+        dry_run_format=DryRunFormat.TABLE,
+    )
+
+    captured = capsys.readouterr()
+    # Table output should contain key elements
+    assert "TQ Oracle Dry Run" in captured.out
+    assert "Vault Info" in captured.out
+    assert "Summary" in captured.out
+    assert "Asset Breakdown" in captured.out
+    assert "Calldata" in captured.out
 
 
 @pytest.mark.asyncio
@@ -247,7 +273,7 @@ async def test_publish_report_routes_to_stdout_on_dry_run(
     await publish_report(broadcast_config, sample_report)
 
     mock_publish_to_stdout.assert_awaited_once_with(
-        sample_report, expected_oracle_address
+        sample_report, expected_oracle_address, broadcast_config.dry_run_format
     )
     mock_send_to_safe.assert_not_awaited()
 

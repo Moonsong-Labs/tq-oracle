@@ -15,7 +15,8 @@ from safe_eth.safe.safe_tx import SafeTx
 from web3 import Web3
 
 from .encoder import encode_submit_reports
-from ..settings import OracleSettings
+from .formatter import format_report_table
+from ..settings import OracleSettings, DryRunFormat
 from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
@@ -53,12 +54,17 @@ async def _post_tx_with_retry(tx_service: TransactionServiceApi, safe_tx: SafeTx
     return await asyncio.to_thread(tx_service.post_transaction, safe_tx)
 
 
-async def publish_to_stdout(report: OracleReport, oracle_address: str) -> None:
+async def publish_to_stdout(
+    report: OracleReport,
+    oracle_address: str,
+    dry_run_format: DryRunFormat = DryRunFormat.TABLE,
+) -> None:
     """Publish report to stdout (dry run mode).
 
     Args:
         report: The oracle report to publish
         oracle_address: The address of the oracle contract
+        dry_run_format: Output format (TABLE for rich dashboard, JSON for raw JSON)
 
     This corresponds to the "Report published to stdout" step in the flowchart.
     """
@@ -66,11 +72,15 @@ async def publish_to_stdout(report: OracleReport, oracle_address: str) -> None:
         oracle_address=oracle_address,
         report=report,
     )
-    data = {
-        "report": report.to_dict(),
-        "encoded_calldata": encoded_calldata.hex(),
-    }
-    print(json.dumps(data, indent=2))
+
+    if dry_run_format == DryRunFormat.JSON:
+        data = {
+            "report": report.to_dict(),
+            "encoded_calldata": encoded_calldata.hex(),
+        }
+        print(json.dumps(data, indent=2))
+    else:
+        format_report_table(report, encoded_calldata)
 
 
 async def build_transaction(
@@ -232,7 +242,7 @@ async def publish_report(
     - If not dry_run and Broadcast mode: build transaction, send to Safe
     """
     if config.dry_run:
-        await publish_to_stdout(report, config.oracle_address)
+        await publish_to_stdout(report, config.oracle_address, config.dry_run_format)
         return
 
     if config.is_broadcast:

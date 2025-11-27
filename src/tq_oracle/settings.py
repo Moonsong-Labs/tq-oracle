@@ -40,6 +40,13 @@ class Network(str, Enum):
     BASE = "base"
 
 
+class DryRunFormat(str, Enum):
+    """Output format for dry run mode."""
+
+    TABLE = "table"
+    JSON = "json"
+
+
 class IdleBalancesAdapterSettings(BaseModel):
     """Configuration options for idle balance collection."""
 
@@ -83,6 +90,7 @@ class OracleSettings(BaseSettings):
 
     # --- global toggles ---
     dry_run: bool = True
+    dry_run_format: DryRunFormat = DryRunFormat.TABLE
     additional_asset_support: bool = True
 
     # --- core addresses / endpoints ---
