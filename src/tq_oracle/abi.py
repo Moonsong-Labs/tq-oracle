@@ -10,6 +10,8 @@ from tq_oracle.settings import OracleSettings
 
 ABIS_DIR = Path(__file__).parent / "abis"
 
+CORE_VAULTS_COLLECTOR_PATH = ABIS_DIR / "CoreVaultsCollector.json"
+MULTICALL_ABI_PATH = ABIS_DIR / "Multicall.json"
 ORACLE_ABI_PATH = ABIS_DIR / "IOracle.json"
 ORACLE_HELPER_ABI_PATH = ABIS_DIR / "OracleHelper.json"
 VAULT_ABI_PATH = ABIS_DIR / "Vault.json"
@@ -20,6 +22,7 @@ WSTETH_ABI_PATH = ABIS_DIR / "WstETH.json"
 FEE_MANAGER_ABI_PATH = ABIS_DIR / "FeeManager.json"
 STAKEWISE_VAULT_ABI_PATH = ABIS_DIR / "StakeWiseVault.json"
 STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH = ABIS_DIR / "StakeWiseOsTokenVaultEscrow.json"
+OSTOKEN_VAULT_CONTROLLER_ABI_PATH = ABIS_DIR / "OsTokenVaultController.json"
 
 
 def load_abi(path: str | Path) -> list[dict]:
@@ -40,6 +43,15 @@ def load_abi(path: str | Path) -> list[dict]:
     with p.open() as f:
         data = json.load(f)
     return data["abi"]
+
+
+def load_core_vaults_collector_abi() -> list[dict]:
+    return load_abi(CORE_VAULTS_COLLECTOR_PATH)
+
+
+def load_multicall_abi() -> list[dict]:
+    """Load the Multicall ABI."""
+    return load_abi(MULTICALL_ABI_PATH)
 
 
 def load_oracle_abi() -> list[dict]:
@@ -87,6 +99,11 @@ def load_stakewise_os_token_vault_escrow_abi() -> list[dict]:
     return load_abi(STAKEWISE_OS_TOKEN_VAULT_ESCROW_ABI_PATH)
 
 
+def load_ostoken_vault_controller_abi() -> list[dict]:
+    """Load the OsToken Vault Controller ABI."""
+    return load_abi(OSTOKEN_VAULT_CONTROLLER_ABI_PATH)
+
+
 def get_oracle_address_from_vault(settings: OracleSettings) -> ChecksumAddress:
     """Fetch the oracle address from the vault contract.
 
@@ -119,3 +136,41 @@ def get_oracle_address_from_vault(settings: OracleSettings) -> ChecksumAddress:
         return oracle_addr
     except Exception as e:
         raise ValueError(f"Failed to fetch oracle address from vault: {e}") from e
+
+
+def fetch_subvault_addresses(settings: OracleSettings) -> list[str]:
+    """Fetch all subvault addresses from the vault contract.
+
+    Args:
+        settings: Oracle settings containing vault_address, vault_rpc, and block_number
+
+    Returns:
+        List of subvault addresses
+
+    Raises:
+        ConnectionError: If RPC connection fails
+        ValueError: If contract call fails
+    """
+    rpc_url = settings.vault_rpc_required
+    vault_address = settings.vault_address_required
+    block_number = settings.block_number_required
+
+    w3 = Web3(Web3.HTTPProvider(URI(rpc_url)))
+    if not w3.is_connected():
+        raise ConnectionError(f"Failed to connect to RPC: {rpc_url}")
+
+    vault_abi = load_vault_abi()
+    checksum_vault = w3.to_checksum_address(vault_address)
+    vault_contract = w3.eth.contract(address=checksum_vault, abi=vault_abi)
+
+    try:
+        count: int = vault_contract.functions.subvaults().call(
+            block_identifier=block_number
+        )
+        subvaults: list[str] = [
+            vault_contract.functions.subvaultAt(i).call(block_identifier=block_number)
+            for i in range(count)
+        ]
+        return subvaults
+    except Exception as e:
+        raise ValueError(f"Failed to fetch subvault addresses from vault: {e}") from e
