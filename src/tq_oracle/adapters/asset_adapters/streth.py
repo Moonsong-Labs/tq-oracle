@@ -1,18 +1,18 @@
-from __future__ import annotations
-
 import asyncio
+import random
 from typing import TYPE_CHECKING
 
+import backoff
+from eth.constants import ZERO_ADDRESS
+from eth_abi.abi import decode, encode
 from web3 import Web3
 from web3.eth import Contract
-import backoff
-import random
 from web3.exceptions import ProviderConnectionError
+
+from ...abi import load_core_vaults_collector_abi, load_multicall_abi, load_vault_abi
 from ...logger import get_logger
-from ...abi import load_multicall_abi, load_vault_abi, load_core_vaults_collector_abi
 from ...settings import Network
 from .base import AssetData, BaseAssetAdapter
-from eth_abi.abi import decode, encode
 
 if TYPE_CHECKING:
     from ...settings import OracleSettings
@@ -141,7 +141,10 @@ class StrETHAdapter(BaseAssetAdapter):
 
         result: list[AssetData] = []
         for asset, amount in cumulative_amounts.items():
-            result.append(AssetData(Web3.to_checksum_address(asset), amount))
+            checksum = Web3.to_checksum_address(asset)
+            if checksum == ZERO_ADDRESS:
+                raise ValueError("Received zero asset address in strETH distributions")
+            result.append(AssetData(checksum, amount))
         return result
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:

@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import asyncio
 import random
 from dataclasses import dataclass
 from typing import Iterable, Optional, cast
 
 import backoff
+from eth.constants import ZERO_ADDRESS
 from web3 import Web3
 from web3.contract import Contract
 from web3.contract.contract import ContractEvent
@@ -26,7 +25,6 @@ from ...settings import OracleSettings
 from .base import AssetData, BaseAssetAdapter
 
 logger = get_logger(__name__)
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 @dataclass(frozen=True, slots=True)

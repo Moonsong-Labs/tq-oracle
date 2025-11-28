@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
 
 import requests
+from eth.constants import ZERO_ADDRESS
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from eth_typing import URI
@@ -13,8 +12,8 @@ from safe_eth.safe.api import TransactionServiceApi
 from safe_eth.safe.safe_tx import SafeTx
 from web3 import Web3
 
-from .encoder import encode_submit_reports
 from ..settings import OracleSettings
+from .encoder import encode_submit_reports
 from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
@@ -150,12 +149,8 @@ async def send_to_safe(
         safe_tx_gas=0,
         base_gas=0,
         gas_price=0,
-        gas_token=Web3.to_checksum_address(
-            "0x0000000000000000000000000000000000000000"
-        ),
-        refund_receiver=Web3.to_checksum_address(
-            "0x0000000000000000000000000000000000000000"
-        ),
+        gas_token=Web3.to_checksum_address(ZERO_ADDRESS),
+        refund_receiver=Web3.to_checksum_address(ZERO_ADDRESS),
         safe_nonce=nonce,
         safe_version="1.3.0",
         chain_id=config.chain_id,
