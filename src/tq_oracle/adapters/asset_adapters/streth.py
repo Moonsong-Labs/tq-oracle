@@ -122,9 +122,13 @@ class StrETHAdapter(BaseAssetAdapter):
 
         cumulative_amounts: dict[str, int] = {}
         for call_result in call_results:
-            balances = list(
-                decode(["(address,int256,string,address)[]"], call_result)[0]
-            )
+            try:
+                balances = list(
+                    decode(["(address,int256,string,address)[]"], call_result)[0]
+                )
+            except Exception as exc:
+                logger.error("Failed to decode distributions from multicall: %s", exc)
+                raise ValueError("Invalid distributions data from multicall") from exc
             for asset, amount, _, _ in balances:
                 if amount != 0:
                     cumulative_amounts[asset] = (
@@ -170,5 +174,9 @@ class StrETHAdapter(BaseAssetAdapter):
                 block_identifier=self.block_number,
             )
         )[1]
-        subvaults = [decode(["address"], response)[0] for response in responses]
+        try:
+            subvaults = [decode(["address"], response)[0] for response in responses]
+        except Exception as exc:
+            logger.error("Failed to decode subvaultAt responses: %s", exc)
+            raise ValueError("Invalid subvault address data from multicall") from exc
         return await self._fetch_assets(subvaults)
