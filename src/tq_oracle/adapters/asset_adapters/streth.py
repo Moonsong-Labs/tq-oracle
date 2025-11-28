@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import random
 from typing import TYPE_CHECKING
@@ -11,10 +13,11 @@ from web3.exceptions import ProviderConnectionError
 
 from ...abi import load_core_vaults_collector_abi, load_multicall_abi, load_vault_abi
 from ...logger import get_logger
-from ...settings import Network
+from ...settings import Network, OracleSettings
 from .base import AssetData, BaseAssetAdapter
 
 if TYPE_CHECKING:
+    # Kept for type checkers that prefer local import inference.
     from ...settings import OracleSettings
 
 logger = get_logger(__name__)
