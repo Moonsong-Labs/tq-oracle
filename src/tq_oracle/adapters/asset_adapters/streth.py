@@ -44,6 +44,10 @@ class StrETHAdapter(BaseAssetAdapter):
             return
 
         self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc_required))
+        if not self.w3.is_connected():
+            raise ConnectionError(
+                f"Failed to connect to RPC: {config.vault_rpc_required}"
+            )
         self.block_number = config.block_number_required
 
         self.vault_address = Web3.to_checksum_address(config.vault_address_required)
