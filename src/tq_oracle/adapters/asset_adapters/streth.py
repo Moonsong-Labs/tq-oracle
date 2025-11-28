@@ -10,6 +10,7 @@ import random
 from web3.exceptions import ProviderConnectionError
 from ...logger import get_logger
 from ...abi import load_multicall_abi, load_vault_abi, load_core_vaults_collector_abi
+from ...settings import Network
 from .base import AssetData, BaseAssetAdapter
 from eth_abi.abi import decode, encode
 
@@ -33,6 +34,14 @@ class StrETHAdapter(BaseAssetAdapter):
             config: Oracle configuration
         """
         super().__init__(config)
+
+        self._skip = config.network != Network.MAINNET
+        if self._skip:
+            logger.info(
+                "Skipping strETH adapter: network=%s (mainnet only)",
+                config.network.value,
+            )
+            return
 
         self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc_required))
         self.block_number = config.block_number_required
@@ -128,6 +137,8 @@ class StrETHAdapter(BaseAssetAdapter):
         return result
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
+        if self._skip:
+            return []
         return await self._fetch_assets([subvault_address])
 
     async def fetch_all_assets(self) -> list[AssetData]:
@@ -136,6 +147,8 @@ class StrETHAdapter(BaseAssetAdapter):
         Returns:
             List of AssetData objects containing asset addresses and balances
         """
+        if self._skip:
+            return []
         vault_contract: Contract = self.w3.eth.contract(
             address=self.vault_address, abi=load_vault_abi()
         )

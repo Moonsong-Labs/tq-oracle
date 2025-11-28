@@ -27,7 +27,7 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-from .constants import NetworkAssets
+from .constants import NetworkAssets, StrEthAddresses
 
 load_dotenv()
 
@@ -356,30 +356,34 @@ class OracleSettings(BaseSettings):
 
         return network_assets_map[self.network]
 
+    def _resolve_streth_addresses(self) -> StrEthAddresses:
+        """Return strETH addresses; only mainnet is supported."""
+
+        if self.network is not Network.MAINNET:
+            raise ValueError("strETH adapter is only supported on mainnet")
+
+        from .constants import STRETH_MAINNET_ADDRESSES
+
+        return STRETH_MAINNET_ADDRESSES
+
     @property
     def streth(self) -> str:
-        from .constants import STRETH
-
-        return STRETH
+        return self._resolve_streth_addresses()["streth"]
 
     @property
     def core_vaults_collector(self) -> str:
-        from .constants import CORE_VAULTS_COLLECTOR
-
-        return CORE_VAULTS_COLLECTOR
+        return self._resolve_streth_addresses()["core_vaults_collector"]
 
     @property
     def streth_redemption_asset(self) -> str:
-        from .constants import ETH_MAINNET_ASSETS
-
-        redemption_asset = ETH_MAINNET_ASSETS["WSTETH"]
+        redemption_asset = self.assets.get("WSTETH")
         if redemption_asset is None:
-            raise ValueError("WstETH deployment not found")
+            raise ValueError(
+                "WSTETH deployment not configured for this network; required for strETH redemption"
+            )
 
         return redemption_asset
 
     @property
     def multicall(self) -> str:
-        from .constants import MULTICALL_ADDRESS
-
-        return MULTICALL_ADDRESS
+        return self._resolve_streth_addresses()["multicall"]

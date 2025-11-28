@@ -20,9 +20,23 @@ class StakewiseAddresses(TypedDict):
     vault: str
 
 
-STRETH = "0x277C6A642564A91ff78b008022D65683cEE5CCC5"
-MULTICALL_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11"
-CORE_VAULTS_COLLECTOR = "0x551233202dcC8761123c0489c3D59ef602f6BEC6"
+class StrEthAddresses(TypedDict):
+    """strETH-related contract addresses per network."""
+
+    streth: str
+    core_vaults_collector: str
+    multicall: str
+
+
+STRETH_MAINNET_ADDRESSES: StrEthAddresses = {
+    "streth": "0x277C6A642564A91ff78b008022D65683cEE5CCC5",
+    "core_vaults_collector": "0x551233202dcC8761123c0489c3D59ef602f6BEC6",
+    "multicall": "0xcA11bde05977b3631167028862bE2a173976CA11",
+}
+
+STRETH_ADDRESSES: dict[str, StrEthAddresses] = {
+    "mainnet": STRETH_MAINNET_ADDRESSES,
+}
 
 ETH_ASSET = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 
