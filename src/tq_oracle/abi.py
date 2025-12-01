@@ -14,6 +14,8 @@ from tq_oracle.settings import OracleSettings
 
 ABIS_DIR = Path(__file__).parent / "abis"
 
+CORE_VAULTS_COLLECTOR_PATH = ABIS_DIR / "CoreVaultsCollector.json"
+MULTICALL_ABI_PATH = ABIS_DIR / "Multicall.json"
 ORACLE_ABI_PATH = ABIS_DIR / "IOracle.json"
 ORACLE_HELPER_ABI_PATH = ABIS_DIR / "OracleHelper.json"
 VAULT_ABI_PATH = ABIS_DIR / "Vault.json"
@@ -45,6 +47,15 @@ def load_abi(path: str | Path) -> list[dict]:
     with p.open() as f:
         data = json.load(f)
     return data["abi"]
+
+
+def load_core_vaults_collector_abi() -> list[dict]:
+    return load_abi(CORE_VAULTS_COLLECTOR_PATH)
+
+
+def load_multicall_abi() -> list[dict]:
+    """Load the Multicall ABI."""
+    return load_abi(MULTICALL_ABI_PATH)
 
 
 def load_oracle_abi() -> list[dict]:

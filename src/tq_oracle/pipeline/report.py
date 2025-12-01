@@ -24,6 +24,7 @@ async def build_report(ctx: PipelineContext) -> None:
     report = await generate_report(
         state.settings.vault_address_required,
         ctx.price_data_required.base_asset,
+        ctx.total_assets_required,
         aggregated,
         final_prices,
     )
