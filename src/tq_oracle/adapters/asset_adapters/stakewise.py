@@ -226,7 +226,7 @@ class StakeWiseAdapter(BaseAssetAdapter):
     async def fetch_all_assets(self) -> list[AssetData]:
         """Fetch StakeWise positions for all subvaults plus extra addresses."""
 
-        subvault_addresses = fetch_subvault_addresses(self.config)
+        subvault_addresses = await fetch_subvault_addresses(self.config)
         addresses_to_scan = [self.config.vault_address_required] + subvault_addresses
 
         seen = {addr.lower() for addr in addresses_to_scan}

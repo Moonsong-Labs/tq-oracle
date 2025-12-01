@@ -92,7 +92,7 @@ async def collect_assets(ctx: PipelineContext) -> None:
     log = ctx.state.logger
 
     log.info("Discovering subvaults from vault contract...")
-    subvault_addresses = await asyncio.to_thread(fetch_subvault_addresses, s)
+    subvault_addresses = await fetch_subvault_addresses(s)
     log.info("Found %d subvaults", len(subvault_addresses))
 
     subvault_config_map = {

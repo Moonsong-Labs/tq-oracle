@@ -291,7 +291,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
 
     async def _fetch_subvault_addresses(self) -> list[str]:
         """Get the subvault addresses for the given vault."""
-        return await asyncio.to_thread(fetch_subvault_addresses, self.config)
+        return await fetch_subvault_addresses(self.config)
 
     async def _fetch_supported_assets(self) -> list[str]:
         """Get the supported assets for the given vault."""

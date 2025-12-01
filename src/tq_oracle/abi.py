@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import cast
+
+import asyncio
+
 import json
 from pathlib import Path
 
@@ -127,7 +131,7 @@ def get_oracle_address_from_vault(settings: OracleSettings) -> ChecksumAddress:
         raise ValueError(f"Failed to fetch oracle address from vault: {e}") from e
 
 
-def fetch_subvault_addresses(settings: OracleSettings) -> list[str]:
+async def fetch_subvault_addresses(settings: OracleSettings) -> list[str]:
     """Fetch all subvault addresses from the vault contract.
 
     Args:
@@ -153,13 +157,20 @@ def fetch_subvault_addresses(settings: OracleSettings) -> list[str]:
     vault_contract = w3.eth.contract(address=checksum_vault, abi=vault_abi)
 
     try:
-        count: int = vault_contract.functions.subvaults().call(
-            block_identifier=block_number
+        count: int = await asyncio.to_thread(
+            vault_contract.functions.subvaults().call,
+            block_identifier=block_number,
         )
-        subvaults: list[str] = [
-            vault_contract.functions.subvaultAt(i).call(block_identifier=block_number)
-            for i in range(count)
-        ]
-        return subvaults
+        subvaults = await asyncio.gather(
+            *[
+                asyncio.to_thread(
+                    vault_contract.functions.subvaultAt(i).call,
+                    block_identifier=block_number,
+                )
+                for i in range(count)
+            ]
+        )
+
+        return cast(list[str], subvaults)
     except Exception as e:
         raise ValueError(f"Failed to fetch subvault addresses from vault: {e}") from e
