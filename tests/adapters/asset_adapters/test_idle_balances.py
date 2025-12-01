@@ -154,11 +154,11 @@ async def test_fetch_assets_marks_extra_tokens_tvl_only(config, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_default_additional_tokens_not_tvl_only(config, monkeypatch):
+async def test_default_additional_tokens_tvl_only(config, monkeypatch):
     # osETH comes from DEFAULT_ADDITIONAL_ASSETS for mainnet
     adapter = IdleBalancesAdapter(config)
 
-    default_token = adapter._default_additional_assets[0]
+    default_additional_token = adapter._default_additional_assets[0]
     base_token = adapter.eth_address
 
     async def fake_fetch_supported_assets():
@@ -173,7 +173,7 @@ async def test_default_additional_tokens_not_tvl_only(config, monkeypatch):
     assets = await adapter.fetch_assets("0xSubvault")
 
     report_flags = {asset.asset_address: asset.tvl_only for asset in assets}
-    assert report_flags[default_token] is True
+    assert report_flags[default_additional_token] is True
     assert report_flags[base_token] is False
 
 

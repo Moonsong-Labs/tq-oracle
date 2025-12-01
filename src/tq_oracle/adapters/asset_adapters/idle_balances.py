@@ -77,7 +77,7 @@ class IdleBalancesAdapter(BaseAssetAdapter):
             *self._default_additional_assets,
             *self._extra_additional_assets,
         ]
-        # Only user-specified extra tokens are tvl_only to avoid conflicts with other adapters
+        # Additional tokens (defaults + extras) are marked tvl_only to avoid conflicts with other adapters
         self._additional_asset_lookup: set[str] = {
             addr.lower() for addr in self._additional_assets
         }
