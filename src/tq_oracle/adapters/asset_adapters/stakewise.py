@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, cast
 
 import backoff
-from eth.constants import ZERO_ADDRESS
 from web3 import Web3
 from web3.contract import Contract
 from web3.contract.contract import ContractEvent
