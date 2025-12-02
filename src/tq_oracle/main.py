@@ -128,6 +128,13 @@ def report(
             help="Override logging verbosity (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL).",
         ),
     ] = None,
+    global_timeout_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--global-timeout-seconds",
+            help="Maximum seconds allowed for the entire pipeline (set 0 to disable).",
+        ),
+    ] = None,
     show_config: Annotated[
         bool,
         typer.Option(
@@ -144,7 +151,7 @@ def report(
     if config_path:
         os.environ["TQ_ORACLE_CONFIG"] = str(config_path)
 
-    init_kwargs: dict[str, Network | bool | int | str] = {}
+    init_kwargs: dict[str, Network | bool | int | float | str] = {}
     if network is not None:
         init_kwargs["network"] = network
     if block_number is not None:
@@ -161,6 +168,8 @@ def report(
         init_kwargs["ignore_active_proposal_check"] = ignore_active_proposal_check
     if log_level is not None:
         init_kwargs["log_level"] = log_level.upper()
+    if global_timeout_seconds is not None:
+        init_kwargs["global_timeout_seconds"] = global_timeout_seconds
 
     settings = OracleSettings(**init_kwargs)
 
