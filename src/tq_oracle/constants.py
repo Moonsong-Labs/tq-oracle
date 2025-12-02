@@ -1,6 +1,6 @@
 """Blockchain contract address constants."""
 
-from typing import Optional, TypedDict
+from typing import Optional, TypedDict, cast
 
 
 class NetworkAssets(TypedDict):
@@ -10,12 +10,14 @@ class NetworkAssets(TypedDict):
     ETH: Optional[str]
     WETH: Optional[str]
     WSTETH: Optional[str]
+    OSETH: Optional[str]
 
 
 class StakewiseAddresses(TypedDict):
     """Hard-coded StakeWise contract addresses per network."""
 
     os_token: str
+    os_token_vault_controller: str
     os_token_vault_escrow: str
     vault: str
 
@@ -33,6 +35,7 @@ ETH_MAINNET_ASSETS: NetworkAssets = {
     "ETH": ETH_ASSET,
     "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     "WSTETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+    "OSETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
 }
 
 SEPOLIA_ASSETS: NetworkAssets = {
@@ -42,6 +45,7 @@ SEPOLIA_ASSETS: NetworkAssets = {
     "ETH": ETH_ASSET,
     "WETH": "0xf531B8F309Be94191af87605CfBf600D71C2cFe0",
     "WSTETH": None,
+    "OSETH": None,
 }
 
 BASE_ASSETS: NetworkAssets = {
@@ -51,6 +55,7 @@ BASE_ASSETS: NetworkAssets = {
     "ETH": ETH_ASSET,
     "WETH": "0x4200000000000000000000000000000000000006",
     "WSTETH": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
+    "OSETH": None,
 }
 
 # Hardcoded overrides, if required
@@ -67,12 +72,22 @@ BASE_ORACLE_HELPER = "0x9bB327889402AC19BF2D164eA79CcfE46c16a37B"
 
 STAKEWISE_MAINNET_ADDRESSES: StakewiseAddresses = {
     "os_token": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
+    "os_token_vault_controller": "0x2A261e60FB14586B474C208b1B7AC6D0f5000306",
     "os_token_vault_escrow": "0x09e84205DF7c68907e619D07aFD90143c5763605",
     "vault": "0xe6D8d8Ac54461b1c5ed15740eeE322043F696C08",
 }
 
 STAKEWISE_ADDRESSES: dict[str, StakewiseAddresses] = {
     "mainnet": STAKEWISE_MAINNET_ADDRESSES,
+}
+
+DEFAULT_ADDITIONAL_ASSETS: dict[str, dict[str, str]] = {
+    "mainnet": {
+        "osETH": STAKEWISE_MAINNET_ADDRESSES["os_token"],
+    },
+    "base": {
+        "USDC": cast(str, BASE_ASSETS["USDC"]),
+    },
 }
 
 
