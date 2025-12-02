@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tq_oracle.constants import STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
+
 import os
 from enum import Enum
 from pathlib import Path
@@ -51,7 +53,10 @@ class StakewiseAdapterSettings(BaseModel):
     """Configuration options for StakeWise adapter defaults."""
 
     stakewise_vault_addresses: list[str] = Field(default_factory=list)
-    stakewise_exit_queue_start_block: int | None = None
+    stakewise_exit_queue_start_block: int = 0
+    stakewise_exit_max_lookback_blocks: int = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
+    extra_addresses: list[str] = Field(default_factory=list)
+    skip_exit_queue_scan: bool = False
 
     model_config = ConfigDict(extra="ignore")
 
@@ -78,6 +83,7 @@ class OracleSettings(BaseSettings):
 
     # --- global toggles ---
     dry_run: bool = True
+    additional_asset_support: bool = True
 
     # --- core addresses / endpoints ---
     vault_address: str | None = None
@@ -133,10 +139,6 @@ class OracleSettings(BaseSettings):
     # --- adapters (from config file only) ---
     subvault_adapters: list[dict[str, Any]] = []
     adapters: AdapterSettings = Field(default_factory=AdapterSettings)
-
-    # --- stakewise shared addresses ---
-    stakewise_os_token_address: str | None = None
-    stakewise_os_token_vault_escrow: str | None = None
 
     # --- runtime computed values ---
     using_default_rpc: bool = False
