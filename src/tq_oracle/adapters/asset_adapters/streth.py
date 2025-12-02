@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from typing import TYPE_CHECKING
 
+import backoff
+from eth.constants import ZERO_ADDRESS
+from eth_abi.abi import decode, encode
 from web3 import Web3
 from web3.eth import Contract
-import backoff
-import random
 from web3.exceptions import ProviderConnectionError
+
+from ...abi import load_core_vaults_collector_abi, load_multicall_abi, load_vault_abi
 from ...logger import get_logger
-from ...abi import load_multicall_abi, load_vault_abi, load_core_vaults_collector_abi
+from ...settings import Network, OracleSettings
 from .base import AssetData, BaseAssetAdapter
-from eth_abi.abi import decode, encode
 
 if TYPE_CHECKING:
+    # Kept for type checkers that prefer local import inference.
     from ...settings import OracleSettings
 
 logger = get_logger(__name__)
@@ -34,7 +38,19 @@ class StrETHAdapter(BaseAssetAdapter):
         """
         super().__init__(config)
 
+        self._skip = config.network != Network.MAINNET
+        if self._skip:
+            logger.info(
+                "Skipping strETH adapter: network=%s (mainnet only)",
+                config.network.value,
+            )
+            return
+
         self.w3 = Web3(Web3.HTTPProvider(config.vault_rpc_required))
+        if not self.w3.is_connected():
+            raise ConnectionError(
+                f"Failed to connect to RPC: {config.vault_rpc_required}"
+            )
         self.block_number = config.block_number_required
 
         self.vault_address = Web3.to_checksum_address(config.vault_address_required)
@@ -113,9 +129,13 @@ class StrETHAdapter(BaseAssetAdapter):
 
         cumulative_amounts: dict[str, int] = {}
         for call_result in call_results:
-            balances = list(
-                decode(["(address,int256,string,address)[]"], call_result)[0]
-            )
+            try:
+                balances = list(
+                    decode(["(address,int256,string,address)[]"], call_result)[0]
+                )
+            except Exception as exc:
+                logger.error("Failed to decode distributions from multicall: %s", exc)
+                raise ValueError("Invalid distributions data from multicall") from exc
             for asset, amount, _, _ in balances:
                 if amount != 0:
                     cumulative_amounts[asset] = (
@@ -124,10 +144,15 @@ class StrETHAdapter(BaseAssetAdapter):
 
         result: list[AssetData] = []
         for asset, amount in cumulative_amounts.items():
-            result.append(AssetData(Web3.to_checksum_address(asset), amount))
+            checksum = Web3.to_checksum_address(asset)
+            if checksum == ZERO_ADDRESS:
+                raise ValueError("Received zero asset address in strETH distributions")
+            result.append(AssetData(checksum, amount))
         return result
 
     async def fetch_assets(self, subvault_address: str) -> list[AssetData]:
+        if self._skip:
+            return []
         return await self._fetch_assets([subvault_address])
 
     async def fetch_all_assets(self) -> list[AssetData]:
@@ -136,6 +161,8 @@ class StrETHAdapter(BaseAssetAdapter):
         Returns:
             List of AssetData objects containing asset addresses and balances
         """
+        if self._skip:
+            return []
         vault_contract: Contract = self.w3.eth.contract(
             address=self.vault_address, abi=load_vault_abi()
         )
@@ -157,5 +184,9 @@ class StrETHAdapter(BaseAssetAdapter):
                 block_identifier=self.block_number,
             )
         )[1]
-        subvaults = [decode(["address"], response)[0] for response in responses]
+        try:
+            subvaults = [decode(["address"], response)[0] for response in responses]
+        except Exception as exc:
+            logger.error("Failed to decode subvaultAt responses: %s", exc)
+            raise ValueError("Invalid subvault address data from multicall") from exc
         return await self._fetch_assets(subvaults)
