@@ -1,50 +1,16 @@
 """Asset collection from various adapters."""
 
-from __future__ import annotations
-
 import asyncio
 from typing import Any
 
-from web3 import Web3
-
-from ..abi import load_vault_abi
+from ..abi import fetch_subvault_addresses
 from ..adapters.asset_adapters import get_adapter_class
 from ..adapters.asset_adapters.base import AssetData
 from ..adapters.asset_adapters.idle_balances import IdleBalancesAdapter
+from ..adapters.asset_adapters.stakewise import StakeWiseAdapter
+from ..adapters.asset_adapters.streth import StrETHAdapter
 from ..processors import compute_total_aggregated_assets
-from ..state import AppState
 from .context import PipelineContext
-
-
-async def _fetch_subvault_addresses(state: AppState) -> list[str]:
-    """Discover all subvault addresses from the vault contract.
-
-    Args:
-        state: Application state containing settings
-
-    Returns:
-        List of subvault addresses
-    """
-    s = state.settings
-    log = state.logger
-
-    w3 = Web3(Web3.HTTPProvider(s.vault_rpc_required))
-    vault_abi = load_vault_abi()
-    vault_address = w3.to_checksum_address(s.vault_address_required)
-    contract = w3.eth.contract(address=vault_address, abi=vault_abi)
-
-    count = await asyncio.to_thread(contract.functions.subvaults().call)
-    log.debug("Vault has %d subvaults", count)
-
-    # Fetch all subvault addresses in parallel to avoid thread pool exhaustion
-    subvault_addresses = await asyncio.gather(
-        *[
-            asyncio.to_thread(contract.functions.subvaultAt(i).call)
-            for i in range(count)
-        ]
-    )
-
-    return list(subvault_addresses)
 
 
 def _sanitize_adapter_kwargs(values: dict[str, Any]) -> dict[str, Any]:
@@ -70,21 +36,29 @@ def _process_adapter_results(
         results: Results from asyncio.gather (may contain exceptions)
         asset_data: List to append successful asset results to
         log: Logger instance
+
+    Raises:
+        ValueError: If any adapter failed
     """
+    failures: list[tuple[str, BaseException]] = []
+
     for task_info, result in zip(tasks_info, results):
         if isinstance(result, BaseException):
             e = result
             if len(task_info) == 2:  # (name, _)
                 name = task_info[0]
                 log.error("Adapter '%s' failed: %s", name, e)
+                failures.append((name, e))
             elif len(task_info) == 3:  # (subvault_addr, adapter, name)
                 subvault_addr, _, name = task_info
+                identifier = f"{name} (subvault {subvault_addr})"
                 log.error(
                     "Adapter '%s' failed for subvault %s: %s",
                     name,
                     subvault_addr,
                     e,
                 )
+                failures.append((identifier, e))
         elif isinstance(result, list):
             assets = result
             if len(task_info) == 2:  # (name, _)
@@ -100,6 +74,12 @@ def _process_adapter_results(
                 )
             asset_data.append(assets)
 
+    if failures:
+        failure_list = ", ".join(name for name, _ in failures)
+        raise ValueError(
+            f"Failed to collect assets from {len(failures)} adapter(s): {failure_list}"
+        )
+
 
 async def collect_assets(ctx: PipelineContext) -> None:
     """Collect assets from all configured adapters.
@@ -113,12 +93,26 @@ async def collect_assets(ctx: PipelineContext) -> None:
     log = ctx.state.logger
 
     log.info("Discovering subvaults from vault contract...")
-    subvault_addresses = await _fetch_subvault_addresses(ctx.state)
+    subvault_addresses = await fetch_subvault_addresses(s)
     log.info("Found %d subvaults", len(subvault_addresses))
 
     subvault_config_map = {
         cfg["subvault_address"].lower(): cfg for cfg in s.subvault_adapters
     }
+
+    dangerous_configs = [
+        cfg
+        for cfg in s.subvault_adapters
+        if cfg.get("skip_subvault_existence_check", False)
+    ]
+    if dangerous_configs and not s.allow_dangerous:
+        addresses = [cfg["subvault_address"] for cfg in dangerous_configs]
+        raise ValueError(
+            f"Configuration uses 'skip_subvault_existence_check' for subvault(s): "
+            f"{', '.join(addresses)}. This is a dangerous operation that bypasses "
+            f"subvault existence validation. You must explicitly allow this by "
+            f"passing the --allow-dangerous CLI flag."
+        )
 
     # Validate subvault_adapters config references existing subvaults
     if s.subvault_adapters:
@@ -174,7 +168,32 @@ async def collect_assets(ctx: PipelineContext) -> None:
         )
         log.debug("Added default idle_balances adapter (all subvaults)")
 
-    # 2. Add additional adapters per subvault
+    # 2. Add default stakewise adapter (runs against all subvaults + extra_addresses)
+    stakewise_config = s.adapters.stakewise
+    if stakewise_config.stakewise_vault_addresses:
+        stakewise_adapter = StakeWiseAdapter(s)
+        asset_fetch_tasks.append(
+            ("stakewise_all_subvaults", stakewise_adapter.fetch_all_assets())
+        )
+        log.debug(
+            "Added default stakewise adapter (all subvaults + %d extra addresses)",
+            len(stakewise_config.extra_addresses),
+        )
+
+    # 3. Add additional adapters per subvault
+    should_run_streth = any(
+        not get_subvault_config(addr).get("skip_streth", False)
+        for addr in subvault_addresses
+    )
+
+    if should_run_streth:
+        streth_adapter = StrETHAdapter(s)
+        asset_fetch_tasks.append(
+            ("streth_vault_chain", streth_adapter.fetch_all_assets())
+        )
+        log.debug("Added default vault_chain strETH adapter")
+
+    # 4. Add additional adapters per subvault
     def create_adapter_task(
         subvault_addr: str, adapter_name: str
     ) -> tuple[str, Any, str] | None:

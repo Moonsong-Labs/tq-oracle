@@ -64,7 +64,7 @@ async def run_preflight(ctx: PipelineContext) -> None:
     )
     async def _run_pre_checks_with_retry() -> None:
         """Run pre-checks with automatic retry on retriable errors."""
-        await run_pre_checks(s, ctx.vault_address)
+        await run_pre_checks(s)
 
     await _run_pre_checks_with_retry()
     log.info("Pre-checks passed successfully")

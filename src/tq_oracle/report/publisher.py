@@ -5,6 +5,7 @@ import json
 import logging
 
 import requests
+from eth.constants import ZERO_ADDRESS
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from eth_typing import URI
@@ -13,8 +14,8 @@ from safe_eth.safe.api import TransactionServiceApi
 from safe_eth.safe.safe_tx import SafeTx
 from web3 import Web3
 
-from .encoder import encode_submit_reports
 from ..settings import OracleSettings
+from .encoder import encode_submit_reports
 from .generator import OracleReport
 
 logger = logging.getLogger(__name__)
@@ -107,13 +108,17 @@ async def send_to_safe(
         if config.safe_txn_srvc_api_key
         else None
     )
-    tx_service = TransactionServiceApi(network, ethereum_client, api_key=api_key)
+    tx_service = TransactionServiceApi(
+        network, ethereum_client, api_key=api_key, request_timeout=10
+    )
 
     safe_checksum = Web3.to_checksum_address(config.safe_address)
 
     safe_api_url = f"{tx_service.base_url}/api/v1/safes/{safe_checksum}/"
     logger.debug("Fetching Safe info from: %s", safe_api_url)
-    safe_info_response = await asyncio.to_thread(requests.get, safe_api_url)
+    safe_info_response = await asyncio.to_thread(
+        requests.get, safe_api_url, timeout=10.0
+    )
     safe_info_response.raise_for_status()
     safe_info_data = safe_info_response.json()
     nonce = int(safe_info_data.get("nonce", 0))
@@ -146,12 +151,8 @@ async def send_to_safe(
         safe_tx_gas=0,
         base_gas=0,
         gas_price=0,
-        gas_token=Web3.to_checksum_address(
-            "0x0000000000000000000000000000000000000000"
-        ),
-        refund_receiver=Web3.to_checksum_address(
-            "0x0000000000000000000000000000000000000000"
-        ),
+        gas_token=Web3.to_checksum_address(ZERO_ADDRESS),
+        refund_receiver=Web3.to_checksum_address(ZERO_ADDRESS),
         safe_nonce=nonce,
         safe_version="1.3.0",
         chain_id=config.chain_id,

@@ -43,7 +43,7 @@ async def test_no_errors_when_all_checks_pass(mock_adapters, config):
     ]
 
     # Should not raise
-    await run_pre_checks(config, "0xVAULT")
+    await run_pre_checks(config)
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_raises_when_check_fails(mock_adapters, config):
     mock_adapters.__iter__.return_value = [lambda config: mock_adapter]
 
     with pytest.raises(PreCheckError, match="Pre-checks failed"):
-        await run_pre_checks(config, "0xVAULT")
+        await run_pre_checks(config)
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_includes_failure_message_in_error(mock_adapters, config):
     mock_adapters.__iter__.return_value = [lambda config: mock_adapter]
 
     with pytest.raises(PreCheckError, match="already published"):
-        await run_pre_checks(config, "0xVAULT")
+        await run_pre_checks(config)
 
 
 @pytest.mark.asyncio
@@ -97,4 +97,4 @@ async def test_handles_adapter_exception(mock_adapters, config):
     mock_adapters.__iter__.return_value = [lambda config: mock_adapter]
 
     with pytest.raises(PreCheckError, match="Pre-checks failed"):
-        await run_pre_checks(config, "0xVAULT")
+        await run_pre_checks(config)

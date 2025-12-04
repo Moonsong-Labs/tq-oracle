@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tq_oracle.constants import STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
+
 import os
 from enum import Enum
 from pathlib import Path
@@ -27,7 +29,7 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-from .constants import NetworkAssets
+from .constants import NetworkAssets, StrEthAddresses
 
 load_dotenv()
 
@@ -51,7 +53,10 @@ class StakewiseAdapterSettings(BaseModel):
     """Configuration options for StakeWise adapter defaults."""
 
     stakewise_vault_addresses: list[str] = Field(default_factory=list)
-    stakewise_exit_queue_start_block: int | None = None
+    stakewise_exit_queue_start_block: int = 0
+    stakewise_exit_max_lookback_blocks: int = STAKEWISE_EXIT_MAX_LOOKBACK_BLOCKS
+    extra_addresses: list[str] = Field(default_factory=list)
+    skip_exit_queue_scan: bool = False
 
     model_config = ConfigDict(extra="ignore")
 
@@ -78,6 +83,7 @@ class OracleSettings(BaseSettings):
 
     # --- global toggles ---
     dry_run: bool = True
+    additional_asset_support: bool = True
 
     # --- core addresses / endpoints ---
     vault_address: str | None = None
@@ -96,12 +102,23 @@ class OracleSettings(BaseSettings):
     ignore_empty_vault: bool = False
     ignore_timeout_check: bool = False
     ignore_active_proposal_check: bool = False
+    allow_dangerous: bool = False
     pre_check_retries: int = 3
     pre_check_timeout: float = 12.0
 
     # --- price validation ---
-    price_warning_tolerance_percentage: float = 0.5
-    price_failure_tolerance_percentage: float = 1.0
+    price_warning_tolerance_percentage: float = Field(
+        default=0.5,
+        gt=0,
+        lt=100.0,
+        description="Price deviation warning threshold (%). Must be positive and less than failure threshold.",
+    )
+    price_failure_tolerance_percentage: float = Field(
+        default=1.0,
+        gt=0,
+        lt=100.0,
+        description="Price deviation failure threshold (%). Must be positive and greater than warning threshold.",
+    )
 
     # Pyth-specific settings
     pyth_enabled: bool = True
@@ -123,10 +140,6 @@ class OracleSettings(BaseSettings):
     subvault_adapters: list[dict[str, Any]] = []
     adapters: AdapterSettings = Field(default_factory=AdapterSettings)
 
-    # --- stakewise shared addresses ---
-    stakewise_os_token_address: str | None = None
-    stakewise_os_token_vault_escrow: str | None = None
-
     # --- runtime computed values ---
     using_default_rpc: bool = False
     _chain_id: int | None = None
@@ -145,6 +158,19 @@ class OracleSettings(BaseSettings):
         if v is None or isinstance(v, SecretStr):
             return v
         return SecretStr(v)
+
+    @model_validator(mode="after")
+    def validate_price_tolerance_ordering(self) -> "OracleSettings":
+        """Validate that warning tolerance is less than failure tolerance."""
+        if (
+            self.price_warning_tolerance_percentage
+            >= self.price_failure_tolerance_percentage
+        ):
+            raise ValueError(
+                f"price_warning_tolerance_percentage ({self.price_warning_tolerance_percentage}) "
+                f"must be less than price_failure_tolerance_percentage ({self.price_failure_tolerance_percentage})"
+            )
+        return self
 
     @model_validator(mode="after")
     def set_derived_values(self) -> "OracleSettings":
@@ -309,9 +335,7 @@ class OracleSettings(BaseSettings):
                 )
             from .abi import get_oracle_address_from_vault
 
-            self._oracle_address = get_oracle_address_from_vault(
-                self.vault_address, self.vault_rpc
-            )
+            self._oracle_address = get_oracle_address_from_vault(self)
         return self._oracle_address
 
     @property
@@ -333,3 +357,35 @@ class OracleSettings(BaseSettings):
             raise ValueError(f"Unknown network: {self.network}")
 
         return network_assets_map[self.network]
+
+    def _resolve_streth_addresses(self) -> StrEthAddresses:
+        """Return strETH addresses; only mainnet is supported."""
+
+        if self.network is not Network.MAINNET:
+            raise ValueError("strETH adapter is only supported on mainnet")
+
+        from .constants import STRETH_MAINNET_ADDRESSES
+
+        return STRETH_MAINNET_ADDRESSES
+
+    @property
+    def streth(self) -> str:
+        return self._resolve_streth_addresses()["streth"]
+
+    @property
+    def core_vaults_collector(self) -> str:
+        return self._resolve_streth_addresses()["core_vaults_collector"]
+
+    @property
+    def streth_redemption_asset(self) -> str:
+        redemption_asset = self.assets.get("WSTETH")
+        if redemption_asset is None:
+            raise ValueError(
+                "WSTETH deployment not configured for this network; required for strETH redemption"
+            )
+
+        return redemption_asset
+
+    @property
+    def multicall(self) -> str:
+        return self._resolve_streth_addresses()["multicall"]
