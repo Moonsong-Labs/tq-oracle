@@ -140,8 +140,7 @@ sequenceDiagram
     participant FeeManager
     participant ShareManager
 
-    rect rgb(230, 245, 230)
-    Note over User,ShareManager: DEPOSIT FLOW
+    opt DEPOSIT FLOW
     User->>DepositQueue: deposit(assets)
     Note over DepositQueue: Request queued<br/>(time-delayed)
 
@@ -167,8 +166,7 @@ sequenceDiagram
     ShareManager-->>User: Vault shares
     end
 
-    rect rgb(245, 235, 230)
-    Note over User,ShareManager: REDEEM FLOW
+    opt REDEEM FLOW
     User->>RedeemQueue: redeem(shares)
     Note over RedeemQueue: Request queued<br/>(time-delayed)
 
