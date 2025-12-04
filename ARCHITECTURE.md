@@ -110,6 +110,107 @@ sequenceDiagram
     end
 ```
 
+### How Mellow Vaults Work
+
+Mellow flexible vaults are modular yield-bearing vaults where user deposits flow through a layered architecture:
+
+```mermaid
+flowchart TB
+    subgraph Vault
+        SM[ShareManager<br/>mint/burn]
+        FM[FeeManager<br/>perf/protocol fees]
+        RM[RiskManager<br/>TVL limits]
+        Q[Deposit/Redeem Queues<br/>batch requests, settle at oracle price]
+    end
+    Vault --> SV1[Subvault<br/>EigenLayer]
+    Vault --> SV2[Subvault<br/>Symbiotic]
+    Vault --> SV3[Subvault<br/>Aave]
+```
+
+**Deposit-to-share lifecycle:**
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant DepositQueue
+    participant RedeemQueue
+    participant TQOracle as TQ Oracle
+    participant Oracle
+    participant Vault
+    participant FeeManager
+    participant ShareManager
+
+    rect rgb(230, 245, 230)
+    Note over User,ShareManager: DEPOSIT FLOW
+    User->>DepositQueue: deposit(assets)
+    Note over DepositQueue: Request queued<br/>(time-delayed)
+
+    Note over TQOracle: Scheduled run...
+    TQOracle->>TQOracle: Aggregate balances<br/>(vault + subvaults + protocols)
+    TQOracle->>TQOracle: Price assets, compute TVL
+    TQOracle->>Oracle: submitReports(Report[])
+
+    Oracle->>Oracle: Validate deviation & cooldown
+    Oracle->>Vault: handleReport(asset, priceD18, timestamps)
+
+    Vault->>FeeManager: calculateFee(priceD18, totalShares)
+    FeeManager-->>Vault: feeShares
+    Vault->>ShareManager: mint(feeRecipient, feeShares)
+    Vault->>FeeManager: updateState(priceD18)
+
+    Vault->>DepositQueue: handleReport(priceD18, depositTimestamp)
+    DepositQueue->>DepositQueue: shares = assets × priceD18 / 1e18
+    Note over DepositQueue: Shares claimable
+
+    User->>DepositQueue: claim()
+    DepositQueue->>ShareManager: mint(user, shares)
+    ShareManager-->>User: Vault shares
+    end
+
+    rect rgb(245, 235, 230)
+    Note over User,ShareManager: REDEEM FLOW
+    User->>RedeemQueue: redeem(shares)
+    Note over RedeemQueue: Request queued<br/>(time-delayed)
+
+    Note over TQOracle: Scheduled run...
+    TQOracle->>Oracle: submitReports(Report[])
+    Oracle->>Vault: handleReport(asset, priceD18, timestamps)
+
+    Vault->>RedeemQueue: handleReport(priceD18, redeemTimestamp)
+    RedeemQueue->>RedeemQueue: assets = shares × 1e18 / priceD18
+    Note over RedeemQueue: Batch created
+
+    Vault->>Vault: handleBatches() [Curator]
+    Vault->>Vault: Pull liquidity from subvaults if needed
+    Vault->>RedeemQueue: Transfer assets for batch
+
+    User->>RedeemQueue: claim()
+    RedeemQueue->>ShareManager: burn(user, shares)
+    RedeemQueue-->>User: Assets
+    end
+```
+
+**Key components:**
+
+- **Vault**: Central coordinator that holds idle assets and delegates to subvaults.
+- **Subvaults**: Isolated contracts deploying assets to external protocols (EigenLayer, Symbiotic, etc.).
+- **ShareManager**: Controls share minting/burning with whitelist/blacklist permissions.
+- **FeeManager**: Calculates performance fees (on gains) and protocol fees (time-accrued).
+- **Queues**: Batch user deposit/redeem requests; settled atomically when oracle reports arrive.
+- **Oracle**: Validates price reports against deviation thresholds and enforces cooldown periods.
+
+**The oracle report lifecycle:**
+
+1. Users submit deposit/redeem requests to queues (time-delayed).
+2. TQ Oracle computes TVL by aggregating vault + subvault + external protocol balances.
+3. TQ Oracle submits `Report[]` via `Oracle.submitReports()` through a Safe multisig.
+4. Oracle contract validates price deviation and cooldown, then calls `Vault.handleReport()`.
+5. Vault mints fee shares, updates FeeManager state, and propagates price to queues.
+6. Queues convert pending deposits→shares and pending redemptions→assets at the reported price.
+7. Users claim their shares or redeemed assets.
+
+TQ Oracle is the off-chain price authority—it computes what the on-chain Oracle consumes. The on-chain Oracle enforces security invariants (max deviation, timeouts, suspicious-report flagging), but relies on TQ Oracle for accurate TVL calculation across all asset positions.
+
 ## Extension Points
 - **Asset adapters**: Implement `BaseAssetAdapter`, register in `ADAPTER_REGISTRY`, and wire via `subvault_adapters`.
 - **Price adapters**: Implement `BasePriceAdapter` and append to `PRICE_ADAPTERS` to join the pricing chain.
