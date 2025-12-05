@@ -13,11 +13,18 @@ async def test_generate_report_creates_correct_structure():
     aggregated = AggregatedAssets(assets={"0xA": 1000, "0xB": 2000})
     final_prices = FinalPrices(prices={"0xA": 10**18, "0xB": 2 * 10**18})
 
-    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
+    report = await generate_report(
+        vault_address,
+        base_asset,
+        5000,
+        aggregated,
+        final_prices,
+    )
 
     assert isinstance(report, OracleReport)
     assert report.vault_address == vault_address
     assert report.base_asset == base_asset
+    assert report.tvl_in_base_asset == 5000
     assert report.total_assets == {"0xA": 1000, "0xB": 2000}
     assert report.final_prices == {"0xA": 10**18, "0xB": 2 * 10**18}
 
@@ -30,10 +37,13 @@ async def test_generate_report_with_empty_data():
     aggregated = AggregatedAssets(assets={})
     final_prices = FinalPrices(prices={})
 
-    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
+    report = await generate_report(
+        vault_address, base_asset, 0, aggregated, final_prices
+    )
 
     assert report.vault_address == vault_address
     assert report.base_asset == base_asset
+    assert report.tvl_in_base_asset == 0
     assert report.total_assets == {}
     assert report.final_prices == {}
 
@@ -46,16 +56,20 @@ async def test_report_to_dict_includes_all_fields():
     aggregated = AggregatedAssets(assets={"0xA": 500})
     final_prices = FinalPrices(prices={"0xA": 10**18})
 
-    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
+    report = await generate_report(
+        vault_address, base_asset, 500, aggregated, final_prices
+    )
     report_dict = report.to_dict()
 
     assert isinstance(report_dict, dict)
     assert "vault_address" in report_dict
     assert "base_asset" in report_dict
+    assert "tvl_in_base_asset" in report_dict
     assert "total_assets" in report_dict
     assert "final_prices" in report_dict
     assert report_dict["vault_address"] == vault_address
     assert report_dict["base_asset"] == base_asset
+    assert report_dict["tvl_in_base_asset"] == 500
     assert report_dict["total_assets"] == {"0xA": 500}
     assert report_dict["final_prices"] == {"0xA": 10**18}
 
@@ -70,7 +84,13 @@ async def test_report_to_dict_serializable():
     aggregated = AggregatedAssets(assets={"0xUSDC": 123456})
     final_prices = FinalPrices(prices={"0xUSDC": 987654321})
 
-    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
+    report = await generate_report(
+        vault_address,
+        base_asset,
+        121932631137376,
+        aggregated,
+        final_prices,
+    )
     report_dict = report.to_dict()
 
     json_str = json.dumps(report_dict)
@@ -78,6 +98,7 @@ async def test_report_to_dict_serializable():
 
     deserialized = json.loads(json_str)
     assert deserialized["vault_address"] == vault_address
+    assert deserialized["tvl_in_base_asset"] == 121932631137376
     assert deserialized["total_assets"]["0xUSDC"] == 123456
 
 
@@ -103,7 +124,16 @@ async def test_multiple_assets_and_prices_in_report():
         }
     )
 
-    report = await generate_report(vault_address, base_asset, aggregated, final_prices)
+    report = await generate_report(
+        vault_address,
+        base_asset,
+        (10000 * 10**18 // 10**18)
+        + (5 * 2000 * 10**18 // 10**18)
+        + (1 * 40000 * 10**18 // 10**18)
+        + (8000 * 10**18 // 10**18),
+        aggregated,
+        final_prices,
+    )
 
     assert len(report.total_assets) == 4
     assert len(report.final_prices) == 4

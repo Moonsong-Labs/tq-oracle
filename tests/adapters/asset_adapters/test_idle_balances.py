@@ -52,6 +52,7 @@ async def test_fetch_supported_assets_integration(config):
         "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         "0xdAC17F958D2ee523a2206206994597C13D831ec7",
         "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
+        "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
     ]
 
     assert len(supported_assets) == len(expected_assets)
@@ -111,7 +112,7 @@ async def test_fetch_eth_balance_integration(config):
 
 def test_merge_supported_assets_includes_configured_tokens(config):
     config.adapters.idle_balances.extra_tokens = {
-        "osETH": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
+        "TEST": "0x00000000000000000000000000000000000000AA"
     }
     adapter = IdleBalancesAdapter(config)
 
@@ -122,7 +123,7 @@ def test_merge_supported_assets_includes_configured_tokens(config):
 
     assert merged[0] == base_asset
     assert any(
-        addr.lower() == "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38" for addr in merged
+        addr.lower() == "0x00000000000000000000000000000000000000aa" for addr in merged
     )
 
 
@@ -137,7 +138,7 @@ async def test_fetch_assets_marks_extra_tokens_tvl_only(config, monkeypatch):
     base_token = adapter.eth_address
 
     async def fake_fetch_supported_assets():
-        return [base_token, extra_token]
+        return adapter._merge_supported_assets([base_token])
 
     async def fake_fetch_asset_balance(_w3, _subvault, asset_address, tvl_only=False):
         return AssetData(asset_address=asset_address, amount=1, tvl_only=tvl_only)
@@ -149,6 +150,30 @@ async def test_fetch_assets_marks_extra_tokens_tvl_only(config, monkeypatch):
 
     report_flags = {asset.asset_address: asset.tvl_only for asset in assets}
     assert report_flags[extra_token] is True
+    assert report_flags[base_token] is False
+
+
+@pytest.mark.asyncio
+async def test_default_additional_tokens_not_tvl_only(config, monkeypatch):
+    # osETH comes from DEFAULT_ADDITIONAL_ASSETS for mainnet
+    adapter = IdleBalancesAdapter(config)
+
+    default_token = adapter._default_additional_assets[0]
+    base_token = adapter.eth_address
+
+    async def fake_fetch_supported_assets():
+        return adapter._merge_supported_assets([base_token])
+
+    async def fake_fetch_asset_balance(_w3, _subvault, asset_address, tvl_only=False):
+        return AssetData(asset_address=asset_address, amount=1, tvl_only=tvl_only)
+
+    monkeypatch.setattr(adapter, "_fetch_supported_assets", fake_fetch_supported_assets)
+    monkeypatch.setattr(adapter, "_fetch_asset_balance", fake_fetch_asset_balance)
+
+    assets = await adapter.fetch_assets("0xSubvault")
+
+    report_flags = {asset.asset_address: asset.tvl_only for asset in assets}
+    assert report_flags[default_token] is True
     assert report_flags[base_token] is False
 
 
@@ -187,3 +212,59 @@ async def test_fetch_all_assets_includes_extra_addresses(config, monkeypatch):
         adapter.w3.to_checksum_address(extra_address),
     }
     assert set(recorded) == expected
+
+
+@pytest.mark.asyncio
+async def test_fetch_all_assets_logs_error_on_vault_failure(
+    config, monkeypatch, caplog
+):
+    adapter = IdleBalancesAdapter(config)
+
+    subvault_addr = "0x00000000000000000000000000000000000000AA"
+    failed_vault_addr = "0x00000000000000000000000000000000000000BB"
+
+    async def fake_fetch_subvault_addresses():
+        return [subvault_addr, failed_vault_addr]
+
+    async def fake_fetch_supported_assets():
+        return ["0xToken"]
+
+    async def fake_fetch_assets(address, *, supported_assets=None):
+        if adapter.w3.to_checksum_address(address).lower() == failed_vault_addr.lower():
+            raise ConnectionError("RPC connection failed")
+        return [AssetData(asset_address="0xToken", amount=1)]
+
+    monkeypatch.setattr(
+        adapter,
+        "_fetch_subvault_addresses",
+        fake_fetch_subvault_addresses,
+    )
+    monkeypatch.setattr(adapter, "_fetch_supported_assets", fake_fetch_supported_assets)
+    monkeypatch.setattr(adapter, "fetch_assets", fake_fetch_assets)
+
+    result = await adapter.fetch_all_assets()
+
+    assert len(result) == 2  # main vault + subvault_addr succeed
+    assert "RPC connection failed" in caplog.text
+
+
+def test_additional_assets_can_be_disabled(config):
+    config.additional_asset_support = False
+    config.adapters.idle_balances.extra_tokens = {
+        "TEST": "0x00000000000000000000000000000000000000AA"
+    }
+    config.adapters.idle_balances.extra_addresses = [
+        "0x00000000000000000000000000000000000000BB"
+    ]
+
+    adapter = IdleBalancesAdapter(config)
+
+    base_asset = adapter.w3.to_checksum_address(
+        "0x0000000000000000000000000000000000000001"
+    )
+    merged = adapter._merge_supported_assets([base_asset])
+
+    assert adapter._default_additional_assets == []
+    assert adapter._extra_additional_assets_by_symbol == {}
+    assert adapter._extra_addresses == []
+    assert merged == [base_asset]

@@ -13,6 +13,7 @@ def config():
         vault_address="0xVault",
         oracle_helper_address="0xOracleHelper",
         vault_rpc="https://eth.drpc.org",
+        block_number=23690139,
         network=Network.MAINNET,
         safe_address=None,
         dry_run=False,
@@ -31,6 +32,13 @@ def eth_address(config):
 @pytest.fixture
 def weth_address(config):
     address = config.assets["WETH"]
+    assert address is not None
+    return address
+
+
+@pytest.fixture
+def oseth_address(config):
+    address = config.assets["OSETH"]
     assert address is not None
     return address
 
@@ -128,6 +136,54 @@ async def test_fetch_prices_preserves_existing_prices(
     assert len(result.prices) == 2
     assert result.prices["0x111"] == Decimal(123)
     assert result.prices[weth_address] == Decimal("1")
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_oseth_uses_native_value(
+    mocker, config, eth_address, oseth_address
+):
+    adapter = ETHAdapter(config)
+    mock_price_wei = 987654321
+    mock_get_oseth_price = mocker.patch.object(
+        adapter, "_get_oseth_price", return_value=mock_price_wei
+    )
+
+    result = await adapter.fetch_prices(
+        [oseth_address], PriceData(base_asset=eth_address, prices={})
+    )
+
+    mock_get_oseth_price.assert_called_once()
+    expected_price = Decimal(mock_price_wei) / Decimal(10**18)
+    assert result.prices[oseth_address] == expected_price
+
+
+@pytest.mark.asyncio
+async def test_fetch_prices_oseth_skipped_when_disabled(
+    mocker, eth_address, oseth_address
+):
+    config = OracleSettings(
+        vault_address="0xVault",
+        oracle_helper_address="0xOracleHelper",
+        vault_rpc="https://eth.drpc.org",
+        block_number=23690139,
+        network=Network.MAINNET,
+        additional_asset_support=False,
+        dry_run=False,
+    )
+    adapter = ETHAdapter(config)
+    mocker.patch.object(
+        adapter,
+        "_get_oseth_price",
+        side_effect=AssertionError(
+            "Should not be called when additional assets disabled"
+        ),
+    )
+
+    result = await adapter.fetch_prices(
+        [oseth_address], PriceData(base_asset=eth_address, prices={})
+    )
+
+    assert oseth_address not in result.prices
 
 
 @pytest.mark.asyncio

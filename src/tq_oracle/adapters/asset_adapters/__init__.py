@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from .base import BaseAssetAdapter
 from .idle_balances import IdleBalancesAdapter
+from .streth import StrETHAdapter
 from .stakewise import StakeWiseAdapter
 
 ADAPTER_REGISTRY: dict[str, type[BaseAssetAdapter]] = {
     "idle_balances": IdleBalancesAdapter,
+    "streth": StrETHAdapter,
     "stakewise": StakeWiseAdapter,
 }
 
@@ -37,6 +39,7 @@ __all__ = [
     "ASSET_ADAPTERS",
     "ADAPTER_REGISTRY",
     "IdleBalancesAdapter",
+    "StrETHAdapter",
     "StakeWiseAdapter",
     "get_adapter_class",
 ]
