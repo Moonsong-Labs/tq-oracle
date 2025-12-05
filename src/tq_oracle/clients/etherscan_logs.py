@@ -1,17 +1,15 @@
-"""Etherscan Logs API client for fetching event logs.
+"""Etherscan Logs API client for fetching event logs."""
 
-This module provides a reusable client for the Etherscan logs/getLogs API endpoint
-"""
-
-from typing import Any, Sequence, TypedDict
+from typing import Any, cast
 
 import backoff
 import requests
+from eth_abi.codec import ABICodec
 from web3 import Web3
+from web3._utils.events import get_event_data
+from web3._utils.filters import construct_event_filter_params
 from web3.contract.contract import ContractEvent
 from web3.types import EventData
-
-from eth_typing import HexStr
 
 from ..logger import get_logger
 
@@ -23,42 +21,9 @@ ETHERSCAN_API_V2_URL = "https://api.etherscan.io/v2/api"
 class EtherscanRateLimitError(Exception):
     """Raised when Etherscan returns a rate limit error."""
 
-    pass
-
-
-class EtherscanLogsResult(TypedDict, total=False):
-    """Raw Etherscan API response for a single log entry."""
-
-    address: str
-    topics: list[str]
-    data: str
-    blockNumber: str
-    blockHash: str
-    timeStamp: str
-    gasPrice: str
-    gasUsed: str
-    logIndex: str
-    transactionHash: str
-    transactionIndex: str
-
-
-class EtherscanLogsResponse(TypedDict):
-    """Complete Etherscan logs API response."""
-
-    status: str
-    message: str
-    result: list[EtherscanLogsResult] | str
-
 
 class EtherscanLogsClient:
-    """Client for fetching event logs from Etherscan API v2.
-
-    Provides async-compatible log fetching with:
-    - Automatic pagination
-    - Exponential backoff retry logic
-    - Topic filtering support
-    - Conversion to Web3.py EventData format
-    """
+    """Client for fetching event logs from Etherscan API v2."""
 
     def __init__(
         self,
@@ -68,26 +33,17 @@ class EtherscanLogsClient:
         page_size: int = 1000,
         request_timeout: int = 15,
     ):
-        """Initialize the Etherscan logs client.
-
-        Args:
-            api_key: Etherscan API key
-            chain_id: Chain ID for the network (1 for mainnet, etc.)
-            api_url: Base API URL (defaults to Etherscan v2 API)
-            page_size: Number of results per page (max 1000)
-            request_timeout: HTTP request timeout in seconds
-        """
         self._api_key = api_key
         self._chain_id = chain_id
-        self._page_size = max(1, min(page_size, 1000))
-        self._request_timeout = request_timeout
+        self._page_size = min(page_size, 1000)
+        self._timeout = request_timeout
         self._session = requests.Session()
 
     def fetch_logs(
         self,
         event: ContractEvent,
         contract_address: str,
-        argument_filters: dict[str, str],
+        argument_filters: dict[str, Any],
         from_block: int,
         to_block: int,
     ) -> list[EventData] | None:
@@ -103,201 +59,145 @@ class EtherscanLogsClient:
         Returns:
             List of decoded EventData, or None if the request fails
         """
-        abi = getattr(event, "abi", None)
-        if not abi:
+        abi = event._get_event_abi()
+        codec: ABICodec = event.w3.codec
+        event_name = abi.get("name", "unknown")
+
+        # Use documented web3 internal API for filter params
+        try:
+            _, filter_params = construct_event_filter_params(
+                abi,
+                codec,
+                address=Web3.to_checksum_address(contract_address),
+                argument_filters=argument_filters,
+                from_block=from_block,
+                to_block=to_block,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Etherscan filter params failed — event=%s error=%s",
+                event_name,
+                exc,
+            )
             return None
 
-        topics = self._resolve_topics(event, argument_filters)
-        if not topics or not topics[0]:
+        topics: list[Any] = list(filter_params.get("topics") or [])
+        if not topics:
+            logger.warning(
+                "Etherscan query skipped — event=%s has no topics",
+                event_name,
+            )
             return None
 
         logs: list[EventData] = []
         page = 1
-        filter_desc = ", ".join(f"{k}={v}" for k, v in argument_filters.items())
 
         while True:
-            payload = self._call(
-                contract_address,
-                topics,
-                from_block,
-                to_block,
-                page,
-            )
-            if payload is None:
-                return None
+            result = self._call(contract_address, topics, from_block, to_block, page)
+            if result is None:
+                return None if page == 1 else logs
 
-            status = payload.get("status", "").strip()
-            message = payload.get("message", "").strip().lower()
-            result = payload.get("result")
-
-            if status != "1":
-                if isinstance(result, str) and result.lower() == "no records found":
-                    break
-                if message == "no records found":
-                    break
-                logger.warning(
-                    "Etherscan log query failed — event=%s filters={%s} blocks=[%d,%d] error=%s",
-                    event.event_name,
-                    filter_desc,
-                    from_block,
-                    to_block,
-                    payload.get("result") or payload.get("message"),
-                )
-                return None
-
-            if not isinstance(result, list):
-                logger.warning("Unexpected Etherscan logs result: %s", result)
-                return None
-
-            for raw_log in result:
-                decoded = self._process_log(event, raw_log)
-                if decoded is not None:
-                    logs.append(decoded)
+            for raw in result:
+                try:
+                    log_entry = self._to_log_entry(raw)
+                    logs.append(cast(EventData, get_event_data(codec, abi, log_entry)))
+                except Exception:
+                    continue
 
             if len(result) < self._page_size:
                 break
             page += 1
 
         logger.debug(
-            "Etherscan query — event=%s filter={%s} found=%d",
-            event.event_name,
-            filter_desc,
+            "Etherscan query — event=%s filters=%s found=%d",
+            abi.get("name", "unknown"),
+            argument_filters,
             len(logs),
         )
         return logs
 
     @backoff.on_exception(
         backoff.expo,
-        (requests.RequestException, ValueError, EtherscanRateLimitError),
+        (requests.RequestException, EtherscanRateLimitError),
         max_time=30,
         jitter=backoff.full_jitter,
     )
     def _call(
         self,
-        contract_address: str,
-        topics: Sequence[str | None],
+        address: str,
+        topics: list[Any],
         from_block: int,
         to_block: int,
         page: int,
-    ) -> EtherscanLogsResponse | None:
-        """Make a paginated request to the Etherscan logs API."""
+    ) -> list[dict[str, Any]] | None:
+        """Make a paginated request to Etherscan logs API."""
         params: dict[str, Any] = {
-            "chainid": str(self._chain_id),
+            "chainid": self._chain_id,
             "module": "logs",
             "action": "getLogs",
-            "address": contract_address,
-            "fromBlock": str(from_block),
-            "toBlock": str(to_block),
+            "address": address,
+            "fromBlock": from_block,
+            "toBlock": to_block,
             "page": page,
             "offset": self._page_size,
-            "sort": "asc",
             "apikey": self._api_key,
         }
 
-        # Add topic filters
-        topic0 = topics[0] if len(topics) > 0 else None
-        topic1 = topics[1] if len(topics) > 1 else None
-        topic2 = topics[2] if len(topics) > 2 else None
+        # Add topics - convert bytes to hex string for Etherscan API
+        for i, topic in enumerate(topics[:3]):
+            if topic is not None:
+                params[f"topic{i}"] = topic.hex() if isinstance(topic, bytes) else topic
+                if i > 0:
+                    params[f"topic0_{i}_opr"] = "and"
 
-        if topic0:
-            params["topic0"] = topic0
-        if topic1:
-            params["topic1"] = topic1
-            params["topic0_1_opr"] = "and"
-        if topic2:
-            params["topic2"] = topic2
-            params["topic0_2_opr"] = "and"
-
-        response = self._session.get(
-            ETHERSCAN_API_V2_URL,
-            params=params,
-            timeout=self._request_timeout,
+        resp = self._session.get(
+            ETHERSCAN_API_V2_URL, params=params, timeout=self._timeout
         )
-        response.raise_for_status()
+        resp.raise_for_status()
+        data = resp.json()
 
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise ValueError("Unexpected Etherscan payload format")
+        result = data.get("result", "")
+        message = data.get("message", "").lower()
 
-        result = payload.get("result", "")
-        if isinstance(result, str) and "rate limit" in result.lower():
-            raise EtherscanRateLimitError(result)
+        # Handle string results (errors)
+        if isinstance(result, str):
+            if "rate limit" in result.lower():
+                raise EtherscanRateLimitError(result)
+            if "no records" in result.lower():
+                return []
+            logger.debug("Etherscan returned error — result=%s", result)
+            return None
 
-        return payload  # type: ignore[return-value]
+        # Handle list results
+        if isinstance(result, list):
+            # Empty list with "No records found" message is valid (no events)
+            if not result and "no records" in message:
+                return []
+            # Success - return the results
+            if data.get("status") == "1":
+                return result
+            # Empty list with status=0 but no error message - treat as no records
+            if not result:
+                return []
 
-    def _resolve_topics(
-        self,
-        event: ContractEvent,
-        argument_filters: dict[str, str],
-    ) -> list[str | None]:
-        """Extract Ethereum log topics from a contract event with filters."""
-        try:
-            params = event._get_event_filter_params(event.abi, argument_filters)
-        except Exception:
-            return []
-
-        topics = params.get("topics") or []
-        resolved: list[str | None] = []
-
-        for index in range(len(topics)):
-            resolved.append(self._extract_topic(topics, index))
-
-        return resolved
+        logger.debug(
+            "Etherscan unexpected response — status=%s message=%s",
+            data.get("status"),
+            message,
+        )
+        return None
 
     @staticmethod
-    def _extract_topic(topics: Sequence[Any], index: int) -> str | None:
-        """Safely extract and convert a single topic to hex string."""
-        if len(topics) <= index:
-            return None
-
-        value = topics[index]
-        if isinstance(value, list):
-            value = value[0] if value else None
-        if value is None:
-            return None
-        if isinstance(value, (bytes, bytearray)):
-            if isinstance(value, bytearray):
-                value = bytes(value)
-            return Web3.to_hex(value)
-        if isinstance(value, str):
-            return value
-        return Web3.to_hex(value)
-
-    def _process_log(
-        self,
-        event: ContractEvent,
-        raw_log: EtherscanLogsResult,
-    ) -> EventData | None:
-        """Decode a raw Etherscan log using the contract event."""
-        try:
-            formatted = self._format_log(raw_log)
-            return event.process_log(formatted)
-        except Exception:
-            return None
-
-    @staticmethod
-    def _format_log(raw_log: EtherscanLogsResult) -> dict[str, Any]:
-        """Convert Etherscan API log format to Web3.py EventLog format."""
-
-        def to_int(value: str | None) -> int:
-            if not value:
-                return 0
-            return Web3.to_int(hexstr=HexStr(value))
-
-        data_hex = raw_log.get("data") or "0x"
-        block_hash_hex = raw_log.get("blockHash") or "0x0"
-        tx_hash_hex = raw_log.get("transactionHash") or "0x0"
-        topics_hex = raw_log.get("topics", []) or []
-
+    def _to_log_entry(raw: dict[str, Any]) -> dict[str, Any]:
+        """Convert Etherscan log to web3 log entry format."""
         return {
-            "address": raw_log.get("address"),
-            "blockHash": block_hash_hex,
-            "blockNumber": to_int(raw_log.get("blockNumber")),
-            "data": data_hex,
-            "logIndex": to_int(raw_log.get("logIndex")),
-            "topics": [
-                Web3.to_bytes(hexstr=HexStr(topic)) for topic in topics_hex if topic
-            ],
-            "transactionHash": tx_hash_hex,
-            "transactionIndex": to_int(raw_log.get("transactionIndex")),
+            "address": raw.get("address"),
+            "blockHash": bytes.fromhex(raw.get("blockHash", "0" * 66)[2:]),
+            "blockNumber": int(raw.get("blockNumber", "0x0"), 16),
+            "data": bytes.fromhex((raw.get("data") or "0x")[2:] or "00"),
+            "logIndex": int(raw.get("logIndex", "0x0"), 16),
+            "topics": [bytes.fromhex(t[2:]) for t in raw.get("topics", []) if t],
+            "transactionHash": bytes.fromhex(raw.get("transactionHash", "0" * 66)[2:]),
+            "transactionIndex": int(raw.get("transactionIndex", "0x0"), 16),
+            "removed": False,
         }
