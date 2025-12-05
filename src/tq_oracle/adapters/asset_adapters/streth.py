@@ -118,6 +118,12 @@ class StrETHAdapter(BaseAssetAdapter):
             )
             for asset, amount, _, _ in balances:
                 if amount != 0:
+                    if amount < 0:
+                        logger.warning(
+                            "Negative balance from strETH collector: asset=%s amount=%d",
+                            asset,
+                            amount,
+                        )
                     cumulative_amounts[asset] = (
                         cumulative_amounts.get(asset, 0) + amount
                     )
