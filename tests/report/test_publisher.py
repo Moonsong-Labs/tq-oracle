@@ -52,7 +52,7 @@ async def test_publish_to_stdout_prints_correct_json(
     """
     expected_dict = sample_report.to_dict()
 
-    await publish_to_stdout(sample_report, "0x2234567890123456789012345678901234567890")
+    await publish_to_stdout(sample_report, "0x2234567890123456789012345678901234567890", True)
 
     captured = capsys.readouterr()
     assert captured.err == ""

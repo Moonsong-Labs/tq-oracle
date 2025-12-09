@@ -21,7 +21,9 @@ from .generator import OracleReport
 logger = logging.getLogger(__name__)
 
 
-async def publish_to_stdout(report: OracleReport, oracle_address: str, indent: bool) -> None:
+async def publish_to_stdout(
+    report: OracleReport, oracle_address: str, indent: bool
+) -> None:
     """Publish report to stdout (dry run mode).
 
     Args:
@@ -200,7 +202,9 @@ async def publish_report(
     - If not dry_run and Broadcast mode: build transaction, send to Safe
     """
     if config.dry_run:
-        await publish_to_stdout(report, config.oracle_address, config.dry_run_report_indent)
+        await publish_to_stdout(
+            report, config.oracle_address, config.dry_run_report_indent
+        )
         return
 
     if config.is_broadcast:
